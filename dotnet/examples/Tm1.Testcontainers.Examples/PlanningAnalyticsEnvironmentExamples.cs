@@ -67,6 +67,21 @@ public static class PlanningAnalyticsEnvironmentExamples
         // @end
     }
 
+    public static async Task<string> Engine()
+    {
+        // @start region = engine
+        // TM1 11 and TM1 v12 side by side: a server, and an engine with two databases
+        await using var env = PlanningAnalyticsEnvironment
+            .Builder()
+            .Tm1("legacy")
+            .Tm1Engine(engine => engine.WithDatabase("planning").WithDatabase("sales").WithUser("analyst", "Analysts"))
+            .Build();
+        await env.StartAsync();
+        var planning = env.Tm1Database("planning");
+        return planning.RestUrl + " and " + env.Tm1("legacy").RestUrl;
+        // @end
+    }
+
     public static async Task<string> FromConfig()
     {
         // @start region = file

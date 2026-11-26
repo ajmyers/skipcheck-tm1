@@ -121,6 +121,9 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
             .WithCommand("--wiredTigerCacheSizeGB", "0.5");
         WithEnv("TM1_DATASTORE_URL", $"mongodb://{DatastoreUser}:{DatastorePassword}@{DatastoreAlias}:27017");
         DependsOn(Datastore);
+        // A network of their own unless one is given. It's made in Docker only when used.
+        ownNetwork = Network.NewNetwork();
+        WithNetwork(ownNetwork);
         MountSource();
     }
 
@@ -162,7 +165,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <exception cref="ArgumentException">The image can't take a name.</exception>
     public Tm1EngineContainer WithDatabase(string instance, string name)
     {
-        var database = RequireName(instance, "instance") + "/" + RequireName(name, "database");
+        var database = RequireInstance(instance) + "/" + RequireName(name, "database");
         if (!databases.Contains(database))
         {
             databases.Add(database);
@@ -266,7 +269,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <exception cref="InvalidOperationException">It isn't started, or TM1 refuses.</exception>
     public async Task<Tm1Database> CreateDatabaseAsync(string instance, string name, CancellationToken cancellationToken = default)
     {
-        var database = RequireName(instance, "instance") + "/" + RequireName(name, "database");
+        var database = RequireInstance(instance) + "/" + RequireName(name, "database");
         await ChangeAsync(["database", "create", database], cancellationToken, CreateTimeout, undo: ["database", "drop", database]).ConfigureAwait(false);
         return new Tm1Database(this, instance, name);
     }
@@ -292,6 +295,19 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
 
     /// <summary>Before anything starts: the datastore, which this depends on, starts ahead of <see cref="Configure"/>.</summary>
     private protected override void BeforeDependenciesStart() => JoinNetwork();
+
+    /// <summary>The datastore goes on the engine's network at once, not when the engine starts: whatever starts the
+    /// engine may start what it depends on first, and the datastore must be there by then.</summary>
+    private protected override void NetworkSet(Network? network)
+    {
+        // Null while the base class is still being made
+        Datastore?.WithNetwork(network);
+        if (!ReferenceEquals(network, ownNetwork))
+        {
+            // A network it was given is the giver's to remove
+            ownNetwork = null;
+        }
+    }
 
     /// <inheritdoc/>
     protected internal override void Configure()
@@ -336,13 +352,9 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         }
         if (ownNetwork is { } made)
         {
-            ownNetwork = null;
-            if (ReferenceEquals(Network, made))
-            {
-                // The next start makes another
-                WithNetwork(null);
-                Datastore.WithNetwork(null);
-            }
+            // Another for the next start, as a new engine has
+            ownNetwork = Network.NewNetwork();
+            WithNetwork(ownNetwork);
             try
             {
                 await made.DisposeAsync().ConfigureAwait(false);
@@ -362,6 +374,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <summary>Puts the engine and its datastore on one network: the one given, or a new one.</summary>
     private void JoinNetwork()
     {
+        // Only if it was taken off its network (WithNetwork(null)): it has had one since it was made
         if (Network is null)
         {
             ownNetwork = Network.NewNetwork();
@@ -538,6 +551,15 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         }
     }
 
+    private static string RequireInstance(string name)
+    {
+        if (name is null || !InstanceName().IsMatch(name))
+        {
+            throw new ArgumentException($"A TM1 instance's name is letters, digits, '_' and '-', starting with a letter or digit: {name}", nameof(name));
+        }
+        return name;
+    }
+
     private static string RequireName(string name, string what)
     {
         if (name is null || !DatabaseName().IsMatch(name))
@@ -553,6 +575,10 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     // The image's own rule: at least three characters, and nothing the commands or a URL would need quoting for
     [GeneratedRegex(@"\A[A-Za-z0-9][A-Za-z0-9_-]{2,}\z")]
     private static partial Regex DatabaseName();
+
+    // An instance's name has no least length: only a database's does
+    [GeneratedRegex(@"\A[A-Za-z0-9][A-Za-z0-9_-]*\z")]
+    private static partial Regex InstanceName();
 
     [GeneratedRegex(@"\A[A-Za-z0-9._-]+\z")]
     private static partial Regex UserName();

@@ -121,6 +121,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     public TSelf WithNetwork(Network? network)
     {
         Network = network;
+        NetworkSet(network);
         return Self;
     }
 
@@ -285,6 +286,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
 
     /// <summary>Runs as it starts, before what it depends on does: Java's containers override <c>start()</c> for this.</summary>
     private protected virtual void BeforeDependenciesStart() { }
+
+    /// <summary>Runs whenever <see cref="WithNetwork"/> sets the network: for a container that takes another with it,
+    /// as Java's containers override <c>withNetwork</c>.</summary>
+    private protected virtual void NetworkSet(Network? network) { }
 
     /// <summary>Runs when starting failed, whatever failed, before the failure is thrown on: for a container that
     /// must leave nothing behind then. It mustn't throw, or its failure would hide the start's.</summary>

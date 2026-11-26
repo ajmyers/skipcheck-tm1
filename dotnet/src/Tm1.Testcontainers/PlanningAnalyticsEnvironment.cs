@@ -84,6 +84,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     private readonly PawContainer? paw;
     private readonly CognosContainer? cognos;
     private readonly KeycloakContainer? keycloak;
+    private readonly Tm1EngineContainer? tm1Engine;
 
     private PlanningAnalyticsEnvironment(EnvironmentBuilder b, bool reuseEnabled)
     {
@@ -114,24 +115,28 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             }
             b.CognosCustomizer(cognos);
         }
-        var tm1Source = b.Get(
-            b.Tm1SourceSet,
-            ibm => new Tm1Source.Bundle(ibm),
-            Tm1Source.Discover,
-            image => new Tm1Source.PrivateImage(image),
-            b.Tm1Image,
-            Xunit.RequiresTm1FactAttribute.NoSourceMessage
-        );
+        // TM1 11's parts, when there's a server: an environment may be a TM1 v12 engine alone
+        var tm1Source =
+            b.Tm1Names.Count == 0
+                ? null
+                : b.Get(
+                    b.Tm1SourceSet,
+                    ibm => new Tm1Source.Bundle(ibm),
+                    Tm1Source.Discover,
+                    image => new Tm1Source.PrivateImage(image),
+                    b.Tm1Image,
+                    Xunit.RequiresTm1FactAttribute.NoSourceMessage
+                );
         var tm1Image = Runs(b.Tm1Image, tm1Source is Tm1Source.PrivateImage) ? b.Tm1Image : null;
         AdminServer =
-            b.AdminServerCustomizer is not null || b.Tm1Customizers.Count > 1
+            tm1Source is not null && (b.AdminServerCustomizer is not null || b.Tm1Customizers.Count > 1)
                 ? (tm1Image is not null ? new Tm1AdminServerContainer(tm1Image, tm1Source) : new Tm1AdminServerContainer(tm1Source)).WithNetwork(network)
                 : null;
         var servers = new Dictionary<string, Tm1ServerContainer>(StringComparer.Ordinal);
         var order = new List<string>();
         foreach (var name in b.Tm1Names)
         {
-            var server = (tm1Image is not null ? new Tm1ServerContainer(tm1Image, tm1Source) : new Tm1ServerContainer(tm1Source))
+            var server = (tm1Image is not null ? new Tm1ServerContainer(tm1Image, tm1Source!) : new Tm1ServerContainer(tm1Source!))
                 .WithNetwork(network)
                 .WithNetworkAliases(name)
                 .WithEnv("TM1_SERVER_NAME", name);
@@ -147,8 +152,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             order.Add(name);
         }
         Tm1Servers = new OrderedServers(order, servers);
-        var first = servers[order[0]];
-        if (b.Tm1WebCustomizer is not null)
+        // Build() has checked that TM1 Web and PAW come with a server
+        var first = order.Count == 0 ? null : servers[order[0]];
+        if (b.Tm1WebCustomizer is not null && first is not null)
         {
             var source = b.Get(
                 b.Tm1WebSourceSet,
@@ -170,7 +176,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 tm1Web.DependsOn(server);
             }
         }
-        if (b.PawCustomizer is not null)
+        if (b.PawCustomizer is not null && first is not null)
         {
             paw = new PawContainer(
                 b.Get(b.PawSourceSet, b.PawFromIbm, PawSource.Discover, null, null, Xunit.RequiresPawFactAttribute.NoSourceMessage)
@@ -180,6 +186,24 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 paw.WithAdminServer(AdminServer);
             }
         }
+        if (b.Tm1EngineCustomizer is not null)
+        {
+            var source = b.Get(
+                b.Tm1EngineSourceSet,
+                ibm => new Tm1EngineSource.Bundle(ibm),
+                Tm1EngineSource.Discover,
+                image => new Tm1EngineSource.PrivateImage(image),
+                b.Tm1EngineImage,
+                Xunit.RequiresTm1EngineFactAttribute.NoSourceMessage
+            );
+            // Its datastore goes on the same network with it, at once
+            tm1Engine = (
+                Runs(b.Tm1EngineImage, source is Tm1EngineSource.PrivateImage)
+                    ? new Tm1EngineContainer(b.Tm1EngineImage, source)
+                    : new Tm1EngineContainer(source)
+            ).WithNetwork(network);
+        }
+        // The callers' own settings last, so they can change anything set above
         Apply(b.AdminServerCustomizer, AdminServer);
         foreach (var name in order)
         {
@@ -188,6 +212,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         Apply(b.Tm1WebCustomizer, tm1Web);
         Apply(b.PawCustomizer, paw);
         Apply(b.KeycloakCustomizer, keycloak);
+        Apply(b.Tm1EngineCustomizer, tm1Engine);
     }
 
     /// <summary>A builder for an environment.</summary>
@@ -210,8 +235,12 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <see cref="EnvironmentBuilder.CamSecurity"/>, by default LDAP with the first user as administrator;</item>
     /// <item><c>paw</c>: <see cref="EnvironmentBuilder.Paw"/> with <see cref="PawContainer.AcceptLicense"/>, which the file must say
     /// (<c>acceptLicense: true</c>); the zip is <c>zip</c> in <c>ibm</c>, or the newest there;</item>
+    /// <item><c>tm1Engine</c>: <see cref="EnvironmentBuilder.Tm1Engine()"/>, with each of <c>databases</c> as
+    /// <see cref="Tm1EngineContainer.WithDatabase(string, string)"/> in its <c>instance</c>, and <c>users</c> as
+    /// <see cref="Tm1EngineContainer.WithUser"/> (a user's password is checked and not used: TM1 v12 keeps none). It runs
+    /// beside <c>tm1</c>, or alone;</item>
     /// <item><c>ibm</c>: each part's source, the folder as <see cref="Testcontainers.Tm1Source.Bundle"/>,
-    /// <see cref="Testcontainers.Tm1WebSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
+    /// <see cref="Testcontainers.Tm1WebSource.Bundle"/>, <see cref="Testcontainers.Tm1EngineSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
     /// file's folder; <c>~</c> is the user's home;</item>
     /// <item><c>images</c>: the image each part runs, as a container's image argument. A part with no other source takes its image as
     /// the private image with IBM's software built in (<see cref="Testcontainers.Tm1Source.PrivateImage"/> and the like).</item>
@@ -220,7 +249,7 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// pa-setup's <c>.env</c> sets, such as <c>TM1_BUNDLE_URL</c>), else its image as a private image.</para>
     /// <para>Ignored, because they place things on the host that Testcontainers manages itself: <c>name</c> (the compose project; the
     /// environment has its own network), every <c>port</c>, <c>adminPort</c> and <c>keycloakPort</c> (Testcontainers maps random host
-    /// ports), and <c>files</c> (the host folder pa-setup keeps databases in; each test environment starts from a new database, or one
+    /// ports), <c>tm1Engine.datastore</c> and <c>images.mongo</c> (the engine's MongoDB is its own here), and <c>files</c> (the host folder pa-setup keeps databases in; each test environment starts from a new database, or one
     /// copied in with <see cref="Tm1ServerContainer.WithData"/>). They're still checked as <c>pa-setup</c> checks them.</para>
     /// <para>Refused, because the environment can't run them yet: <c>cognos</c> without <c>tm1.servers</c>, and
     /// <c>seed: 24retail</c>.</para>
@@ -302,6 +331,16 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <exception cref="InvalidOperationException">It wasn't added.</exception>
     public KeycloakContainer Keycloak() => Require(keycloak, "Keycloak", "Keycloak()");
 
+    /// <summary>The TM1 v12 engine.</summary>
+    /// <exception cref="InvalidOperationException">It wasn't added.</exception>
+    public Tm1EngineContainer Tm1Engine() => Require(tm1Engine, "TM1 v12 engine", "Tm1Engine()");
+
+    /// <summary>A database of the TM1 v12 engine, in the instance <c>tm1</c>; for another instance's, use
+    /// <c>Tm1Engine().Database(instance, name)</c>.</summary>
+    /// <exception cref="InvalidOperationException">The environment has no engine.</exception>
+    /// <exception cref="ArgumentException">The engine has no such database.</exception>
+    public Tm1Database Tm1Database(string name) => Tm1Engine().Database(name);
+
     /// <summary>The network everything is on.</summary>
     public Network Network { get; }
 
@@ -375,6 +414,9 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             case CognosContainer cognos:
                 d.Append(" source=").Append(cognos.Source).Append(" users=").Append(cognos.UsersSpec());
                 break;
+            case Tm1EngineContainer engine:
+                d.Append(" source=").Append(engine.Source);
+                break;
         }
         return d.ToString();
     }
@@ -387,7 +429,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     private static string Map(IEnumerable<KeyValuePair<string, string>> map) =>
         "{" + string.Join(", ", map.OrderBy(e => e.Key, StringComparer.Ordinal).Select(e => e.Key + "=" + e.Value)) + "}";
 
-    /// <summary>Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, PAW.</summary>
+    /// <summary>Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, the TM1 v12
+    /// engine (which starts and stops its own datastore), PAW.</summary>
     internal List<IStartable> Containers()
     {
         var all = new List<IStartable>();
@@ -407,6 +450,11 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         if (tm1Web is not null)
         {
             all.Add(tm1Web);
+        }
+        // Beside TM1 11's parts: nothing of theirs depends on it, nor it on them
+        if (tm1Engine is not null)
+        {
+            all.Add(tm1Engine);
         }
         if (paw is not null)
         {
@@ -470,6 +518,10 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         internal Action<KeycloakContainer>? KeycloakCustomizer { get; private set; }
 
+        internal Action<Tm1EngineContainer>? Tm1EngineCustomizer { get; private set; }
+
+        internal Tm1EngineSource? Tm1EngineSourceSet { get; private set; }
+
         internal CognosContainer.Namespace CamNamespaceSet { get; private set; } = CognosContainer.Namespace.Ldap;
 
         internal IReadOnlyList<string> CamAdminsSet { get; private set; } = [];
@@ -498,6 +550,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         internal string? CognosImage { get; set; }
 
         internal string? KeycloakImage { get; set; }
+
+        internal string? Tm1EngineImage { get; set; }
 
         /// <summary>Adds a TM1 server, named <paramref name="name"/> (its server name and network alias).</summary>
         public EnvironmentBuilder Tm1(string name) => Tm1(name, _ => { });
@@ -564,6 +618,17 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
+        /// <summary>Adds a TM1 v12 engine, with one database, <c>tm1</c>. It runs beside the TM1 servers, or alone: an
+        /// environment needs a server or an engine.</summary>
+        public EnvironmentBuilder Tm1Engine() => Tm1Engine(_ => { });
+
+        /// <summary>Adds a TM1 v12 engine, changed with <paramref name="customizer"/>: its databases and users, for instance.</summary>
+        public EnvironmentBuilder Tm1Engine(Action<Tm1EngineContainer> customizer)
+        {
+            Tm1EngineCustomizer = customizer ?? throw new ArgumentNullException(nameof(customizer));
+            return this;
+        }
+
         /// <summary>The CAM namespace and the TM1 administrators (by default, the first test user).</summary>
         public EnvironmentBuilder CamSecurity(CognosContainer.Namespace @namespace, params string[] admins)
         {
@@ -600,6 +665,13 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
+        /// <summary>Where the engine gets TM1 v12 from, rather than <see cref="Testcontainers.Tm1EngineSource.Discover()"/>.</summary>
+        public EnvironmentBuilder Tm1EngineSource(Tm1EngineSource source)
+        {
+            Tm1EngineSourceSet = source ?? throw new ArgumentNullException(nameof(source));
+            return this;
+        }
+
         /// <summary>The network to use, rather than a new one (which the environment removes when it stops).</summary>
         public EnvironmentBuilder Network(Testcontainers.Network network)
         {
@@ -629,9 +701,22 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
         /// <summary>Builds, with the developer's reuse switch given, so tests needn't set it.</summary>
         internal PlanningAnalyticsEnvironment Build(bool reuseEnabled)
         {
-            if (Tm1Names.Count == 0)
+            if (Tm1Names.Count == 0 && Tm1EngineCustomizer is null)
             {
-                throw new InvalidOperationException("Add at least one TM1 server with Tm1(name)");
+                throw new InvalidOperationException("Add at least one TM1 server with Tm1(name), or a TM1 v12 engine with Tm1Engine()");
+            }
+            if (
+                Tm1Names.Count == 0
+                && (AdminServerCustomizer is not null || Tm1WebCustomizer is not null || PawCustomizer is not null || CognosCustomizer is not null)
+            )
+            {
+                throw new InvalidOperationException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: add a TM1 server with Tm1(name)");
+            }
+            if (ReuseSet && Tm1EngineCustomizer is not null)
+            {
+                throw new InvalidOperationException(
+                    "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, and a kept one keeps every database tests left"
+                );
             }
             if (KeycloakCustomizer is not null && CognosCustomizer is null)
             {
