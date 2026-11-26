@@ -6,7 +6,8 @@ Run tests against a real IBM Planning Analytics (TM1) server in Docker, with
 [testcontainers-python](https://testcontainers-python.readthedocs.io). The Python port of the
 Java [`tm1-testcontainers`](../../java/tm1-testcontainers/README.md) module: the same classes, sources,
 settings, images, mounts and messages, named the Python way. Built on the
-[`tm1-server`](../../docker/tm1-server) image.
+[`tm1-server`](../../docker/tm1-server) image, and on [`tm1-engine`](../../docker/tm1-engine) for
+[TM1 v12](#tm1-v12).
 
 > **No IBM software is included.** You supply your own licensed TM1 Server for Linux, and
 > you're responsible for following your IBM license terms. Without it, tests that need TM1
@@ -72,6 +73,68 @@ A bundle is unpacked into the `tm1-testcontainers-cache` volume once, shared wit
 `ghcr.io/ajmyers/tm1-server`, tagged `edge` for development versions). Cognos (`COGNOS_*`), TM1
 Web (`TM1_WEB_*`) and PAW (`PAW_ZIP`, `PAW_BUNDLE_DIR`, `PAW_ACCEPT_LICENSE`) read Java's
 settings too.
+
+## TM1 v12
+
+TM1 v12, the TM1 engine of Planning Analytics 3.x, runs from the
+[`tm1-engine`](../../docker/tm1-engine) image, beside the MongoDB it keeps its metadata in. One
+engine holds instances, each holding databases, and has no passwords of its own: a test logs in by
+user name, through the instance's application.
+
+```python
+import httpx2
+import pytest
+
+pytestmark = pytest.mark.requires_tm1_engine
+
+
+def test_lists_cubes(tm1_database):
+    url = tm1_database.rest_url  # http://localhost:54321/tm1/api/v1/Databases('testcubes_k3f9')/
+    headers = tm1_database.login().authorize({})  # the session cookie of admin
+    assert httpx2.get(url + "Cubes?$select=Name", headers=headers).status_code == 200
+```
+
+`requires_tm1_engine` and the fixtures are Java's `@RequiresTm1Engine`:
+
+- **Skipped** without Docker or a TM1 v12 source; a source that's configured but wrong fails.
+- **`tm1_engine`** is `Tm1EngineContainer.shared()`: one engine per test process, started on first
+  use (about 40 seconds) and removed when the session ends. It's never kept for reuse: an engine
+  and its datastore belong together.
+- **`tm1_database`** is a database of the **test module's own**, created when a test of the module
+  first asks for it (about 10 seconds) and dropped when the module is done. Java gives each test
+  class a database; the module, a test file, is that unit in pytest. It's named after the module,
+  as `testcubes_k3f9` for `test_cubes.py`.
+- **`@pytest.mark.requires_tm1_engine(share_database=True)`** gives the tests it marks the engine's
+  one shared database, `tm1`, instead, at no cost: give their objects unique names and delete
+  them. The marker nearest the test counts: its own, then its class's, then its module's.
+- **`min_version="12.6"`** skips the tests on an older engine. Checking it starts the engine.
+
+`db.login("analyst")` is a `Tm1Login` as that user: `cookie()` and `authorize(headers)` log in for
+you, `token()` gets the application's bearer token, and `client_id`, `client_secret` and `user` are
+for a client that logs in itself. An engine of your own has the databases and users you name:
+
+```python
+from skipcheck_tm1_testcontainers import Tm1EngineContainer, Tm1EngineSource
+
+with Tm1EngineContainer(Tm1EngineSource.Bundle("/path/to/ibm-downloads")).with_database("planning").with_user("analyst", "Analysts") as engine:
+    planning = engine.database("planning")
+    scratch = engine.create_database("scratch")  # and engine.drop_database(scratch)
+```
+
+`Tm1EngineSource.discover()` reads these, in this order:
+
+| Setting | Source |
+|---|---|
+| `TM1_ENGINE_PRIVATE_IMAGE` | `Tm1EngineSource.PrivateImage`: an image with TM1 v12 built in |
+| `TM1_ENGINE_HOME_DIR` | `Tm1EngineSource.InstallDir`: an install the image made (`bin/tm1sd.exe`), mounted read-only |
+| `TM1_ENGINE_INSTALL_VOLUME` | `Tm1EngineSource.InstallVolume`: a Docker volume holding such an install |
+| `TM1_ENGINE_BUNDLE_DIR` (`TM1_ENGINE_BUNDLE`) | `Tm1EngineSource.Bundle`: a folder holding IBM's `tm1-v<version>-standalone-linux.tgz` (the newest, or the one named) |
+| `TM1_ENGINE_BUNDLE_URL` (`TM1_ENGINE_BUNDLE_SHA256`) | `Tm1EngineSource.BundleUrl`: a link to the package |
+| `TM1_BUNDLE_DIR` | TM1 11's downloads folder, when it holds a TM1 v12 package too: one folder serves both |
+
+A package is installed into the `tm1-engine-testcontainers-cache` volume once. `TM1_ENGINE_IMAGE`
+replaces the `tm1-engine` image (default `ghcr.io/ajmyers/tm1-engine`, tagged `edge` for development
+versions), e.g. `tm1-engine:local` for one you built.
 
 ## More than one server
 
@@ -156,6 +219,11 @@ env.start()  # seconds, once a run with this configuration has started it
 | `IllegalArgumentException`, `IllegalStateException` | `ValueError`, `RuntimeError` |
 | `Network.newNetwork()` | `Network.new_network()`: created when a container first starts on it |
 | `@RequiresTm1` and its `Tm1ServerContainer` parameter | `@pytest.mark.requires_tm1` and the `tm1_server` fixture |
+| `@RequiresTm1Engine(shareDatabase = true, minVersion = "12.6")` and its `Tm1EngineContainer` and `Tm1Database` parameters | `@pytest.mark.requires_tm1_engine(share_database=True, min_version="12.6")` and the `tm1_engine` and `tm1_database` fixtures |
+| A database per test class | A database per test module (file) |
+| `withDatabase(name)`, `withDatabase(instance, name)`; the same for `database` and `createDatabase` | `with_database(name)`, `with_database(instance, name)`, in Java's order |
+| `login.authorize(HttpRequest.Builder)` | `login.authorize(headers)`: a dict of headers, or an `httpx2.Request` |
+| `equals`, `hashCode`, `toString` | `==`, `hash()`, `repr()` |
 | `withReuse(true)` | `with_reuse(True)`, honoured when `testcontainers.reuse.enable=true` (testcontainers-python has no reuse of its own) |
 
 Containers are set up without Docker, as Java's are, so wiring is tested anywhere; they connect

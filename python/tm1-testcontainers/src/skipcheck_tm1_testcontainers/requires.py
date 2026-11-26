@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from . import cognos, paw, tm1, web
+from . import cognos, engine, paw, tm1, web
 
-__all__ = ["RequiresCognos", "RequiresPaw", "RequiresTm1", "RequiresTm1Web"]
+__all__ = ["RequiresCognos", "RequiresPaw", "RequiresTm1", "RequiresTm1Engine", "RequiresTm1Web"]
 
 
 class RequiresTm1:
@@ -22,6 +22,35 @@ class RequiresTm1:
 
     NO_SOURCE_MESSAGE = tm1.NO_SOURCE_MESSAGE
     mark = pytest.mark.requires_tm1
+
+
+class RequiresTm1Engine:
+    """Runs a test against a real TM1 v12 engine, and skips it when there isn't one: ``mark`` is the
+    marker (``@RequiresTm1Engine.mark``, or ``@pytest.mark.requires_tm1_engine``). For TM1 11, use
+    :class:`RequiresTm1`.
+
+    Tests are skipped, not failed, when Docker isn't available or no :class:`Tm1EngineSource` is
+    configured, so a build without IBM software stays green. A source that is configured but wrong
+    fails instead.
+
+    One engine serves the whole test session (:meth:`Tm1EngineContainer.shared`, the ``tm1_engine``
+    fixture), and **each test module gets a database of its own** (the ``tm1_database`` fixture),
+    created when a test of the module first asks for it and dropped when the module is done. So
+    modules don't see each other's objects. Java's "test class" is the unit a test framework shares
+    set-up over: in pytest that's the module, a test file.
+
+    A database takes about 10 seconds to create and 7 to drop.
+    ``@pytest.mark.requires_tm1_engine(share_database=True)`` gives the tests it marks the engine's
+    one shared database, ``tm1``, instead, at no cost: they then need uniquely named objects, and to
+    delete them afterwards. ``min_version="12.6"`` skips them on an older engine; checking it starts
+    the engine. The marker nearest the test counts: its own, then its class's, then its module's."""
+
+    NO_SOURCE_MESSAGE = engine.NO_SOURCE_MESSAGE
+    mark = pytest.mark.requires_tm1_engine
+    share_database = False
+    """The marker's ``share_database`` unless it's given: a database of the module's own."""
+    min_version = ""
+    """The marker's ``min_version`` unless it's given: any version."""
 
 
 class RequiresCognos:

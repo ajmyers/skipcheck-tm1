@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Testcontainers for IBM Planning Analytics (TM1): TM1 Server, the Admin Server, TM1 Web,
-Planning Analytics Workspace, Cognos Analytics and Keycloak in Docker, for tests. The Python port
+"""Testcontainers for IBM Planning Analytics (TM1): TM1 Server, the Admin Server, the TM1 v12
+engine, TM1 Web, Planning Analytics Workspace, Cognos Analytics and Keycloak in Docker, for tests. The Python port
 of the Java ``tm1-testcontainers`` module, on testcontainers-python.
 
 No IBM software is included: a source (:class:`Tm1Source` and the others) supplies it.
@@ -9,10 +9,11 @@ No IBM software is included: a source (:class:`Tm1Source` and the others) suppli
 
 from ._container import GenericContainer, Network, docker_available, reuse_enabled
 from .cognos import CognosContainer, KeycloakContainer, Namespace, User
+from .engine import Tm1Database, Tm1EngineContainer, Tm1Login
 from .environment import PlanningAnalyticsEnvironment
 from .paw import PawContainer, PawSession
-from .requires import RequiresCognos, RequiresPaw, RequiresTm1, RequiresTm1Web
-from .sources import CognosSource, PawSource, Tm1Source, Tm1WebSource
+from .requires import RequiresCognos, RequiresPaw, RequiresTm1, RequiresTm1Engine, RequiresTm1Web
+from .sources import CognosSource, PawSource, Tm1EngineSource, Tm1Source, Tm1WebSource
 from .tm1 import Tm1AdminServerContainer, Tm1Seed, Tm1ServerContainer
 from .web import Tm1WebContainer
 
@@ -30,8 +31,13 @@ __all__ = [
     "RequiresCognos",
     "RequiresPaw",
     "RequiresTm1",
+    "RequiresTm1Engine",
     "RequiresTm1Web",
     "Tm1AdminServerContainer",
+    "Tm1Database",
+    "Tm1EngineContainer",
+    "Tm1EngineSource",
+    "Tm1Login",
     "Tm1Seed",
     "Tm1ServerContainer",
     "Tm1Source",

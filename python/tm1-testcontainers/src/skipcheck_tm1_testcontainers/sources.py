@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Where each product comes from: Java's ``Tm1Source``, ``CognosSource``, ``Tm1WebSource`` and
-``PawSource``.
+"""Where each product comes from: Java's ``Tm1Source``, ``CognosSource``, ``Tm1WebSource``,
+``PawSource`` and ``Tm1EngineSource``.
 
 No IBM software is in the images, so a source supplies it: an image with it built in, an
 installed folder, a Docker volume holding an install, a folder holding IBM's download, or a link
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import ClassVar
 from urllib.parse import urlsplit
 
-__all__ = ["CognosSource", "Lookup", "PawSource", "Tm1Source", "Tm1WebSource", "setting"]
+__all__ = ["CognosSource", "Lookup", "PawSource", "Tm1EngineSource", "Tm1Source", "Tm1WebSource", "setting"]
 
 Lookup = Callable[[str], str | None] | Mapping[str, str]
 """How ``discover`` reads a setting: a function from its name to its value (``dict.get``), or a
@@ -500,3 +500,150 @@ def _newest_zip(folder: Path) -> Path:
     if not zips:
         raise ValueError(f"{PawSource.BUNDLE_DIR} has no {_PAW_PREFIX}*.zip: {_absolute(folder)}")
     return max(zips, key=lambda f: f.stat().st_mtime)
+
+
+# --- TM1 v12 -----------------------------------------------------------------------------------
+
+
+class Tm1EngineSource:
+    """Where a :class:`Tm1EngineContainer` gets TM1 v12 from, as the ``tm1-engine`` image takes it.
+    One of :class:`Tm1EngineSource.PrivateImage`, :class:`Tm1EngineSource.InstallDir`,
+    :class:`Tm1EngineSource.InstallVolume`, :class:`Tm1EngineSource.Bundle` or
+    :class:`Tm1EngineSource.BundleUrl`. The image contains no IBM software, so every container
+    needs one. For TM1 11, see :class:`Tm1Source`."""
+
+    PRIVATE_IMAGE: ClassVar[str] = "TM1_ENGINE_PRIVATE_IMAGE"
+    HOME_DIR: ClassVar[str] = "TM1_ENGINE_HOME_DIR"
+    INSTALL_VOLUME: ClassVar[str] = "TM1_ENGINE_INSTALL_VOLUME"
+    BUNDLE_DIR: ClassVar[str] = "TM1_ENGINE_BUNDLE_DIR"
+    BUNDLE: ClassVar[str] = "TM1_ENGINE_BUNDLE"
+    BUNDLE_URL: ClassVar[str] = "TM1_ENGINE_BUNDLE_URL"
+    BUNDLE_SHA256: ClassVar[str] = "TM1_ENGINE_BUNDLE_SHA256"
+
+    PrivateImage: ClassVar[type[_EnginePrivateImage]]
+    InstallDir: ClassVar[type[_EngineInstallDir]]
+    InstallVolume: ClassVar[type[_EngineInstallVolume]]
+    Bundle: ClassVar[type[_EngineBundle]]
+    BundleUrl: ClassVar[type[_EngineBundleUrl]]
+
+    def describe(self) -> str:
+        """A short description for logs and messages. Never includes a URL's query string."""
+        raise NotImplementedError
+
+    @staticmethod
+    def discover(lookup: Lookup | None = None) -> Tm1EngineSource | None:
+        """The first source set, in this order: ``TM1_ENGINE_PRIVATE_IMAGE``, ``TM1_ENGINE_HOME_DIR``,
+        ``TM1_ENGINE_INSTALL_VOLUME``, ``TM1_ENGINE_BUNDLE_DIR`` (with ``TM1_ENGINE_BUNDLE``),
+        ``TM1_ENGINE_BUNDLE_URL`` (with ``TM1_ENGINE_BUNDLE_SHA256``), then ``TM1_BUNDLE_DIR``, TM1 11's
+        downloads folder, when it holds a ``tm1-v*-standalone-linux.tgz`` too: one folder then
+        serves both versions. None if none is."""
+        get = _getter(lookup)
+        if (image := get(Tm1EngineSource.PRIVATE_IMAGE)) is not None:
+            return Tm1EngineSource.PrivateImage(image)
+        if (home := get(Tm1EngineSource.HOME_DIR)) is not None:
+            return Tm1EngineSource.InstallDir(Path(home))
+        if (volume := get(Tm1EngineSource.INSTALL_VOLUME)) is not None:
+            return Tm1EngineSource.InstallVolume(volume)
+        if (folder := get(Tm1EngineSource.BUNDLE_DIR)) is not None:
+            return Tm1EngineSource.Bundle(Path(folder), get(Tm1EngineSource.BUNDLE))
+        if (url := get(Tm1EngineSource.BUNDLE_URL)) is not None:
+            return Tm1EngineSource.BundleUrl(url, get(Tm1EngineSource.BUNDLE_SHA256))
+        # The TM1 downloads folder, when it holds TM1 v12 too. Skipped quietly when it doesn't:
+        # that folder is TM1 11's setting, and is valid without v12 in it.
+        tm1_dir = get(Tm1Source.BUNDLE_DIR)
+        if tm1_dir is not None and (
+            get(Tm1EngineSource.BUNDLE) is not None or _has_file(Path(tm1_dir), lambda n: n.startswith("tm1-v") and n.endswith("-standalone-linux.tgz"))
+        ):
+            return Tm1EngineSource.Bundle(Path(tm1_dir), get(Tm1EngineSource.BUNDLE))
+        return None
+
+
+@dataclass(frozen=True)
+class _EnginePrivateImage(Tm1EngineSource):
+    """An image built on ``tm1-engine`` with TM1 inside, from a private registry. It contains IBM
+    software, so it must never be pushed anywhere public."""
+
+    image: str
+
+    def __post_init__(self) -> None:
+        _require_text(self.image, "image")
+
+    def describe(self) -> str:
+        return f"private image {self.image}"
+
+
+@dataclass(frozen=True)
+class _EngineInstallDir(Tm1EngineSource):
+    """A TM1 v12 install the ``tm1-engine`` image made (``install`` as its command), as a folder:
+    the one containing ``bin/tm1sd.exe``. Mounted read-only. An install made by IBM's installer
+    isn't one."""
+
+    dir: Path
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "dir", _absolute(self.dir))
+        if not (self.dir / "bin" / "tm1sd.exe").is_file():
+            raise ValueError(
+                f"Not a TM1 v12 install: {self.dir} has no bin/tm1sd.exe. Point {Tm1EngineSource.HOME_DIR} at an install the tm1-engine image made."
+            )
+
+    def describe(self) -> str:
+        return f"install folder {self.dir}"
+
+
+@dataclass(frozen=True)
+class _EngineInstallVolume(Tm1EngineSource):
+    """A named Docker volume holding an install the ``tm1-engine`` image made. If the volume is
+    empty, the container fails to start, since there's nothing to install from."""
+
+    name: str
+
+    def __post_init__(self) -> None:
+        _require_text(self.name, "name")
+
+    def describe(self) -> str:
+        return f"install volume {self.name}"
+
+
+@dataclass(frozen=True)
+class _EngineBundle(Tm1EngineSource):
+    """A folder holding IBM's ``tm1-v<version>-standalone-linux.tgz``, mounted read-only: the
+    newest, or ``file`` within it. The image installs TM1 from it on first start into a shared
+    cache volume, so later starts are fast. The folder can hold TM1 11, TM1 Web and Cognos
+    downloads too: each image picks its own."""
+
+    dir: Path
+    file: str | None = None
+
+    def __post_init__(self) -> None:
+        _folder_and_file(self, Tm1EngineSource.BUNDLE_DIR, Tm1EngineSource.BUNDLE, "package")
+
+    def describe(self) -> str:
+        return "package " + (str(self.dir / self.file) if self.file is not None else f"{self.dir} (newest)")
+
+
+@dataclass(frozen=True)
+class _EngineBundleUrl(Tm1EngineSource):
+    """A download link for IBM's package, such as a pre-signed S3, R2 or GCS URL. Links can carry
+    credentials in the query string or the user-info part, so neither is ever logged."""
+
+    url: str
+    sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_text(self.url, "url")
+        _blank_to_none(self, "sha256")
+
+    def describe(self) -> str:
+        return "package URL " + _url_without_secrets(self.url)
+
+
+for _name, _cls in {
+    "PrivateImage": _EnginePrivateImage,
+    "InstallDir": _EngineInstallDir,
+    "InstallVolume": _EngineInstallVolume,
+    "Bundle": _EngineBundle,
+    "BundleUrl": _EngineBundleUrl,
+}.items():
+    _cls.__name__, _cls.__qualname__ = _name, f"Tm1EngineSource.{_name}"
+    setattr(Tm1EngineSource, _name, _cls)

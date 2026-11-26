@@ -444,6 +444,6 @@ def test_counts_an_excluded_class_out_of_a_shared_name() -> None:
 
 def test_counts_a_name_once_for_each_file_of_this_package_that_has_it() -> None:
     here = unit_tests_here()
-    assert here["test_finds_nothing_when_nothing_is_set"] == 4, "the TM1, TM1 Web, Cognos and PAW sources' tests"
+    assert here["test_finds_nothing_when_nothing_is_set"] == 5, "the TM1, TM1 v12, TM1 Web, Cognos and PAW sources' tests"
     assert here["test_uses_the_zip_set_directly"] == 1
     assert here["test_no_such_test"] == 0
