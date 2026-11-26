@@ -48,7 +48,10 @@ export abstract class GenericContainer implements Startable {
   readonly #extraHosts = new Map<string, string>();
   readonly #copies: { source: string; target: string }[] = [];
   readonly #binds: Bind[] = [];
-  readonly #labels = new Map<string, string>();
+  // The first is on every container this library starts, in every language; its value is the
+  // language. A label like any other: withLabel can replace it, and it's part of what a reused
+  // container is found by
+  readonly #labels = new Map<string, string>([["io.skipcheck.tm1.testcontainers", "typescript"]]);
   #command: string[] = [];
   #hostname: string | undefined;
   #network: Network | undefined;
@@ -317,10 +320,7 @@ export abstract class GenericContainer implements Startable {
   }
 
   async #build(): Promise<TcGenericContainer> {
-    let c: TcGenericContainer = new OnItsNetwork(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels({
-      ...Object.fromEntries(this.#labels),
-      "io.skipcheck.tm1.testcontainers": "typescript",
-    });
+    let c: TcGenericContainer = new OnItsNetwork(this.#image).withEnvironment(Object.fromEntries(this.#env)).withLabels(Object.fromEntries(this.#labels));
     const platform = this.platform();
     if (platform !== undefined) c = c.withPlatform(platform);
     if (this.#command.length > 0) c = c.withCommand(this.#command);

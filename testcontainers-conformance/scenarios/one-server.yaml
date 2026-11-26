@@ -1,0 +1,7 @@
+# One TM1 server, with a sample database and a tm1s.cfg setting.
+version: 1
+tm1:
+  servers:
+    planning:
+      seed: sdata
+      cfg: { MaxThreads: 4 }

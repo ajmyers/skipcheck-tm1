@@ -26,6 +26,7 @@ Run the Gradle task for what you changed before you push. They're what CI runs.
 | `api-site/` | `./gradlew checkApiSite` |
 | `java/tm1-codegen/`, `spec/tm1-overlay.json`, or the probe file | `./gradlew :tm1-codegen:exportSpec` (rewrites `spec/tm1-api.json`), then `./gradlew :tm1-client:test -PrecordConformance` (rewrites `spec/conformance/builders.json` and the recorded calls), then `./gradlew checkAll`. See [the conformance README](spec/conformance/README.md) |
 | `java/tools/tm1-probe/` | `./gradlew :tools:tm1-probe:build`; for a new TM1 version, `./gradlew probeTm1` with a TM1 source, and commit the file it writes ([its README](java/tools/tm1-probe/README.md)) |
+| What a `tm1-testcontainers` container is created with (image, command, environment, labels, ports, mounts, network, aliases), in any language | `./gradlew containerConformance --continue`, with Docker and a TM1 source: every language starts the same scenarios, and what Docker got must be equal ([its README](testcontainers-conformance/README.md)). CI can't run it: say in the PR whether you ran it |
 | How a client talks to TM1 | `./gradlew liveTest --continue`, if a TM1 is configured: every client's live tests, then a comparison of what each sent TM1 (`scripts/compare-live-traffic.py`), which must be equal. CI can't run these: say in the PR whether you ran them |
 | Not sure | `./gradlew checkAll packageTest` |
 

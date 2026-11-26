@@ -338,6 +338,15 @@ def test_the_identity_is_the_same_for_the_same_configuration_and_differs_otherwi
     assert len(set(identities)) == len(identities)
 
 
+def test_every_container_names_the_language_that_started_it() -> None:
+    env = builder().tm1("planning").tm1("reporting").tm1_web().cognos(lambda cognos: cognos.with_user("admin", "adminpw")).keycloak().build()
+    assert len(env.containers()) == 6
+    for part in env.containers():
+        assert isinstance(part, GenericContainer)
+        # The same label in every language, so docker ps finds what this library started
+        assert part._labels["io.skipcheck.tm1.testcontainers"] == "python", part
+
+
 def test_starting_a_reused_environment_marks_every_container_with_its_identity() -> None:
     env = builder().tm1("planning").tm1("reporting").tm1_web().reuse(True)._build(True)
     env._prepare_for_reuse()

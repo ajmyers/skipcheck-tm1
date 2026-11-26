@@ -55,6 +55,24 @@ class PlanningAnalyticsEnvironmentTest {
 	}
 
 	@Test
+	void everyContainerNamesTheLanguageThatStartedIt() {
+		var env = builder().tm1("planning")
+			.tm1("reporting")
+			.tm1Web()
+			.cognos(cognos -> cognos.withUser("admin", "adminpw"))
+			.keycloak()
+			.build();
+		assertThat(env.containers()).hasSize(6);
+		for (Startable part : env.containers()) {
+			var container = (GenericContainer<?>) part;
+			// The same label in every language, so docker ps finds what this library
+			// started
+			assertThat(container.getLabels()).as(container.toString())
+				.containsEntry("io.skipcheck.tm1.testcontainers", "java");
+		}
+	}
+
+	@Test
 	void cognosPutsEveryServerInCamSecurity() {
 		var env = builder().tm1("planning")
 			.tm1("reporting")
