@@ -32,10 +32,18 @@ run --entrypoint sh "$image" -c 'ldconfig -p | grep -q "libcurl.so.4 " && comman
   || fail "missing runtime dependency (libcurl4 / tini / procps)"
 pass "runtime dependencies present"
 
-# 3b. libjsig.so, which TM1 builds before 11.8.035 link, resolves from LD_LIBRARY_PATH alone
-run --entrypoint python3 "$image" -c 'import ctypes; ctypes.CDLL("libjsig.so")' \
-  || fail "libjsig.so doesn't load from LD_LIBRARY_PATH"
-pass "libjsig.so loads (for TM1 before 11.8.035)"
+# 3b. libjsig.so, which TM1 11.8.024 to 11.8.032 link, loads by name: the image's copy, with its
+#     license, even when a container sets its own LD_LIBRARY_PATH; an install's own copy in bin64 first
+loaded='import ctypes; ctypes.CDLL("libjsig.so"); print([l.split()[-1] for l in open("/proc/self/maps") if "libjsig" in l][0])'
+out=$(run --entrypoint python3 "$image" -c "$loaded" 2>/dev/null | tail -1) || true
+[ "$out" = /usr/local/lib/tm1-server/jvm/libjsig.so ] || fail "the image's libjsig.so isn't the one loaded: $out"
+out=$(run -e LD_LIBRARY_PATH=/opt/odbc/lib --entrypoint python3 "$image" -c "$loaded" 2>/dev/null | tail -1) || true
+[ "$out" = /usr/local/lib/tm1-server/jvm/libjsig.so ] || fail "libjsig.so isn't found with another LD_LIBRARY_PATH: $out"
+out=$(run --entrypoint sh "$image" -c "mkdir -p /opt/ibm/cognos/tm1_64/bin64 && cp /usr/local/lib/tm1-server/jvm/libjsig.so /opt/ibm/cognos/tm1_64/bin64/ && python3 -c '$loaded'" 2>/dev/null | tail -1) || true
+[ "$out" = /opt/ibm/cognos/tm1_64/bin64/libjsig.so ] || fail "an install's own libjsig.so doesn't come first: $out"
+run --entrypoint sh "$image" -c 'grep -q "GPL" /usr/local/lib/tm1-server/jvm/copyright && grep -q "^openjdk-21-jre-headless " /usr/local/lib/tm1-server/jvm/VERSION' \
+  || fail "libjsig.so's copyright file or version is missing"
+pass "libjsig.so loads (for TM1 11.8.024 to 11.8.032), an install's own first, with its license"
 
 # 4. Without a TM1 install: exits 2 and explains what to mount
 set +e
