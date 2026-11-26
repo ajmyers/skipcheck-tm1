@@ -69,9 +69,12 @@ def log(message=""):
 # Paths in the file are the host's (the Docker daemon resolves bind mounts), which may
 # be Windows paths. They're joined in the host's style and never touched from here.
 
+def is_windows_path(path):
+    return bool(re.match(r"^[A-Za-z]:[\\/]", path)) or "\\" in path
+
+
 def host_join(base, *parts):
-    windows = bool(re.match(r"^[A-Za-z]:[\\/]", base)) or "\\" in base
-    style = ntpath if windows else posixpath
+    style = ntpath if is_windows_path(base) else posixpath
     return style.normpath(style.join(base, *parts))
 
 
@@ -120,8 +123,16 @@ def parse_user(entry, where, password_optional=False):
     out or empty: analyst, analyst::Analysts or analyst:analystpw:Analysts."""
     if isinstance(entry, str):
         parts = entry.split(":")
-        if password_optional and len(parts) == 1:
-            parts.append("")
+        if password_optional:
+            if len(parts) == 1:
+                parts.append("")
+            elif len(parts) == 2 and parts[1]:
+                # The image's own form has groups there; here the second part is a password
+                raise ConfigError(f"{where}: {entry!r} reads as a password, which TM1 v12 doesn't keep: "
+                                  f"for a group, write {parts[0]}::{parts[1]}")
+            if len(parts) not in (2, 3):
+                raise ConfigError(f"{where}: expected user, user::group,group or user:password:group,group, "
+                                  f"not {entry!r}")
         if len(parts) not in (2, 3):
             raise ConfigError(f"{where}: expected user:password[:group,group], not {entry!r}")
         name, password = parts[0], parts[1]
@@ -131,10 +142,14 @@ def parse_user(entry, where, password_optional=False):
         name, password, groups = entry.get("name"), entry.get("password"), entry.get("groups") or []
         if password_optional and password is None:
             password = ""
+        if password_optional and not isinstance(groups, list):
+            raise ConfigError(f"{where}: groups must be a list, e.g. groups: [Analysts]")
     else:
         raise ConfigError(f"{where}: a user is user:password[:groups] or a mapping")
     if not isinstance(name, str) or not USER.match(name):
         raise ConfigError(f"{where}: user name {name!r} must be letters, digits, '.', '_' and '-'")
+    if password_optional and (not isinstance(password, str) or re.search(r"[:\s]", password)):
+        raise ConfigError(f"{where}: {name}'s password must be text without ':' or spaces (quote a number)")
     if not isinstance(password, str) or (not password and not password_optional) or re.search(r"[:\s]", password):
         raise ConfigError(f"{where}: {name}'s password must be non-empty, without ':' or spaces")
     for g in groups:
@@ -284,26 +299,36 @@ def normalize(cfg):
             where = f"tm1Engine.databases.{dname}"
             # No check for names that differ only in case, as tm1.servers has: Sales and sales
             # are two databases to TM1 v12
-            if not isinstance(dname, str) or not ENGINE_NAME.match(dname):
+            if not isinstance(dname, str):
+                raise ConfigError(f"{where}: YAML reads this name as a number or true/false: put it in quotes")
+            if not ENGINE_NAME.match(dname):
                 raise ConfigError(f"{where}: database names are letters, digits, _ and -, starting with a letter or digit")
             if len(dname) < 3:
                 raise ConfigError(f"{where}: TM1 needs database names of at least 3 characters")
             d = d or {}
             check_keys(d, ("instance",), where)
-            instance = d.get("instance") or ENGINE_INSTANCE
+            instance = ENGINE_INSTANCE if d.get("instance") is None else d["instance"]
             if not isinstance(instance, str) or not ENGINE_NAME.match(instance):
                 raise ConfigError(f"{where}.instance: instance names are letters, digits, _ and -, starting with a letter or digit")
             databases[dname] = {"instance": instance}
-        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True)
-                        for i, u in enumerate(engine.get("users") or [])]
+        listed = engine.get("users") or []
+        if not isinstance(listed, list):
+            raise ConfigError("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]")
+        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True) for i, u in enumerate(listed)]
         engine_names = [u["name"].lower() for u in engine_users]
         if len(set(engine_names)) != len(engine_names):
             raise ConfigError("tm1Engine.users: a user is listed twice")
         datastore = engine.get("datastore")
-        datastore = {} if datastore in (None, True) else datastore
+        datastore = {} if datastore in (None, True, False) else datastore
         check_keys(datastore, ("port",), "tm1Engine.datastore")
+        # Published only when a port is given: the engine reaches it on the project's network
+        published = datastore.get("port")
         engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
-                  "datastorePort": port(datastore["port"], "tm1Engine.datastore", 27017) if "port" in datastore else None}
+                  "datastorePort": None if published is None else port(published, "tm1Engine.datastore", 27017)}
+        for sname in servers:
+            # The engine's two compose services: a server of that name would be replaced by them
+            if sname.lower() in ("tm1-engine", "tm1-engine-mongo"):
+                raise ConfigError(f"tm1.servers.{sname}: that name is the TM1 v12 engine's here; give the server another")
     m["tm1Engine"] = engine
 
     if not (servers or cognos or engine):
@@ -422,8 +447,14 @@ def generate(m):
             # last save, and TM1's list of its databases, are in MongoDB
             "volumes": [f"{host_join(files, 'datastore')}:/data/db"],
         }
+        if is_windows_path(files):
+            # MongoDB's storage engine needs a real Linux filesystem, which a Windows folder shared
+            # into Docker isn't: there its data goes in a volume
+            mongo["volumes"] = ["tm1-engine-datastore:/data/db"]
+            volumes["tm1-engine-datastore"] = {}
         if engine["datastorePort"]:
-            mongo["ports"] = [f"{engine['datastorePort']}:27017"]
+            # This computer only: it's MongoDB's root account, with a password that isn't a secret
+            mongo["ports"] = [f"127.0.0.1:{engine['datastorePort']}:27017"]
         services["tm1-engine-mongo"] = mongo
         env = {"TM1_DATASTORE_URL": f"mongodb://{DATASTORE_USER}:{DATASTORE_PASSWORD}@tm1-engine-mongo:27017",
                "TM1_DATABASES": ",".join(f"{d['instance']}/{name}" for name, d in engine["databases"].items()),
@@ -577,6 +608,9 @@ def urls(m):
         base = f"http://localhost:{engine['port']}/"
         credentials = host_join(m["files"], "tm1-engine", "credentials")
         rows.append(("TM1 engine", base + "manage/v1/", "root credentials in " + host_join(credentials, "root.json")))
+        if engine["datastorePort"]:
+            rows.append(("  its MongoDB", f"mongodb://localhost:{engine['datastorePort']}/",
+                         f"{DATASTORE_USER} / {DATASTORE_PASSWORD}"))
         for dname, d in engine["databases"].items():
             rows.append((f"  {dname}", f"{base}{d['instance']}/api/v1/Databases('{dname}')/", ""))
         names = ["admin"] + [u["name"] for u in engine["users"] if u["name"].lower() != "admin"]
@@ -586,40 +620,107 @@ def urls(m):
                          host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
         first = next(iter(engine["databases"]))
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
+        rows.append(("  the secrets", "setup.sh credentials --json", "if you can't read those files: the engine writes them as root"))
     width = max(len(r[0]) for r in rows)
     for what, url, login in rows:
         log(f"  {what.ljust(width)}  {url}" + (f"   ({login})" if login else ""))
 
 
-def engine_command(m, *args):
+def engine_exec(m, *args, capture=False):
     """Runs the tm1-engine image's own command in the running engine."""
     if not m["tm1Engine"]:
         raise ConfigError("this needs a TM1 v12 engine: add tm1Engine to the file")
-    return compose(m, "exec", "-T", "tm1-engine", "tm1-engine", *args, check=False).returncode
+    cmd = ["docker", "compose", "-p", m["name"], "-f", os.path.join(WORK, "compose.yaml"),
+           "--project-directory", WORK, "exec", "-T", "tm1-engine", "tm1-engine", *args]
+    return subprocess.run(cmd, capture_output=capture, text=True)
 
 
-def qualified(m, name):
-    """INSTANCE/NAME for a database: as given, or in the instance the file puts it in."""
+def engine_inventory(m):
+    """What the engine has now, as its 'credentials --json' says: the file isn't the whole
+    truth once 'database create' has run."""
+    done = engine_exec(m, "credentials", "--json", capture=True)
+    if done.returncode != 0:
+        raise ConfigError("the engine didn't answer; is it up? " + (done.stderr or done.stdout).strip())
+    return json.loads(done.stdout)
+
+
+def find_instance(m, name, inventory):
+    """The instance a database is in: as given (INSTANCE/NAME), else where the engine has it."""
     if "/" in name:
-        return name
-    known = (m["tm1Engine"] or {}).get("databases", {}).get(name)
-    return f"{known['instance'] if known else ENGINE_INSTANCE}/{name}"
+        return name.split("/", 1)
+    found = [i["name"] for i in inventory["instances"] if name in [d["name"] for d in i["databases"]]]
+    if len(found) == 1:
+        return found[0], name
+    if not found:
+        raise ConfigError(f"the engine has no database {name!r}; it has " + ", ".join(
+            f"{i['name']}/{d['name']}" for i in inventory["instances"] for d in i["databases"]))
+    raise ConfigError(f"{name!r} is in several instances ({', '.join(found)}): write INSTANCE/{name}")
 
 
-def engine_main(m, command, args):
+def host_view(m, inventory):
+    """The engine's own account of itself, as seen from this computer: the port it's published
+    on, and where its credential files are here."""
+    held = host_join(m["files"], "tm1-engine", "credentials")
+
+    def on_host(path):
+        inside = "/tm1/credentials/"
+        return host_join(held, *path[len(inside):].split("/")) if str(path).startswith(inside) else path
+
+    inventory["port"] = m["tm1Engine"]["port"]
+    inventory["url"] = f"http://localhost:{m['tm1Engine']['port']}/"
+    if isinstance(inventory.get("root"), dict) and "file" in inventory["root"]:
+        inventory["root"]["file"] = on_host(inventory["root"]["file"])
+    for instance in inventory.get("instances", []):
+        for application in instance.get("applications", []):
+            if "file" in application:
+                application["file"] = on_host(application["file"])
+    return inventory
+
+
+def engine_main(m, command, args, as_json=False):
     if command == "credentials":
-        if args not in ([], ["--json"]):
+        if args:
             raise ConfigError("usage: credentials [--json]")
-        return engine_command(m, "credentials", *args)
+        inventory = host_view(m, engine_inventory(m))
+        if as_json:
+            log(json.dumps(inventory, indent=2))
+            return 0
+        # Where each secret is, not the secret: --json prints those
+        base = inventory["url"]
+        log(f"  Management API  {base}manage/v1/   (root credentials in "
+            f"{host_join(m['files'], 'tm1-engine', 'credentials', 'root.json')})")
+        for instance in inventory["instances"]:
+            for database in instance["databases"]:
+                log(f"  Database        {base}{instance['name']}/api/v1/Databases('{database['name']}')/")
+            for application in instance["applications"]:
+                log(f"  Application     {instance['name']}/{application['name']}   client ID "
+                    f"{application.get('clientId')}, secret in {application.get('file', '(not held)')}")
+        log("  Log in: setup.sh session [DATABASE [USER]]. The secrets themselves: setup.sh credentials --json")
+        return 0
     if command == "session":
         if len(args) > 2:
             raise ConfigError("usage: session [DATABASE [USER]]")
         # A session is an instance's, and serves every database there
-        instance = qualified(m, args[0]).split("/")[0] if args else ENGINE_INSTANCE
-        return engine_command(m, "session", instance, *args[1:])
+        if args:
+            inventory = engine_inventory(m)
+            if "/" not in args[0] and args[0] in [i["name"] for i in inventory["instances"]] and \
+                    not [1 for i in inventory["instances"] for d in i["databases"] if d["name"] == args[0]]:
+                instance = args[0]  # an instance's own name, as the image's command takes
+            else:
+                instance = find_instance(m, args[0], inventory)[0]
+        else:
+            instance = next(iter(m["tm1Engine"]["databases"].values()))["instance"]
+        return engine_exec(m, "session", instance, *args[1:]).returncode
     if len(args) != 2 or args[0] not in ("create", "drop"):
         raise ConfigError("usage: database create NAME, or database drop NAME (INSTANCE/NAME for another instance)")
-    return engine_command(m, "database", args[0], qualified(m, args[1]))
+    if args[0] == "create":
+        target = args[1] if "/" in args[1] else f"{ENGINE_INSTANCE}/{args[1]}"
+        return engine_exec(m, "database", "create", target).returncode
+    instance, name = find_instance(m, args[1], engine_inventory(m))
+    if (m["tm1Engine"]["databases"].get(name) or {}).get("instance") == instance:
+        raise ConfigError(f"{name} is one of the file's databases, which 'up' makes again: take it out of "
+                          "tm1Engine.databases first")
+    return engine_exec(m, "database", "drop", f"{instance}/{name}").returncode
 
 
 SAMPLE = """# pa-environment.yaml: what pa-setup runs. Then run: setup.sh up
@@ -648,8 +749,8 @@ def main():
     parser.add_argument("command", nargs="?", default="up",
                         choices=["init", "up", "generate", "urls", "status", "logs", "down",
                                  "credentials", "session", "database"])
-    # argparse.REMAINDER: 'credentials --json' is the command's own option
-    parser.add_argument("services", nargs=argparse.REMAINDER)
+    parser.add_argument("services", nargs="*")
+    parser.add_argument("--json", action="store_true", help="with credentials: as JSON, secrets included")
     parser.add_argument("-f", "--file", default="pa-environment.yaml")
     a = parser.parse_args()
     path = os.path.join(WORK, a.file)
@@ -683,7 +784,7 @@ def main():
         elif a.command == "logs":
             compose(m, "logs", "--tail", "100", *a.services)
         elif a.command in ("credentials", "session", "database"):
-            return engine_main(m, a.command, a.services)
+            return engine_main(m, a.command, a.services, a.json)
         elif a.command == "down":
             if m["paw"]:
                 run_paw(m, "down")

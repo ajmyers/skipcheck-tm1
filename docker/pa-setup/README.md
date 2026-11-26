@@ -42,9 +42,9 @@ the first release.
 | `logs [service...]` | Recent logs, e.g. `logs planning cognos` |
 | `down` | Stops and removes the containers. Data (TM1 databases, installs, the Cognos content store) is kept. |
 | `generate` | Only writes `compose.yaml` |
-| `credentials` | With a TM1 v12 engine: every address of the engine, and where each credential is. `--json` for a program (it includes the secrets). |
-| `session [database [user]]` | With an engine: logs in and prints the session cookie, for `curl -b`. Default: `admin`. |
-| `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance. |
+| `credentials` | With a TM1 v12 engine: every address of the engine as it is now, and where each credential is, as seen from your computer. `--json` for a program (it includes the secrets). |
+| `session [database [user]]` | With an engine: logs in and prints the session cookie, for `curl -b`. Default: the file's first database, as `admin`. |
+| `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance than `tm1`. A database the file names isn't dropped: `up` would make it again, so take it out of the file first. |
 
 `-f other.yaml` uses another file in the same folder. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
@@ -113,8 +113,8 @@ tm1Engine: true            # one database, tm1; log in as admin
 |---|---|---|
 | `tm1Engine.port` | 4444 | TM1's gateway on your computer: the REST API, logins and the management API |
 | `tm1Engine.databases.<name>` | one, `tm1` | A database. Names need at least 3 characters, and `Sales` and `sales` are two. `instance` puts it in another instance than `tm1`: an instance has its own credentials, sessions and URL prefix. |
-| `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. |
-| `tm1Engine.datastore.port` | not published | Publishes the engine's MongoDB on your computer |
+| `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. The middle part is a password, as in `cognos.users`, and may be empty. |
+| `tm1Engine.datastore.port` | not published | Publishes the engine's MongoDB on your computer only (`127.0.0.1`). `up` prints its login. |
 
 - **One engine holds every database.** Unlike TM1 11, a database isn't a container: `database
   create` adds one to the running engine in about 13 seconds.
@@ -130,6 +130,11 @@ tm1Engine: true            # one database, tm1; log in as admin
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.
+- **On Windows, MongoDB's data is in a Docker volume instead** (`<name>_tm1-engine-datastore`):
+  MongoDB needs a Linux filesystem, which a Windows folder shared into Docker isn't. Remove it with
+  the folder: `docker volume rm`.
+- **The credential files are written by the engine, as root.** On Linux you may not be able to read
+  them: `credentials --json` prints what they hold.
 - **Memory:** about 1 GB for the engine and MongoDB with two databases (0.7 GB just started, 1.1 GB
   after a day's use, with TM1 12.6.7).
 - **TM1 Web, PAW and Cognos security are TM1 11's** here: they need `tm1.servers`.

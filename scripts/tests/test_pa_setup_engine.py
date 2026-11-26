@@ -110,7 +110,7 @@ tm1Engine:
         ("tm1Engine: {databases: {planning: {instance: a/b}}}", "tm1Engine.databases.planning.instance: instance names"),
         ("tm1Engine: {databases: {planning: {seed: sdata}}}", "tm1Engine.databases.planning: unknown setting(s) seed"),
         ("tm1Engine: {users: ['bad user']}", "tm1Engine.users[0]: user name"),
-        ("tm1Engine: {users: ['a:b:c:d']}", "tm1Engine.users[0]: expected user:password"),
+        ("tm1Engine: {users: ['a:b:c:d']}", "tm1Engine.users[0]: expected user, user::group,group or"),
         ("tm1Engine: {users: [analyst, Analyst]}", "tm1Engine.users: a user is listed twice"),
         ("tm1Engine: {port: 0}", "tm1Engine: port must be a number"),
         ("tm1Engine: {datastore: {prot: 1}}", "tm1Engine.datastore: unknown setting(s) prot"),
@@ -175,7 +175,7 @@ def test_publishes_the_datastore_only_when_asked_and_takes_other_images(pa_setup
     assert generated["services"]["tm1-engine"]["image"] == "tm1-engine:local"
     assert generated["services"]["tm1-engine"]["ports"] == ["4500:4444"]
     assert generated["services"]["tm1-engine-mongo"]["image"] == "mongo:8.2"
-    assert generated["services"]["tm1-engine-mongo"]["ports"] == ["27018:27017"]
+    assert generated["services"]["tm1-engine-mongo"]["ports"] == ["127.0.0.1:27018:27017"]
     assert "TM1_USERS" not in generated["services"]["tm1-engine"]["environment"]
 
 
@@ -215,68 +215,225 @@ def test_counts_the_engine_and_each_database_in_the_memory_it_needs(pa_setup: Mo
     assert both == pytest.approx(one + 0.5)
 
 
+INVENTORY = {
+    "port": 4444,
+    "root": {"clientId": "rootid", "clientSecret": "rootsecret", "file": "/tm1/credentials/root.json"},
+    "instances": [
+        {
+            "name": "tm1",
+            "applications": [
+                {"name": "tm1", "clientId": "appid", "clientSecret": "appsecret", "file": "/tm1/credentials/tm1/tm1.json"}
+            ],
+            "databases": [{"name": "planning"}, {"name": "scratch"}],
+        },
+        {
+            "name": "other",
+            "applications": [
+                {"name": "tm1", "clientId": "otherid", "clientSecret": "othersecret", "file": "/tm1/credentials/other/tm1.json"}
+            ],
+            "databases": [{"name": "sales"}, {"name": "scratch"}, {"name": "extra"}],
+        },
+    ],
+}
+
+
 @pytest.fixture
 def ran(pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
-    """What the engine's commands would run in the engine's container."""
+    """What the engine's commands run in the engine's container, with the engine answering
+    'credentials --json' as one with two instances would."""
     calls: list[list[str]] = []
 
-    def compose(m: dict[str, Any], *args: str, check: bool = True) -> Any:
-        calls.append(list(args))
-        return type("Done", (), {"returncode": 0})()
+    def run(cmd: list[str], **kwargs: Any) -> Any:
+        assert cmd[:2] == ["docker", "compose"] and "exec" in cmd, cmd
+        sent = cmd[cmd.index("exec") :]
+        assert sent[:4] == ["exec", "-T", "tm1-engine", "tm1-engine"], cmd
+        calls.append(sent[4:])
+        out = json.dumps(INVENTORY) if sent[4:] == ["credentials", "--json"] else ""
+        return type("Done", (), {"returncode": 0, "stdout": out, "stderr": ""})()
 
-    monkeypatch.setattr(pa_setup, "compose", compose)
+    monkeypatch.setattr(pa_setup.subprocess, "run", run)
     return calls
 
 
-ENGINE = "tm1Engine: {databases: {planning: {}, sales: {instance: other}}}\n"
-EXEC = ["exec", "-T", "tm1-engine", "tm1-engine"]
+ENGINE = "tm1Engine: {port: 4500, databases: {planning: {}, sales: {instance: other}}}\n"
+ASKED = ["credentials", "--json"]
 
 
 @pytest.mark.parametrize(
     ("command", "args", "sent"),
     [
-        ("credentials", [], ["credentials"]),
-        ("credentials", ["--json"], ["credentials", "--json"]),
-        # A session is an instance's: the database says which
-        ("session", [], ["session", "tm1"]),
-        ("session", ["planning"], ["session", "tm1"]),
-        ("session", ["sales", "analyst"], ["session", "other", "analyst"]),
-        ("session", ["other/sales"], ["session", "other"]),
-        ("database", ["create", "scratch"], ["database", "create", "tm1/scratch"]),
-        ("database", ["create", "other/scratch"], ["database", "create", "other/scratch"]),
-        # One the file names is dropped from the instance the file puts it in
-        ("database", ["drop", "sales"], ["database", "drop", "other/sales"]),
+        # A session is an instance's: with no database, the file's first one's
+        ("session", [], [["session", "tm1"]]),
+        ("session", ["planning"], [ASKED, ["session", "tm1"]]),
+        ("session", ["sales", "analyst"], [ASKED, ["session", "other", "analyst"]]),
+        # One made with 'database create', which the file doesn't know: the engine does
+        ("session", ["extra"], [ASKED, ["session", "other"]]),
+        ("session", ["other/scratch"], [ASKED, ["session", "other"]]),
+        # An instance's own name, as the image's command takes
+        ("session", ["other"], [ASKED, ["session", "other"]]),
+        ("database", ["create", "newone"], [["database", "create", "tm1/newone"]]),
+        ("database", ["create", "other/newone"], [["database", "create", "other/newone"]]),
+        ("database", ["drop", "extra"], [ASKED, ["database", "drop", "other/extra"]]),
+        ("database", ["drop", "tm1/scratch"], [ASKED, ["database", "drop", "tm1/scratch"]]),
     ],
 )
 def test_runs_the_images_own_command_in_the_engine(
-    pa_setup: ModuleType, ran: list[list[str]], command: str, args: list[str], sent: list[str]
+    pa_setup: ModuleType, ran: list[list[str]], command: str, args: list[str], sent: list[list[str]]
 ) -> None:
     assert pa_setup.engine_main(model(pa_setup, ENGINE), command, args) == 0
-    assert ran == [EXEC + sent]
+    assert ran == sent
+
+
+def test_a_session_with_no_database_is_for_the_files_first_instance(
+    pa_setup: ModuleType, ran: list[list[str]]
+) -> None:
+    # No database in the instance tm1 at all: 'session' alone must still log in
+    only_other = "tm1Engine: {databases: {sales: {instance: other}}}\n"
+    assert pa_setup.engine_main(model(pa_setup, only_other), "session", []) == 0
+    assert ran == [["session", "other"]]
 
 
 @pytest.mark.parametrize(
     ("command", "args", "message"),
     [
-        ("credentials", ["--yaml"], "usage: credentials"),
+        ("credentials", ["extra"], "usage: credentials"),
         ("session", ["a", "b", "c"], "usage: session"),
         ("database", [], "usage: database create NAME"),
         ("database", ["rename", "a"], "usage: database create NAME"),
         ("database", ["create"], "usage: database create NAME"),
+        # Never a guess at the instance: a wrong one would give a cookie that's refused
+        ("session", ["nosuch"], "the engine has no database 'nosuch'; it has tm1/planning"),
+        ("database", ["drop", "nosuch"], "the engine has no database 'nosuch'"),
+        ("session", ["scratch"], "'scratch' is in several instances (tm1, other): write INSTANCE/scratch"),
+        ("database", ["drop", "scratch"], "is in several instances"),
+        # 'up' would make it again, empty
+        ("database", ["drop", "planning"], "planning is one of the file's databases"),
+        ("database", ["drop", "other/sales"], "sales is one of the file's databases"),
     ],
 )
-def test_refuses_a_command_it_doesnt_know_how_to_run(
+def test_refuses_a_command_it_cant_run_as_asked(
     pa_setup: ModuleType, ran: list[list[str]], command: str, args: list[str], message: str
 ) -> None:
-    with pytest.raises(pa_setup.ConfigError, match=message):
+    with pytest.raises(pa_setup.ConfigError) as error:
         pa_setup.engine_main(model(pa_setup, ENGINE), command, args)
-    assert ran == []
+    assert message in str(error.value)
+    assert [call for call in ran if call != ASKED] == []
 
 
 def test_the_engines_commands_need_an_engine(pa_setup: ModuleType, ran: list[list[str]]) -> None:
     with pytest.raises(pa_setup.ConfigError, match="add tm1Engine to the file"):
         pa_setup.engine_main(model(pa_setup, "tm1: {servers: {tm1: {}}}\n"), "credentials", [])
     assert ran == []
+
+
+def test_credentials_are_as_seen_from_this_computer(
+    pa_setup: ModuleType, ran: list[list[str]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The engine reports its own port and paths, inside its container
+    assert pa_setup.engine_main(model(pa_setup, ENGINE), "credentials", [], as_json=True) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed["port"] == 4500 and printed["url"] == "http://localhost:4500/"
+    assert printed["root"]["file"] == "/host/project/pa-files/tm1-engine/credentials/root.json"
+    assert printed["instances"][1]["applications"][0]["file"] == (
+        "/host/project/pa-files/tm1-engine/credentials/other/tm1.json"
+    )
+    assert printed["instances"][0]["applications"][0]["clientSecret"] == "appsecret"
+
+    assert pa_setup.engine_main(model(pa_setup, ENGINE), "credentials", []) == 0
+    out = capsys.readouterr().out
+    assert "http://localhost:4500/other/api/v1/Databases('extra')/" in out
+    assert "secret in /host/project/pa-files/tm1-engine/credentials/tm1/tm1.json" in out
+    # Without --json: where each secret is, never the secret
+    assert "secret" in out and "appsecret" not in out and "rootsecret" not in out
+
+
+def run_main(pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *argv: str) -> int:
+    monkeypatch.setattr(pa_setup, "WORK", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["setup", *argv])
+    code = pa_setup.main()
+    assert isinstance(code, int)
+    return code
+
+
+def test_the_command_line_reaches_the_engines_commands(
+    pa_setup: ModuleType, ran: list[list[str]], monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (tmp_path / "pa-environment.yaml").write_text("version: 1\n" + ENGINE)
+    assert run_main(pa_setup, monkeypatch, tmp_path, "session", "sales", "analyst") == 0
+    assert run_main(pa_setup, monkeypatch, tmp_path, "database", "create", "newone") == 0
+    assert run_main(pa_setup, monkeypatch, tmp_path, "credentials", "--json") == 0
+    assert ran == [ASKED, ["session", "other", "analyst"], ["database", "create", "tm1/newone"], ASKED]
+    assert json.loads(capsys.readouterr().out)["port"] == 4500
+    # What it can't run as asked is the file's kind of mistake: exit 2, and why
+    assert run_main(pa_setup, monkeypatch, tmp_path, "database", "drop", "planning") == 2
+    assert "one of the file's databases" in capsys.readouterr().err
+
+
+def test_an_option_after_the_command_is_still_an_option(
+    pa_setup: ModuleType, ran: list[list[str]], monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # 'up -f other.yaml' must read other.yaml, not the default file with '-f' as a service
+    (tmp_path / "pa-environment.yaml").write_text("version: 1\ntm1Engine: {port: 4444}\n")
+    (tmp_path / "other.yaml").write_text("version: 1\ntm1Engine: {port: 4999}\n")
+    assert run_main(pa_setup, monkeypatch, tmp_path, "urls", "-f", "other.yaml") == 0
+    assert "http://localhost:4999/manage/v1/" in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        run_main(pa_setup, monkeypatch, tmp_path, "urls", "--bogus")
+    with pytest.raises(SystemExit) as helped:
+        run_main(pa_setup, monkeypatch, tmp_path, "down", "--help")
+    assert helped.value.code == 0 and ran == []
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("tm1Engine: {users: abc}", "tm1Engine.users must be a list"),
+        ("tm1Engine: {users: [{name: planner, groups: Planners}]}", "groups must be a list"),
+        # The image's own form puts a group there; here it would be read as a password
+        ("tm1Engine: {users: ['analyst:Analysts']}", "for a group, write analyst::Analysts"),
+        ("tm1Engine: {users: [{name: planner, password: 123}]}", "password must be text"),
+        ("tm1Engine: {databases: {2024: {}}}", "put it in quotes"),
+        ("tm1Engine: {databases: {yes: {}}}", "put it in quotes"),
+        ("tm1Engine: {databases: {planning: {instance: 0}}}", "instance names are letters"),
+        ("tm1Engine: true\ntm1: {servers: {TM1-Engine: {}}}", "that name is the TM1 v12 engine's here"),
+        ("tm1Engine: true\ntm1: {servers: {tm1-engine-mongo: {}}}", "that name is the TM1 v12 engine's here"),
+    ],
+)
+def test_refuses_what_would_be_read_as_something_else(pa_setup: ModuleType, text: str, message: str) -> None:
+    assert message in refused(pa_setup, text + "\n")
+
+
+def test_a_server_may_have_the_engines_name_without_an_engine(pa_setup: ModuleType) -> None:
+    assert "tm1-engine" in model(pa_setup, "tm1: {servers: {tm1-engine: {}}}\n")["tm1"]
+
+
+@pytest.mark.parametrize("datastore", ["false", "true", "{}", "{port: }", "~"])
+def test_the_datastore_is_published_only_with_a_port(pa_setup: ModuleType, datastore: str) -> None:
+    engine = model(pa_setup, f"tm1Engine: {{datastore: {datastore}}}\n")["tm1Engine"]
+    assert engine["datastorePort"] is None
+
+
+def test_a_published_datastore_is_for_this_computer_only_and_says_how_to_log_in(
+    pa_setup: ModuleType, capsys: pytest.CaptureFixture[str]
+) -> None:
+    read = model(pa_setup, "tm1Engine: {datastore: {port: 27018}}\n")
+    assert pa_setup.generate(read)["services"]["tm1-engine-mongo"]["ports"] == ["127.0.0.1:27018:27017"]
+    pa_setup.urls(read)
+    assert "mongodb://localhost:27018/   (tm1 / tm1-datastore)" in capsys.readouterr().out
+
+
+def test_on_windows_mongodb_keeps_its_data_in_a_volume(pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
+    # MongoDB's storage needs a Linux filesystem, which a Windows folder shared into Docker isn't
+    monkeypatch.setattr(pa_setup, "HOST_DIR", "C:\\Users\\me\\project")
+    generated = pa_setup.generate(model(pa_setup, "tm1Engine: true\n"))
+    assert generated["services"]["tm1-engine-mongo"]["volumes"] == ["tm1-engine-datastore:/data/db"]
+    assert "tm1-engine-datastore" in generated["volumes"]
+    # The deployment and credentials stay in the folder, where they can be read
+    assert "C:\\Users\\me\\project\\pa-files\\tm1-engine\\deployment:/tm1/deployment" in (
+        generated["services"]["tm1-engine"]["volumes"]
+    )
 
 
 def test_the_example_is_valid_and_fits_the_schema_it_documents(pa_setup: ModuleType) -> None:

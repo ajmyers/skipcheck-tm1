@@ -95,6 +95,12 @@ check_error $'version: 1\ntm1Engine: {databases: {ab: {}}}' "at least 3 characte
 check_error $'version: 1\ntm1Engine: {login: oauth2}' "unknown setting(s) login"
 check_error $'version: 1\ntm1: {servers: {tm1: {}}}\ncredentials: 1' "unknown setting(s) credentials"
 check_error $'version: 1' "nothing to run"
+# The engine's commands need an engine in the file, and say so
+rc=0; out=$(tool $'version: 1\ntm1: {servers: {tm1: {}}}' credentials) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "add tm1Engine to the file" <<<"$out" || fail "credentials without an engine: got $rc: $out"
+# An option after the command is still an option
+rc=0; out=$(tool $'version: 1\ntm1Engine: true' urls -f nosuch.yaml) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "nosuch.yaml not found" <<<"$out" || fail "urls -f nosuch.yaml: got $rc: $out"
 pass "bad files fail with a clear message"
 
 # 6. init writes a starting file that generates
