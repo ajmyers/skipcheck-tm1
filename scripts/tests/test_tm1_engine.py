@@ -54,6 +54,37 @@ def test_plan_takes_a_group_named_twice_as_one() -> None:
     ]
 
 
+ANALYST = 'CAMID("LDAP:u:uid=analyst,ou=people")'
+
+
+def test_plan_takes_a_camid_whole_with_its_groups() -> None:
+    # A CAMID has the commas and colons that part users and groups everywhere else
+    plan = engine.plan({"TM1_USERS": f'viewer, {ANALYST}:Analysts:Readers ,CAMID("OIDC:u:alice"), admin:Ops'})
+    assert plan["users"] == [
+        {"name": "viewer", "groups": []},
+        {"name": ANALYST, "groups": ["Analysts", "Readers"]},
+        {"name": 'CAMID("OIDC:u:alice")', "groups": []},
+        {"name": "admin", "groups": ["Ops"]},
+    ]
+
+
+def test_plan_names_users_by_their_camid_in_a_cognos_namespace() -> None:
+    # The name a TM1 11 server in CAM security answers a pass-through login with, and its friendly name
+    plan = engine.plan({"TM1_USERS": "analyst:Analysts,admin:ADMIN", "TM1_CAM_NAMESPACE": "LDAP"})
+    assert plan["users"] == [
+        {"name": ANALYST, "groups": ["Analysts"], "friendlyName": "LDAP/analyst"},
+        {"name": 'CAMID("LDAP:u:uid=admin,ou=people")', "groups": ["ADMIN"], "friendlyName": "LDAP/admin"},
+    ]
+
+
+def test_plan_names_an_oidc_namespaces_users_its_way_and_leaves_a_full_camid_alone() -> None:
+    env = {"TM1_USERS": f"alice,{ANALYST}", "TM1_CAM_NAMESPACE": "OIDC", "TM1_CAM_NAMESPACE_TYPE": "oidc"}
+    assert engine.plan(env)["users"] == [
+        {"name": 'CAMID("OIDC:u:alice")', "groups": [], "friendlyName": "OIDC/alice"},
+        {"name": ANALYST, "groups": []},
+    ]
+
+
 def test_plan_gives_each_instance_an_application_by_default() -> None:
     plan = engine.plan({"TM1_DATABASES": "planning,finance/sales"})
     assert [entry["applications"] for entry in plan["instances"].values()] == [
@@ -86,6 +117,13 @@ def test_plan_takes_names_as_tm1_does_and_an_empty_application_list_as_unset() -
         ({"TM1_DATABASES": "a/b/sales"}, "names are letters"),
         ({"TM1_USERS": "analyst:"}, "USER[:GROUP[:GROUP]]"),
         ({"TM1_USERS": "analyst,Analyst"}, "listed twice"),
+        ({"TM1_USERS": f"{ANALYST},{ANALYST}:Analysts"}, "listed twice"),
+        ({"TM1_USERS": f"{ANALYST}Analysts"}, 'expected CAMID("...")[:GROUP[:GROUP]]'),
+        ({"TM1_USERS": f"{ANALYST}:"}, "USER[:GROUP[:GROUP]]"),
+        ({"TM1_USERS": "john smith", "TM1_CAM_NAMESPACE": "LDAP"}, 'give the full CAMID("...") instead'),
+        ({"TM1_USERS": "a", "TM1_CAM_NAMESPACE": "LDAP", "TM1_CAM_NAMESPACE_TYPE": "saml"}, "ldap or oidc"),
+        ({"TM1_USERS": "a", "TM1_CAM_NAMESPACE_TYPE": "oidc"}, "set without TM1_CAM_NAMESPACE"),
+        ({"TM1_USERS": "a", "TM1_CAM_NAMESPACE": "my ns"}, "a namespace's ID is letters"),
     ],
 )
 def test_plan_refuses(env: dict[str, str], message: str) -> None:
@@ -513,6 +551,8 @@ def tm1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "TM1_DATABASES",
         "TM1_APPLICATIONS",
         "TM1_USERS",
+        "TM1_CAM_NAMESPACE",
+        "TM1_CAM_NAMESPACE_TYPE",
         "TM1_ENGINE_START_TIMEOUT",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -554,6 +594,20 @@ def test_setup_creates_what_was_asked_for(
         "clientSecret": "root-secret",
     }
     assert engine.command_health([]) == 0
+
+
+def test_setup_creates_cognos_users_under_their_camids(tm1: FakeTm1, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TM1_USERS", "analyst:Analysts,admin:ADMIN")
+    monkeypatch.setenv("TM1_CAM_NAMESPACE", "LDAP")
+    engine.setup()
+    engine.setup()  # and again: a CAMID is found as itself, not made twice
+
+    users = tm1.instances["tm1"]["databases"]["tm1"]["users"]
+    assert users == {
+        "Admin": ["ADMIN"],
+        ANALYST: ["Analysts"],
+        'CAMID("LDAP:u:uid=admin,ou=people")': ["ADMIN"],
+    }
 
 
 def test_setup_again_changes_nothing(

@@ -125,7 +125,9 @@ On every start the container makes sure these exist, and creates only what's mis
 |---|---|---|
 | `TM1_DATABASES` | `tm1` | `[instance/]database,...`: databases, in instance `tm1` unless named. Empty for none. Names need at least 3 characters, and `Sales` and `sales` are two databases. |
 | `TM1_APPLICATIONS` | `tm1` in each instance | `[instance/]application,...`: applications, whose credentials are saved in `/tm1/credentials` |
-| `TM1_USERS` | | `user[:group[:group]],...`: users for every database, in exactly those groups (created if missing). `admin` always stays in `ADMIN`. |
+| `TM1_USERS` | | `user[:group[:group]],...`: users for every database, in exactly those groups (created if missing). `admin` always stays in `ADMIN`. A user can be a whole `CAMID("...")`, commas and colons included. |
+| `TM1_CAM_NAMESPACE` | | The ID of the Cognos namespace the users are in, e.g. `LDAP`: each plain name in `TM1_USERS` is then created under its CAMID. For [pass-through to a TM1 11 server in CAM security](#with-cognos-cam-security). |
+| `TM1_CAM_NAMESPACE_TYPE` | `ldap` | `ldap` or `oidc`: how a name becomes a CAMID, as in [`tm1-server`](../tm1-server/README.md#cognos-cam-security) |
 
 A new database has one user, `Admin`, in the `ADMIN` group. If an application exists
 but its secret isn't in `/tm1/credentials` (the folder was lost), the application is
@@ -273,9 +275,42 @@ curl -u admin:apple "http://localhost:4444/tm1/api/v1/Databases('tm1')/Cubes"
   container before it installs anything; a clash with what's kept in the file is found
   after.
 
-Tried with TM1 12.6.7 forwarding to TM1 11 (Planning Analytics 2.1.25) with its own
-users. **Not tried: a TM1 11 server in Cognos (CAM) security.** TM1 v12 refused a
-`CAMNamespace` header itself, so a CAM user would have to reach TM1 11 as Basic.
+Tried with TM1 12.6.7 forwarding to TM1 11 (Planning Analytics 2.1.25), with its own
+users and in Cognos (CAM) security.
+
+### With Cognos (CAM) security
+
+TM1 passes the `Authorization` header on as it is, so a TM1 11 server in CAM security
+is sent what it takes there: `CAMNamespace` with a name and password, or `CAMPassport`
+with a passport from a Cognos logon. Basic gets 401, as it does from that server.
+
+```sh
+docker run ... -e TM1_PASSTHROUGH_URL=http://tm1-server:8010/api/v1/ \
+  -e TM1_CAM_NAMESPACE=LDAP -e TM1_USERS=analyst:Analysts,admin:ADMIN ghcr.io/ajmyers/tm1-engine
+
+curl -H "Authorization: CAMNamespace $(printf %s analyst:analystpw:LDAP | base64)" \
+  "http://localhost:4444/tm1/api/v1/Databases('tm1')/Cubes"
+```
+
+- **The name TM1 11 answers is the user's CAMID,** such as
+  `CAMID("LDAP:u:uid=analyst,ou=people")`, and that's the user the database must have.
+  `TM1_CAM_NAMESPACE` creates each plain name of `TM1_USERS` under its CAMID, with the
+  friendly name TM1 11 shows (`LDAP/analyst`). A whole `CAMID("...")` in `TM1_USERS` is
+  taken as it is, for a namespace whose CAMIDs have another shape.
+- **Groups are the ones you list.** TM1 11 gets a user's groups from Cognos at logon;
+  TM1 v12 only learns the name. An administrator is a user in `ADMIN`.
+- **With the namespace set, every plain name is a Cognos user.** The database's own
+  `Admin` is still there for service-to-service logins, and `tm1-engine session` takes a
+  CAMID as the user.
+- **A wrong password leaves a session on the TM1 11 server:** it opens one for a refused
+  CAM logon, and TM1 v12 has nothing to close. Logins that succeed, and ones the database
+  refuses (403), leave none.
+- An earlier version of this page said TM1 v12 refused the `CAMNamespace` header. It
+  doesn't: that 401 came from a TM1 11 server that wasn't in CAM security.
+
+Tried with Cognos Analytics 12.1.1 and its LDAP namespace: a user, an administrator, a
+passport, and a user missing from the database (403). **Not tried: the OIDC namespace.**
+Its CAMIDs are made by the rule `tm1-server` uses for TM1 11.
 
 ## Image
 

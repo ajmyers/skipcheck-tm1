@@ -26,6 +26,9 @@ What setup creates comes from the environment:
   TM1_DATABASES     [INSTANCE/]DATABASE,...     default: tm1 (in instance tm1); empty for none
   TM1_APPLICATIONS  [INSTANCE/]APPLICATION,...  default: one named tm1 in each instance
   TM1_USERS         USER[:GROUP[:GROUP]],...    users (and their groups) for every database
+  TM1_CAM_NAMESPACE the Cognos namespace those users are in (e.g. LDAP): each is then created
+                    under its CAMID, the name a TM1 11 server in CAM security answers a
+                    pass-through login with. TM1_CAM_NAMESPACE_TYPE: ldap (default) or oidc
 
 and takes an identity provider's tokens as logins with (see the README, "OAuth 2.0 logins"):
 
@@ -85,6 +88,23 @@ def _items(value):
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+# One user of TM1_USERS. A CAMID("...") stays whole: it has the commas and colons that part the rest
+_USER_ITEM = re.compile(r'\s*(CAMID\("[^"]*"\)[^,]*|[^,]*)\s*(?:,|$)')
+_CAMID = re.compile(r'CAMID\("[^"]*"\)')
+_PLAIN = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def _user_items(value):
+    return [item.strip() for item in _USER_ITEM.findall(value) if item.strip()]
+
+
+def camid(name, namespace, kind):
+    """A Cognos user's CAMID from its short name, by the rule tm1-server's cam-setup.py has."""
+    if not _PLAIN.match(name):
+        raise Failure(f'TM1_USERS: {name!r} isn\'t a plain name; give the full CAMID("...") instead')
+    return f'CAMID("{namespace}:u:{name}")' if kind == "oidc" else f'CAMID("{namespace}:u:uid={name},ou=people")'
+
+
 def _qualified(item, what):
     instance, _, name = item.rpartition("/")
     instance = instance or DEFAULT_INSTANCE
@@ -126,18 +146,38 @@ def plan(env=None):
             name, application = _qualified(item, "application")
             if application not in instance(name)["applications"]:
                 instance(name)["applications"].append(application)
+    namespace = env.get("TM1_CAM_NAMESPACE", "").strip()
+    kind = env.get("TM1_CAM_NAMESPACE_TYPE", "").strip().lower() or "ldap"
+    if kind not in ("ldap", "oidc"):
+        raise Failure(f"TM1_CAM_NAMESPACE_TYPE: {kind!r}: ldap or oidc")
+    if namespace and not NAME.match(namespace):
+        raise Failure(f"TM1_CAM_NAMESPACE: {namespace!r}: a namespace's ID is letters, digits, _ and -")
+    if not namespace and env.get("TM1_CAM_NAMESPACE_TYPE", "").strip():
+        raise Failure("TM1_CAM_NAMESPACE_TYPE is set without TM1_CAM_NAMESPACE, the namespace the users are in")
     users = []
-    for item in _items(env.get("TM1_USERS", "")):
-        name, *listed = [part.strip() for part in item.split(":")]
+    for item in _user_items(env.get("TM1_USERS", "")):
+        whole = _CAMID.match(item)
+        if whole:
+            # CAMID("..."), then its groups: the colons inside it aren't separators
+            name, rest = whole.group(0), item[whole.end():].strip()
+            if rest and not rest.startswith(":"):
+                raise Failure(f"TM1_USERS: {item!r}: expected CAMID(\"...\")[:GROUP[:GROUP]]")
+            listed = [part.strip() for part in rest[1:].split(":")] if rest else []
+        else:
+            name, *listed = [part.strip() for part in item.split(":")]
         if not name or any(not group for group in listed):
             raise Failure(f"TM1_USERS: {item!r}: expected USER[:GROUP[:GROUP]]")
+        friendly = None
+        if namespace and not whole:
+            # Named as TM1 11 names a Cognos user, and shown as it shows one
+            name, friendly = camid(name, namespace, kind), f"{namespace}/{name}"
         groups = []
         for group in listed:  # a group named twice is one group: TM1's group names aren't case-sensitive
             if group.lower() not in (kept.lower() for kept in groups):
                 groups.append(group)
         if name.lower() in (user["name"].lower() for user in users):
             raise Failure(f"TM1_USERS: {name!r} is listed twice")
-        users.append({"name": name, "groups": groups})
+        users.append({"name": name, "groups": groups, **({"friendlyName": friendly} if friendly else {})})
     return {"instances": instances, "users": users}
 
 
@@ -389,6 +429,8 @@ def apply_users(instance, database, users):
         existing = have_users.get(user["name"].lower())
         if existing is None:
             body = {"Name": user["name"]}
+            if user.get("friendlyName"):
+                body["FriendlyName"] = user["friendlyName"]
             if bind:
                 body["Groups@odata.bind"] = bind
             request("POST", "Users", body)
