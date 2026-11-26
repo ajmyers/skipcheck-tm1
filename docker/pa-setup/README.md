@@ -36,7 +36,7 @@ the first release.
 | Command | What it does |
 |---|---|
 | `init` | Writes a starting `pa-environment.yaml` |
-| `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed. |
+| `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed (PAW isn't: run `down` before taking `paw` out). |
 | `urls` | Prints every service's address and login |
 | `status` | Lists the containers and their health |
 | `logs [service...]` | Recent logs, e.g. `logs planning cognos` |
@@ -47,7 +47,7 @@ the first release.
 | `token [user]` | With `tm1Engine.oauth2`: prints an access token for a user, for `curl -H "Authorization: Bearer ..."`. Default: the first user with a password. |
 | `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance than `tm1`. A database the file names isn't dropped: `up` would make it again, so take it out of the file first. |
 
-`-f other.yaml` uses another file in the same folder. The generated `compose.yaml` works with plain
+`-f other.yaml` uses another file in the same folder; give each file its own `name`, or one's `up` and `down` remove the other's containers. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
 
 ## pa-environment.yaml
@@ -144,7 +144,15 @@ tm1Engine: true            # one database, tm1; log in as admin
     names. `up` prints Keycloak's address on your computer (`http://localhost:8181/realms/tm1`).
   - It's a Keycloak of the engine's own. `cognos.oidc` has another: Cognos needs its issuer
     to be an address your browser reaches, and the engine one it reaches itself.
-  - Taking `oauth2` out of the file turns it off again on the next `up`.
+  - `oauth2: false` turns it off again on the next `up`, and keeps the passwords in the file
+    for next time. Taken out altogether, a user written `user:password` is refused: without
+    `oauth2` in the section that form is ambiguous.
+  - Changing a user or a password makes a new Keycloak on the next `up`, and restarts the
+    engine with it: the new realm signs with new keys.
+  - Keycloak is published on your computer only (`127.0.0.1`): its console's login is
+    `admin` / `admin`.
+  - pa-setup owns the engine's OAuth 2.0 setting: one you set by hand in the kept
+    `config.internal.json` is removed on the next `up` without `oauth2`.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.

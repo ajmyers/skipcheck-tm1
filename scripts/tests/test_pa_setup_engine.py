@@ -454,7 +454,8 @@ def test_oauth2_adds_a_keycloak_of_the_engines_own(pa_setup: ModuleType, on: str
     assert keycloak["environment"]["KC_HOSTNAME"] == "http://tm1-engine-keycloak:8080"
     assert keycloak["environment"]["KC_HOSTNAME_BACKCHANNEL_DYNAMIC"] == "true"
     assert keycloak["command"] == ["start-dev", "--import-realm"]
-    assert keycloak["ports"] == ["8181:8080"]
+    # This computer only: the console's login isn't a secret
+    assert keycloak["ports"] == ["127.0.0.1:8181:8080"]
     assert engine["environment"]["TM1_OAUTH2_ISSUER_URL"] == "http://tm1-engine-keycloak:8080/realms/tm1"
     assert engine["environment"]["TM1_OAUTH2_AUDIENCE"] == "tm1"
     assert engine["environment"]["TM1_OAUTH2_ID_CLAIMS"] == "preferred_username"
@@ -480,6 +481,8 @@ def test_the_realm_has_the_audience_tm1_expects_and_the_users_with_a_password(pa
         ("analyst", "an$pw"),
         ("boss", "bosspw"),
     ]
+    # Not made from the name: Keycloak refuses some addresses a name would make
+    assert [u["email"] for u in realm["users"]] == ["user1@example.com", "user2@example.com"]
     assert all(u["enabled"] and u["emailVerified"] and u["email"] for u in realm["users"])
     (mounted,) = generated["services"]["tm1-engine-keycloak"]["configs"]
     assert mounted == {"source": "tm1-engine-realm", "target": "/opt/keycloak/data/import/tm1-realm.json"}
@@ -506,7 +509,9 @@ def test_prints_where_tokens_come_from_and_who_can_log_in(
 ) -> None:
     pa_setup.urls(model(pa_setup, OAUTH.replace("OAUTH2", "{keycloakPort: 8191}")))
     out = capsys.readouterr().out
-    assert "http://localhost:8191/realms/tm1   (client tm1; analyst / an$pw, boss / bosspw)" in out
+    # Who can log in, not their passwords
+    assert "http://localhost:8191/realms/tm1   (client tm1; analyst, boss; passwords in pa-environment.yaml)" in out
+    assert "an$pw" not in out and "bosspw" not in out
     assert "setup.sh token analyst" in out
 
 
@@ -526,7 +531,8 @@ def test_token_asks_the_engines_keycloak_on_the_projects_network(
 
     monkeypatch.setattr(pa_setup.subprocess, "run", run)
     read = model(pa_setup, "name: demo\n" + OAUTH.replace("OAUTH2", "true"))
-    assert pa_setup.engine_main(read, "token", ["boss"]) == 0
+    # Names are one whatever their case
+    assert pa_setup.engine_main(read, "token", ["BOSS"]) == 0
     assert capsys.readouterr().out.strip() == "the.token"
     (cmd,) = asked
     # On the project's network, where Keycloak has the name its tokens carry
@@ -556,11 +562,56 @@ def test_token_refuses_what_it_cant_give(
     assert message in str(error.value)
 
 
-def test_token_says_when_keycloak_gives_none(pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
-    done = type("Done", (), {"returncode": 22, "stdout": "", "stderr": "curl: (22) The requested URL returned error: 401"})()
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "message"),
+    [
+        # Keycloak's own reason, when it answered
+        ('{"error": "invalid_grant", "error_description": "Invalid user credentials"}', "", "Keycloak gave analyst no token: Invalid user credentials"),
+        ("", "curl: (6) Could not resolve host: tm1-engine-keycloak", "Keycloak didn't answer; is the environment up? curl: (6)"),
+        ("<html>", "", "Keycloak didn't answer"),
+    ],
+)
+def test_token_says_why_there_is_none(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch, stdout: str, stderr: str, message: str
+) -> None:
+    done = type("Done", (), {"returncode": 0, "stdout": stdout, "stderr": stderr})()
     monkeypatch.setattr(pa_setup.subprocess, "run", lambda *a, **k: done)
-    with pytest.raises(pa_setup.ConfigError, match="Keycloak gave no token; is the environment up"):
+    with pytest.raises(pa_setup.ConfigError) as error:
         pa_setup.engine_main(model(pa_setup, OAUTH.replace("OAUTH2", "true")), "token", [])
+    assert message in str(error.value)
+
+
+def test_a_changed_user_or_password_makes_a_new_keycloak_and_engine(pa_setup: ModuleType) -> None:
+    # Compose doesn't recreate a container for a config's new content, and Keycloak imports a realm once
+    def marks(users: str) -> tuple[str, str]:
+        services = pa_setup.generate(model(pa_setup, f"tm1Engine: {{users: {users}, oauth2: true}}\n"))["services"]
+        return services["tm1-engine-keycloak"]["environment"]["PA_REALM"], services["tm1-engine"]["environment"]["PA_REALM"]
+
+    first = marks("['analyst:pw1:Analysts']")
+    assert first[0] == first[1] and first == marks("['analyst:pw1:Analysts']")
+    assert marks("['analyst:pw2:Analysts']") != first
+    assert marks("['analyst:pw1:Analysts', 'boss:bosspw:ADMIN']") != first
+    # A user without a password isn't in the realm, and a group is TM1's
+    assert marks("['analyst:pw1:Planners', viewer]") == first
+
+
+def test_oauth2_false_keeps_the_passwords_with_it_off(pa_setup: ModuleType) -> None:
+    read = model(pa_setup, "tm1Engine: {users: ['analyst:analystpw'], oauth2: false}\n")
+    assert read["tm1Engine"]["oauth2"] is None
+    assert read["tm1Engine"]["users"] == [{"name": "analyst", "password": "analystpw", "groups": []}]
+    assert "oauth2: false keeps it, off" in refused(pa_setup, "tm1Engine: {users: ['analyst:analystpw']}\n")
+
+
+def test_a_server_cant_take_the_keycloaks_name_with_oauth2(pa_setup: ModuleType) -> None:
+    text = "tm1: {servers: {tm1-engine-keycloak: {}}}\ntm1Engine: {users: ['a:pw']OAUTH}\n"
+    assert "that name is the TM1 v12 engine's here" in refused(pa_setup, text.replace("OAUTH", ", oauth2: true"))
+    assert "tm1-engine-keycloak" in model(pa_setup, text.replace("OAUTH", ", oauth2: false"))["tm1"]
+
+
+def test_a_dollar_in_a_cognos_password_reaches_cognos(pa_setup: ModuleType) -> None:
+    generated = pa_setup.generate(model(pa_setup, "tm1: {servers: {tm1: {}}}\ncognos: {users: ['analyst:an$pw:Analysts']}\n"))
+    # compose would read $pw as a variable of its own
+    assert generated["services"]["cognos"]["environment"]["COGNOS_USERS"] == "analyst:an$$pw:Analysts"
 
 
 def test_up_and_down_remove_what_was_taken_out_of_the_file(

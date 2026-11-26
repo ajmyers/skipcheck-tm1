@@ -235,8 +235,8 @@ curl -H "Authorization: Bearer $TOKEN" "http://localhost:4444/tm1/api/v1/Databas
   turn it off. With an issuer set here, the two claims lists are the image's too: one you
   leave out is removed, back to TM1's default.
 
-Tried with TM1 12.6.7 and Keycloak 26.4, with Keycloak up before TM1. Not tried: an expired
-token, and a provider that comes up after TM1.
+Tried with TM1 12.6.7 and Keycloak 26.4. A provider that comes up after TM1 works once it's
+there: TM1 fetches its keys when a token comes. Not tried: an expired token.
 
 ## Image
 

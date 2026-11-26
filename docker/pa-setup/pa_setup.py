@@ -30,6 +30,7 @@ The file says what to run; pre-signed download links and other secrets go in .en
 to it, never in the file. See README.md for the format, and pa-environment.schema.json.
 """
 import argparse
+import hashlib
 import json
 import ntpath
 import os
@@ -140,7 +141,8 @@ def parse_user(entry, where, password_optional=False, password_used=True):
             elif len(parts) == 2 and parts[1] and not password_used:
                 # The image's own form has groups there; here the second part is a password
                 raise ConfigError(f"{where}: {entry!r} reads as a password, which TM1 v12 doesn't keep: "
-                                  f"for a group, write {parts[0]}::{parts[1]}")
+                                  f"for a group, write {parts[0]}::{parts[1]}. (A password kept for OAuth 2.0 "
+                                  "logins needs oauth2 in the section: oauth2: false keeps it, off.)")
             if len(parts) not in (2, 3):
                 raise ConfigError(f"{where}: expected user, user::group,group or user:password:group,group, "
                                   f"not {entry!r}")
@@ -326,8 +328,9 @@ def normalize(cfg):
         listed = engine.get("users") or []
         if not isinstance(listed, list):
             raise ConfigError("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]")
-        # With OAuth 2.0 logins a password is used, so user:password means what it says
-        wants_oauth2 = engine.get("oauth2") is not None and engine.get("oauth2") is not False
+        # With oauth2 in the section a password is meant, so user:password says what it means:
+        # on, or false to keep the passwords with OAuth 2.0 off
+        wants_oauth2 = engine.get("oauth2") is not None
         engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True, password_used=wants_oauth2)
                         for i, u in enumerate(listed)]
         engine_names = [u["name"].lower() for u in engine_users]
@@ -356,7 +359,7 @@ def normalize(cfg):
                   "oauth2": oauth2}
         for sname in servers:
             # The engine's two compose services: a server of that name would be replaced by them
-            if sname.lower() in ("tm1-engine", "tm1-engine-mongo"):
+            if sname.lower() in ("tm1-engine", "tm1-engine-mongo") + ((ENGINE_KEYCLOAK,) if oauth2 else ()):
                 raise ConfigError(f"tm1.servers.{sname}: that name is the TM1 v12 engine's here; give the server another")
     m["tm1Engine"] = engine
 
@@ -392,11 +395,12 @@ def oauth2_realm(engine):
                 "config": {"included.custom.audience": OAUTH2_AUDIENCE, "access.token.claim": "true",
                            "id.token.claim": "false"}}],
         }],
-        # Keycloak wants a profile that's complete before it gives a user a token
+        # Keycloak wants a profile that's complete before it gives a user a token. The address
+        # isn't made from the name: Keycloak refuses some that a user's name may be (j..doe)
         "users": [{"username": u["name"], "enabled": True, "emailVerified": True,
-                   "email": u["name"].lower() + "@example.com", "firstName": u["name"], "lastName": "Test",
+                   "email": f"user{i + 1}@example.com", "firstName": u["name"], "lastName": "Test",
                    "credentials": [{"type": "password", "value": u["password"], "temporary": False}]}
-                  for u in engine["users"] if u["password"]],
+                  for i, u in enumerate(u for u in engine["users"] if u["password"])],
     }
 
 
@@ -425,9 +429,10 @@ def generate(m):
         if back:
             env["COGNOS_PMHUB_URLS"] = " ".join(back)
         if cognos["users"]:
+            # $$: compose reads a lone $ in a value as a variable of its own
             env["COGNOS_USERS"] = " ".join(
                 u["name"] + ":" + u["password"] + (":" + ",".join(u["groups"]) if u["groups"] else "")
-                for u in cognos["users"])
+                for u in cognos["users"]).replace("$", "$$")
         svc = {"image": m["images"]["cognosServer"], "platform": "linux/amd64", "hostname": "cognos",
                "stop_grace_period": "3m", "environment": env, "ports": [f"{cognos['port']}:9300"],
                "volumes": ["cognos-install:/opt/ibm/cognos/analytics", "cognos-content-store:/cognos/postgres"] + ibm}
@@ -517,23 +522,31 @@ def generate(m):
         depends = {"tm1-engine-mongo": {"condition": "service_healthy"}}
         if engine["oauth2"]:
             issuer = f"http://{ENGINE_KEYCLOAK}:8080"
+            realm = json.dumps(oauth2_realm(engine), indent=2)
+            # Compose doesn't recreate a container for a config's new content, and Keycloak imports
+            # a realm once: the realm's hash in both containers' settings makes a changed user or
+            # password a new Keycloak, and a new engine with it, as the new realm has new keys
+            realm_hash = hashlib.sha256(realm.encode()).hexdigest()[:16]
             # $$: compose reads a lone $ in the file as a variable of its own
-            configs["tm1-engine-realm"] = {"content": json.dumps(oauth2_realm(engine), indent=2).replace("$", "$$")}
+            configs["tm1-engine-realm"] = {"content": realm.replace("$", "$$")}
             services[ENGINE_KEYCLOAK] = {
                 "image": m["images"]["keycloak"], "command": ["start-dev", "--import-realm"],
                 # Its hostname is its name on the network, whichever way it's reached: a token
                 # fetched through the published port names the issuer TM1 can reach
                 "environment": {"KC_BOOTSTRAP_ADMIN_USERNAME": "admin", "KC_BOOTSTRAP_ADMIN_PASSWORD": "admin",
                                 "KC_HTTP_ENABLED": "true", "KC_HOSTNAME": issuer,
-                                "KC_HOSTNAME_BACKCHANNEL_DYNAMIC": "true"},
-                "ports": [f"{engine['oauth2']['keycloakPort']}:8080"],
+                                "KC_HOSTNAME_BACKCHANNEL_DYNAMIC": "true", "PA_REALM": realm_hash},
+                # This computer only: its console's login isn't a secret, and whoever has it can
+                # make a user TM1 would take for the administrator
+                "ports": [f"127.0.0.1:{engine['oauth2']['keycloakPort']}:8080"],
                 "configs": [{"source": "tm1-engine-realm",
                              "target": f"/opt/keycloak/data/import/{OAUTH2_REALM}-realm.json"}],
                 "healthcheck": {"test": ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080"],
                                 "interval": "10s", "timeout": "5s", "retries": 30, "start_period": "30s"},
             }
             env.update({"TM1_OAUTH2_ISSUER_URL": f"{issuer}/realms/{OAUTH2_REALM}",
-                        "TM1_OAUTH2_AUDIENCE": OAUTH2_AUDIENCE, "TM1_OAUTH2_ID_CLAIMS": "preferred_username"})
+                        "TM1_OAUTH2_AUDIENCE": OAUTH2_AUDIENCE, "TM1_OAUTH2_ID_CLAIMS": "preferred_username",
+                        "PA_REALM": realm_hash})
             depends[ENGINE_KEYCLOAK] = {"condition": "service_healthy"}
         else:
             # The deployment is kept between runs: off has to be said, or an earlier run's stays
@@ -701,8 +714,10 @@ def urls(m):
         rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
         if engine["oauth2"]:
             known = [u for u in engine["users"] if u["password"]]
+            # Who, not their passwords: those are in the file
             rows.append(("  OAuth 2.0", f"http://localhost:{engine['oauth2']['keycloakPort']}/realms/{OAUTH2_REALM}",
-                         f"client {OAUTH2_CLIENT}; " + ", ".join(f"{u['name']} / {u['password']}" for u in known)))
+                         f"client {OAUTH2_CLIENT}; " + ", ".join(u["name"] for u in known) +
+                         "; passwords in pa-environment.yaml"))
             rows.append(("  try it", f"setup.sh token {known[0]['name']}", "a token for curl -H 'Authorization: Bearer ...'"))
         rows.append(("  the secrets", "setup.sh credentials --json", "if you can't read those files: the engine writes them as root"))
     width = max(len(r[0]) for r in rows)
@@ -770,19 +785,27 @@ def engine_token(m, args):
     if len(args) > 1:
         raise ConfigError("usage: token [USER]")
     known = {u["name"]: u["password"] for u in engine["users"] if u["password"]}
-    name = args[0] if args else next(iter(known))
-    if name not in known:
-        raise ConfigError(f"{name} isn't one of tm1Engine.users with a password; they are: {', '.join(known)}")
+    # Names are one whatever their case, in the file, in Keycloak and in TM1
+    name = next((n for n in known if not args or n.lower() == args[0].lower()), None)
+    if name is None:
+        raise ConfigError(f"{args[0]} isn't one of tm1Engine.users with a password; they are: {', '.join(known)}")
     url = f"http://{ENGINE_KEYCLOAK}:8080/realms/{OAUTH2_REALM}/protocol/openid-connect/token"
     done = subprocess.run(
         ["docker", "run", "--rm", "--network", f"{m['name']}_default", "--entrypoint", "curl", SELF_IMAGE,
-         "-fsS", "-m", "30", "--data-urlencode", "grant_type=password", "--data-urlencode", f"client_id={OAUTH2_CLIENT}",
+         "-sS", "-m", "30", "--data-urlencode", "grant_type=password", "--data-urlencode", f"client_id={OAUTH2_CLIENT}",
          "--data-urlencode", f"username={name}", "--data-urlencode", f"password={known[name]}", url],
         capture_output=True, text=True)
     try:
-        token = json.loads(done.stdout)["access_token"]
-    except (ValueError, KeyError, TypeError):
-        raise ConfigError("Keycloak gave no token; is the environment up? " + (done.stderr or done.stdout).strip())
+        answer = json.loads(done.stdout)
+    except ValueError:
+        answer = None
+    if not isinstance(answer, dict):
+        raise ConfigError("Keycloak didn't answer; is the environment up? " + (done.stderr or done.stdout).strip())
+    token = answer.get("access_token")
+    if not token:
+        # Keycloak's own reason: a wrong password, say, or a user it won't log in
+        raise ConfigError(f"Keycloak gave {name} no token: " +
+                          str(answer.get("error_description") or answer.get("error") or answer))
     log(token)
     return 0
 
