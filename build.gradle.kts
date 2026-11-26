@@ -123,18 +123,23 @@ tasks.register("checkAll") {
 // its own tm1-server container, so they run one after the other, never two at once.
 val traffic = layout.buildDirectory.dir("conformance-live")
 val liveSources = listOf("TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR", "TM1_BUNDLE_URL", "TM1_URL")
+// Where the Python, .NET and TypeScript live suites write their reports, under build/test-results, for
+// scripts/test-summary.py and scripts/live-test-versions.py (Java's are Gradle's own)
+val liveReports = listOf("python-live", "dotnet-live", "typescript-live")
 
 val liveTestPrepare = tasks.register("liveTestPrepare") {
 	description = "Checks a TM1 is configured for the live tests, and clears the traffic of the run before."
 	val configured = liveSources.map { providers.environmentVariable(it) }
 	val names = liveSources
 	val directory = traffic
+	val reports = liveReports.map { testResults.dir(it).asFile }
 	outputs.upToDateWhen { false }
 	doLast {
 		if (configured.none { it.isPresent }) {
 			throw GradleException("No TM1 configured: set one of " + names.dropLast(1).joinToString(", ") + " (or TM1_URL). See scripts/live-tests.sh.")
 		}
 		directory.get().asFile.deleteRecursively()
+		reports.forEach { it.deleteRecursively() }
 	}
 }
 
@@ -145,7 +150,7 @@ val liveTestPython = tasks.register<PythonTask>("liveTestPython") {
 	description = "Runs the Python client's tests against a real TM1 (tests/live)."
 	python()
 	directory = root.dir("python/tm1-client")
-	commands = listOf(listOf("python", "-m", "pytest", "tests/live", "-rs"))
+	commands = listOf(listOf("python", "-m", "pytest", "tests/live", "-rs", "--junitxml=" + testResults.file("python-live/pytest.xml").asFile.path))
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava)
 }
@@ -154,7 +159,7 @@ val liveTestDotnet = tasks.register<ToolTask>("liveTestDotnet") {
 	group = "verification"
 	description = "Runs the .NET client's tests against a real TM1 (the Live tests)."
 	directory = root
-	commands = listOf(listOf("dotnet", "test", "dotnet/Tm1.slnx", "--filter", "FullyQualifiedName~.Live."))
+	commands = listOf(listOf("dotnet", "test", "dotnet/Tm1.slnx", "--filter", "FullyQualifiedName~.Live.", "--logger", "trx", "--results-directory", testResults.dir("dotnet-live").asFile.path))
 	defaultEnvironment = dotnetEnvironment
 	dependsOn(liveTestPrepare)
 	mustRunAfter(liveTestJava, liveTestPython)
@@ -169,7 +174,7 @@ val liveTestTypescript = tasks.register<ToolTask>("liveTestTypescript") {
 	// fresh checkout the live tests would find no src/generated (#321)
 	commands = listOf(
 		listOf("npm", "run", "generate", "-w", "tm1-client"),
-		listOf("npm", "run", "test:live", "-w", "tm1-client"),
+		listOf("npm", "run", "test:live", "-w", "tm1-client", "--", "--reporter=default", "--reporter=junit", "--outputFile.junit=" + testResults.file("typescript-live/vitest.xml").asFile.path),
 		listOf("npm", "test", "-w", "tm1-testcontainers"),
 	)
 	dependsOn(liveTestPrepare)
