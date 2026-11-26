@@ -49,7 +49,26 @@ requiresTm1Engine("lists cubes", async ({ tm1Database: db }) => {     // Java's 
 - **`requiresTm1Engine.extend({ shareDatabase: true })`** is a `test` whose tests get the engine's one shared database, `tm1`, instead (Java's `shareDatabase = true`). It costs nothing to get. With an engine per test file, that database is the file's alone, so sharing loses no isolation: it's the option to use there, and saves creating and dropping a database in every file. Where one engine serves several files, its tests need uniquely named objects, and to delete them. **`extend({ minVersion: "12.6" })`** skips its tests on an older engine (Java's `minVersion`).
 - **Logging in:** `db.login()` is `admin`, `db.login("analyst")` any other user. A `Tm1Login` gives the session cookie (`await login.cookie()`, or `await login.authorize(init)` for `fetch`), a bearer token (`token()`, then `session("Bearer " + token)`), or the application's client ID and secret for a client that logs in itself.
 
-An engine of your own, with the databases and users you name:
+### In an environment
+
+`PlanningAnalyticsEnvironment` takes a TM1 v12 engine too, beside its TM1 servers or alone: `tm1Engine()` on the builder, or `tm1Engine(customizer)` to name its databases and users, and `tm1EngineSource(source)` for where TM1 v12 comes from. `env.tm1Engine()` is the engine and `env.tm1Database(name)` a database of its instance `tm1`. In a [`pa-environment.yaml`](#from-pa-environmentyaml) it's the `tm1Engine` section.
+
+```ts
+await using env = PlanningAnalyticsEnvironment.builder()
+  .tm1("legacy")                              // TM1 11
+  .tm1Engine((engine) => engine.withDatabase("planning").withUser("analyst", "Analysts"))
+  .build();
+await env.start();
+env.tm1Database("planning").getRestUrl();
+```
+
+- **A server or an engine:** an environment needs one of them. The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's, and need a TM1 server.
+- **On the environment's network:** the engine and its MongoDB are on it from the moment the environment is built, and the engine starts beside TM1 11's parts, before PAW.
+- **Not reusable:** `reuse(true)` with an engine is refused when the environment is built, whatever your reuse switch says. An engine and its datastore belong together, and a kept one would keep every database tests left.
+
+### An engine of your own
+
+With the databases and users you name:
 
 ```ts
 await using engine = new Tm1EngineContainer(source).withDatabase("planning").withUser("analyst", "Analysts");
@@ -76,9 +95,9 @@ env.tm1("planning").getRestUrl();
 
 It returns the builder, configured, so you can still change it before `build()`. The file is checked as `pa-setup` checks it, with the same defaults and messages.
 
-- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `camSecurity`, `memory`) and `paw` (`acceptLicense`, `zip`).
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `camSecurity`, `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (each of `databases` as `withDatabase(instance, name)`, `users` as `withUser(name, ...groups)`). `cognos.oidc: true`, or an empty mapping, turns OIDC on: only leaving it out, or `false`, is off.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
-- **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own network, random host ports and a new database each time.
+- **Ignored:** `name`, every port, `files`, `tm1Engine.datastore` and `images.mongo` (the engine's MongoDB is the container's own), and a `tm1Engine` user's password (TM1 v12 keeps none). They're still checked. Testcontainers gives the environment its own network, random host ports and a new database each time.
 - **Refused** with an `IllegalArgumentException` naming the setting: `cognos` without `tm1.servers`, and `seed: 24retail`, which the environment can't run yet.
 
 The file is read as YAML 1.1, with the [`yaml`](https://eemeli.org/yaml/) package, so `yes` and `off` are booleans, as in `pa-setup`'s PyYAML.
@@ -100,6 +119,7 @@ The file is read as YAML 1.1, with the [`yaml`](https://eemeli.org/yaml/) packag
 | `IllegalArgumentException`, `IllegalStateException` | the exported `IllegalArgumentException` and `IllegalStateException` (both `Error`s) |
 | `Network.newNetwork()` | `Network.newNetwork()` (`Network.of(…)` wraps a Testcontainers for Node `StartedNetwork`) |
 | `PlanningAnalyticsEnvironment.builder()….build()` | the same; customizers are functions |
+| `Builder.tm1Engine()`, `tm1Engine(customizer)`, `tm1EngineSource(source)`; `env.tm1Engine()`, `env.tm1Database(name)` | the same |
 | `@RequiresTm1`, `@RequiresCognos`, `@RequiresTm1Web`, `@RequiresPaw`, `@RequiresTm1Engine` | `requiresTm1`, `requiresCognos`, `requiresTm1Web`, `requiresPaw`, `requiresTm1Engine` from `./vitest`; their messages and `skipReason()` on `RequiresTm1` and the others |
 | A `Tm1ServerContainer` / `Tm1WebContainer` / `PawContainer` / `CognosSource` test parameter | the `tm1` / `tm1Web` / `paw` / `cognosSource` fixture |
 | A `Tm1Database` / `Tm1EngineContainer` test parameter | the `tm1Database` / `tm1Engine` fixture |
@@ -167,7 +187,7 @@ TM1_PRIVATE_IMAGE=tm1-server-private:2.1.19 npm test -w testcontainers
 
 - **`test/java-parity.test.ts`** reads the Java sources and checks that every public type, nested record and enum, constant, constructor and method has its TypeScript counterpart, with Java's parameter names in order, and that what does I/O returns a `Promise`. It also checks that the skip messages match Java's word for word.
 - **Configuration tests** need no Docker. `sources.test.ts` ports Java's `*SourceTest`; `wiring.test.ts` ports `AdminServerWiringTest`, `CognosContainerTest`, `PlanningAnalyticsEnvironmentTest` and `Tm1EngineWiringTest`, and checks the wait for TM1 v12 to be set up; `vitest-helpers.test.ts` checks the skip helpers, `engine-fixtures.test.ts` `requiresTm1Engine`'s fixtures, with an engine that only records what it's asked for, and `engine-login.test.ts` `Tm1Login`, against a local server.
-- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports every one of Java's `*ExampleTest` classes for TM1 11, each test behind the helper for what it needs (`requiresTm1`, `requiresTm1Web`, `requiresCognos`). For TM1 v12, `engine-containers.test.ts` ports `Tm1EngineContainerTest` and `engine-examples.test.ts` the three examples (`HelloTm1EngineExampleTest`, `DatabasePerClassExampleTest`, `S2sUsersExampleTest`), behind `requiresTm1Engine`.
+- **Container tests** are skipped without Docker or a source. `containers.test.ts` ports `Tm1ServerContainerTest`, `Tm1WebContainerTest` (with its `Tm1WebSession`) and `PawContainerTest`. `examples.test.ts` ports every one of Java's `*ExampleTest` classes for TM1 11, each test behind the helper for what it needs (`requiresTm1`, `requiresTm1Web`, `requiresCognos`). For TM1 v12, `engine-containers.test.ts` ports `Tm1EngineContainerTest`, `engine-examples.test.ts` three examples (`HelloTm1EngineExampleTest`, `DatabasePerClassExampleTest`, `S2sUsersExampleTest`) and `engine-environment-example.test.ts` `Tm1EngineEnvironmentExampleTest`, behind `requiresTm1Engine`.
 - **`test/java-test-parity.test.ts`** holds these tests to Java's: every test of `java/tm1-testcontainers/src/test/java` has a test of the same name here, or a line saying why not in `coverage/unit-excluded.txt`.
 
 The client's live tests (`../tm1-client/test/live`) run against one server for the whole run when `TM1_URL` isn't set, one file after the other: see `global-setup.ts` there.

@@ -198,10 +198,15 @@ function thrown(action: () => unknown): Error {
   throw new Error("Nothing was thrown");
 }
 
+/** The pa-environment.yaml files for TM1 v12, shared with the other languages. */
+const engineFixture = (name: string): string => join(Repo.paEnvironmentEngineFixtures, name);
+
 const pawSource = (): PawSource => new PawSource(join(fixture("ibm"), "ipa_workspace_local_0.0.0.zip"));
 
 const builder = (): PlanningAnalyticsEnvironment.Builder =>
   PlanningAnalyticsEnvironment.builder().tm1Source(source).tm1WebSource(webSource).cognosSource(new CognosSource.PrivateImage("cognos-server:test"));
+
+const engineBuilder = (): PlanningAnalyticsEnvironment.Builder => builder().tm1EngineSource(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
 
 /** Java's PlanningAnalyticsEnvironmentTest. */
 describe("PlanningAnalyticsEnvironment", () => {
@@ -506,12 +511,146 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(() => env.paw().scriptSettings("10.0.0.2", "10.0.0.2", undefined)).toThrow("Cognos");
   });
 
+  it("an engine runs beside the TM1 servers", () => {
+    const env = engineBuilder()
+      .tm1("legacy")
+      .tm1Engine((engine) => engine.withDatabase("planning").withUser("analyst", "Analysts"))
+      .build();
+    const engine = env.tm1Engine();
+    expect(engine.getNetwork()).toBe(env.network());
+    expect(env.tm1("legacy").getNetwork()).toBe(env.network());
+    expect(engine.getSource()).toStrictEqual(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
+    // Its datastore is the engine's own, on the environment's network with it: before anything
+    // is configured or started, and after
+    expect(engine.getDatastore().getNetwork()).toBe(env.network());
+    engine.configure();
+    expect(engine.getDatastore().getNetwork()).toBe(env.network());
+    expect(engine.getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning");
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts");
+    expect(env.tm1Database("planning").getName()).toBe("planning");
+    // Started with TM1 11's parts, and before PAW
+    expect(env.containers()).toEqual([env.tm1("legacy"), engine]);
+    const withPaw = engineBuilder()
+      .tm1("legacy")
+      .tm1Web()
+      .tm1Engine()
+      .paw((paw) => paw.acceptLicense())
+      .pawSource(pawSource())
+      .build();
+    expect(withPaw.containers()).toEqual([withPaw.tm1("legacy"), withPaw.tm1Web(), withPaw.tm1Engine(), withPaw.paw()]);
+    // A network the environment was given is the engine's and its datastore's too
+    const network = Network.newNetwork();
+    const given = engineBuilder().tm1Engine().network(network).build();
+    expect(given.tm1Engine().getNetwork()).toBe(network);
+    expect(given.tm1Engine().getDatastore().getNetwork()).toBe(network);
+  });
+
+  it("starts the engine's datastore on the environment's network", async () => {
+    // Without Docker: the datastore, which starts first, says where it is and goes no further
+    const env = engineBuilder().tm1Engine().build();
+    const datastore = env.tm1Engine().getDatastore();
+    const on: unknown[] = [];
+    vi.spyOn(datastore, "start").mockImplementation(async () => {
+      on.push(datastore.getNetwork());
+      throw new Error("no Docker here");
+    });
+    const stop = vi.spyOn(datastore, "stop").mockResolvedValue();
+    await expect(env.start()).rejects.toThrow("no Docker here");
+    expect(on).toEqual([env.network()]);
+    expect(stop).toHaveBeenCalled();
+    expect(env.network().isCreated()).toBe(false);
+  });
+
+  it("an engine alone is an environment", () => {
+    const env = engineBuilder().tm1Engine().build();
+    expect(env.tm1Servers().size).toBe(0);
+    expect(env.adminServer()).toBeUndefined();
+    expect(env.containers()).toEqual([env.tm1Engine()]);
+    expect(env.tm1Database("tm1").getInstance()).toBe("tm1");
+    expect(env.isRunning()).toBe(false);
+    expect(() => builder().tm1("planning").build().tm1Engine()).toThrow(IllegalStateException);
+    expect(() => builder().tm1("planning").build().tm1Engine()).toThrow("no TM1 v12 engine; add it with tm1Engine()");
+    expect(() => builder().tm1("planning").build().tm1Database("tm1")).toThrow("no TM1 v12 engine; add it with tm1Engine()");
+    expect(() => PlanningAnalyticsEnvironment.builder().build()).toThrow("tm1(name), or a TM1 v12 engine with tm1Engine()");
+  });
+
+  it("the Admin Server, TM1 Web, PAW and Cognos need a TM1 server, not an engine", () => {
+    for (const incomplete of [
+      engineBuilder().tm1Engine().tm1Web(),
+      engineBuilder().tm1Engine().adminServer(),
+      engineBuilder()
+        .tm1Engine()
+        .paw((paw) => paw.acceptLicense())
+        .pawSource(pawSource()),
+      engineBuilder()
+        .tm1Engine()
+        .cognos((cognos) => cognos.withUser("admin", "adminpw")),
+    ]) {
+      expect(() => incomplete.build()).toThrow(IllegalStateException);
+      expect(() => incomplete.build()).toThrow("are TM1 11's: add a TM1 server with tm1(name)");
+    }
+  });
+
+  it("an environment with an engine can't be reused", () => {
+    // Whatever the developer's switch says: the same code must do the same everywhere
+    for (const enabled of [true, false]) {
+      const reused = (): unknown => engineBuilder().tm1("legacy").tm1Engine().reuse(true).build(enabled);
+      expect(reused).toThrow(IllegalStateException);
+      expect(reused).toThrow("An environment with a TM1 v12 engine can't be reused");
+    }
+    // Without reuse it's an environment like any other, whatever the switch
+    expect(engineBuilder().tm1("legacy").tm1Engine().build(true).reused()).toBe(false);
+  });
+
+  it("from config adds the engine with its databases and users", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(engineFixture("tm1-engine.yaml")).build();
+    const ibm = resolve(engineFixture("ibm"));
+    const engine = env.tm1Engine();
+    engine.configure();
+    // Sales and sales are two databases to TM1 v12, and each is in its instance
+    expect(engine.getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning,tm1/Sales,other/sales");
+    // A user's password isn't TM1 v12's to keep
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners");
+    expect(env.tm1Database("Sales").getInstance()).toBe("tm1");
+    expect(engine.database("other", "sales").getName()).toBe("sales");
+    // ibm is every part's source; images are what they run
+    expect(engine.getSource()).toStrictEqual(new Tm1EngineSource.Bundle(ibm));
+    expect(engine.getDockerImageName()).toBe("registry.example.com/tm1-engine:local");
+    expect(env.tm1("legacy").getSource()).toStrictEqual(new Tm1Source.Bundle(ibm));
+    // images.mongo is checked and not used: the engine's MongoDB is its own
+    expect(engine.getDatastore().getDockerImageName()).toBe(Tm1EngineContainer.DATASTORE_IMAGE);
+    expect(engine.getNetwork()).toBe(env.network());
+    expect(engine.getDatastore().getNetwork()).toBe(env.network());
+  });
+
+  it("from config runs an engine alone", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(join(Repo.containerConformanceScenarios, "engine.yaml"))
+      .tm1EngineSource(new Tm1EngineSource.PrivateImage("tm1-engine:test"))
+      .build();
+    expect(env.tm1Servers().size).toBe(0);
+    env.tm1Engine().configure();
+    expect(env.tm1Engine().getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning,tm1/sales");
+    expect(env.tm1Engine().getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts");
+  });
+
+  it("from config takes OIDC true as on", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(engineFixture("oidc-true.yaml")).build();
+    expect(env.keycloak()).toBeInstanceOf(KeycloakContainer);
+    const planning = env.tm1("planning");
+    planning.configure();
+    expect(planning.getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("OIDC");
+  });
+
   it("from config refuses what it cannot run", () => {
-    const invalid = readdirSync(fixture("invalid"))
-      .filter((f) => f.endsWith(".yaml"))
-      .sort()
-      .map((f) => join(fixture("invalid"), f));
-    expect(invalid.length).toBeGreaterThan(0);
+    const invalid: string[] = [];
+    for (const folder of [fixture("invalid"), engineFixture("invalid")]) {
+      const found = readdirSync(folder)
+        .filter((f) => f.endsWith(".yaml"))
+        .sort()
+        .map((f) => join(folder, f));
+      expect(found.length, folder).toBeGreaterThan(0);
+      invalid.push(...found);
+    }
     for (const file of invalid) {
       const first = readFileSync(file, "utf8").split(/\r?\n/)[0]!;
       expect(first, file).toMatch(/^# error: /);
@@ -542,6 +681,10 @@ describe("Tm1Engine wiring", () => {
     named.configure();
     expect(named.getEnvMap().get("TM1_DATABASES")).toBe("tm1/planning,other/sales");
     expect(named.database("other", "sales").getName()).toBe("sales");
+    // An instance's name may be shorter than a database's
+    const short = new Tm1EngineContainer(SOURCE).withDatabase("eu", "sales");
+    short.configure();
+    expect(short.getEnvMap().get("TM1_DATABASES")).toBe("eu/sales");
     expect(() => named.database("tm1")).toThrow(IllegalArgumentException);
     expect(() => named.database("tm1")).toThrow("No database tm1/tm1 was added (withDatabase). Added: [tm1/planning, other/sales]");
   });
@@ -558,6 +701,9 @@ describe("Tm1Engine wiring", () => {
     expect(() => engine.withDatabase("ab")).toThrow(IllegalArgumentException);
     expect(() => engine.withDatabase("two words")).toThrow(IllegalArgumentException);
     expect(() => engine.withDatabase("a/b", "sales")).toThrow(IllegalArgumentException);
+    expect(() => engine.withDatabase("a/b", "sales")).toThrow("A TM1 instance's name is letters, digits, '_' and '-', starting with a letter or digit: a/b");
+    // An instance's name has no least length; a database's does, in any instance
+    expect(() => engine.withDatabase("eu", "ab")).toThrow("A TM1 database's name is at least three letters");
     expect(() => engine.withUser("two words")).toThrow(IllegalArgumentException);
     expect(() => engine.withUser("analyst", "a:b")).toThrow(IllegalArgumentException);
     engine.withUser("analyst");
@@ -589,6 +735,21 @@ describe("Tm1Engine wiring", () => {
     // The shared engine isn't kept between runs, and neither is one of your own
     expect(engine.isShouldBeReused()).toBe(false);
     expect(datastore.isShouldBeReused()).toBe(false);
+  });
+
+  it("its datastore is on its network before anything starts", () => {
+    // Not only once the engine starts or is configured: an environment may start what the engine
+    // depends on first, and TM1 couldn't reach a datastore left off the network
+    const engine = new Tm1EngineContainer(SOURCE);
+    expect(engine.getNetwork()).toBeInstanceOf(Network);
+    expect(engine.getDatastore().getNetwork()).toBe(engine.getNetwork());
+    const network = Network.newNetwork();
+    engine.withNetwork(network);
+    expect(engine.getDatastore().getNetwork()).toBe(network);
+    // And the network it was given stays the one it's on when it's configured and started
+    engine.configure();
+    expect(engine.getNetwork()).toBe(network);
+    expect(engine.getDatastore().getNetwork()).toBe(network);
   });
 
   it("joins a network it is given", () => {

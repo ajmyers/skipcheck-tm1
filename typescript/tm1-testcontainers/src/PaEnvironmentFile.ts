@@ -7,10 +7,13 @@ import { parseDocument, type Tags } from "yaml";
 import { CognosContainer } from "./CognosContainer.js";
 import type { PlanningAnalyticsEnvironment } from "./PlanningAnalyticsEnvironment.js";
 import { IllegalArgumentException } from "./settings.js";
+import { Tm1EngineContainer } from "./Tm1EngineContainer.js";
 import { Tm1Seed } from "./Tm1Seed.js";
 
 const NAME = /^[A-Za-z0-9_-]+$/;
 const USER = /^[A-Za-z0-9._-]+$/;
+// The tm1-engine image's rule for a database's and an instance's name
+const ENGINE_NAME = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const SEEDS = ["empty", "sdata", "24retail"];
 const BOOL = "tag:yaml.org,2002:bool";
 
@@ -29,12 +32,25 @@ export interface FileSources {
   cognosImage?: string;
   /** Keycloak's image. */
   keycloakImage?: string;
+  /** The TM1 v12 engine's image. */
+  tm1EngineImage?: string;
 }
 
 interface Server {
   port: number;
   seed: string;
   cfg: Map<string, string>;
+}
+
+interface Engine {
+  /** Each database's instance, by the database's name, in the file's order. */
+  databases: Map<string, string>;
+  users: EngineUser[];
+}
+
+interface EngineUser {
+  name: string;
+  groups: string[];
 }
 
 interface Cognos {
@@ -94,11 +110,11 @@ class PaEnvironmentFile {
 
   apply(root: unknown, dir: string, b: PlanningAnalyticsEnvironment.Builder): PlanningAnalyticsEnvironment.Builder {
     // pa_setup.normalize: the same checks, in the same order
-    const cfg = this.keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos"], "the file");
+    const cfg = this.keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos", "tm1Engine"], "the file");
     if (cfg.get("version") !== 1n) throw this.error("version: must be 1");
     const ibm = cfg.get("ibm") != null && truthy(cfg.get("ibm")) ? this.hostPath(cfg.get("ibm"), "ibm", dir) : undefined;
     this.hostPath(or(cfg.get("files"), "pa-files"), "files", dir);
-    const images = this.keys(or(cfg.get("images"), new Map()), ["tm1Server", "tm1Web", "cognosServer", "keycloak"], "images");
+    const images = this.keys(or(cfg.get("images"), new Map()), ["tm1Server", "tm1Web", "cognosServer", "keycloak", "tm1Engine", "mongo"], "images");
 
     const tm1 = this.section(cfg, "tm1");
     const servers = new Map<string, Server>();
@@ -158,7 +174,8 @@ class PaEnvironmentFile {
       let oidc = cognos.get("oidc");
       if (oidc === true) oidc = new Map();
       let keycloakPort: number | undefined;
-      if (oidc != null && truthy(oidc)) {
+      // On with true or a mapping, an empty one too: only absent or false is off
+      if (oidc != null && oidc !== false) {
         const o = this.keys(oidc, ["keycloakPort"], "cognos.oidc");
         if (users.length === 0) throw this.error("cognos.oidc: needs cognos.users");
         keycloakPort = this.port(o.get("keycloakPort"), "cognos.oidc", 8180);
@@ -204,8 +221,60 @@ class PaEnvironmentFile {
       pawZip = paw.get("zip") != null && truthy(paw.get("zip")) ? str(paw.get("zip")) : undefined;
     }
 
-    if (servers.size === 0 && cam === undefined) throw this.error("nothing to run: add tm1.servers and/or cognos");
-    const ports: number[] = [...servers.values()].map((s) => s.port);
+    const engineSection = this.section(cfg, "tm1Engine");
+    let engine: Engine | undefined;
+    let enginePort: number | undefined;
+    let datastorePort: number | undefined;
+    if (engineSection !== undefined) {
+      this.keys(engineSection, ["port", "databases", "users", "datastore"], "tm1Engine");
+      const databases = new Map<string, string>();
+      const raw = engineSection.get("databases");
+      if (raw == null) {
+        databases.set(Tm1EngineContainer.DEFAULT_DATABASE, Tm1EngineContainer.DEFAULT_INSTANCE);
+      } else if (!(raw instanceof Map) || raw.size === 0) {
+        throw this.error("tm1Engine.databases: name at least one database, e.g. tm1Engine: {databases: {planning: {}}}");
+      } else {
+        for (const [key, value] of raw as Map<unknown, unknown>) {
+          const where = "tm1Engine.databases." + str(key);
+          // No check for names that differ only in case, as tm1.servers has: Sales and sales are
+          // two databases to TM1 v12
+          if (typeof key !== "string") throw this.error(where + ": YAML reads this name as a number or true/false: put it in quotes");
+          if (!ENGINE_NAME.test(key)) throw this.error(where + ": database names are letters, digits, _ and -, starting with a letter or digit");
+          if (key.length < 3) throw this.error(where + ": TM1 needs database names of at least 3 characters");
+          const d = this.keys(or(value, new Map()), ["instance"], where);
+          const instance = d.get("instance") == null ? Tm1EngineContainer.DEFAULT_INSTANCE : d.get("instance");
+          if (typeof instance !== "string" || !ENGINE_NAME.test(instance)) {
+            throw this.error(where + ".instance: instance names are letters, digits, _ and -, starting with a letter or digit");
+          }
+          databases.set(key, instance);
+        }
+      }
+      const listed = or(engineSection.get("users"), []);
+      if (!Array.isArray(listed)) throw this.error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
+      // Every user is checked before any is found twice, as in pa_setup
+      const engineUsers = (listed as unknown[]).map((u, n) => this.engineUser(u, "tm1Engine.users[" + n + "]"));
+      if (new Set(engineUsers.map((u) => u.name.toLowerCase())).size !== engineUsers.length) throw this.error("tm1Engine.users: a user is listed twice");
+      const datastore = engineSection.get("datastore");
+      const ds = datastore == null || typeof datastore === "boolean" ? new Map<unknown, unknown>() : this.keys(datastore, ["port"], "tm1Engine.datastore");
+      enginePort = this.port(engineSection.get("port"), "tm1Engine", 4444);
+      // Published only when a port is given
+      datastorePort = ds.get("port") == null ? undefined : this.port(ds.get("port"), "tm1Engine.datastore", 27017);
+      for (const name of servers.keys()) {
+        // The engine's two compose services in pa-setup: a server of that name would be replaced
+        // by them
+        const lowered = name.toLowerCase();
+        if (lowered === "tm1-engine" || lowered === "tm1-engine-mongo") {
+          throw this.error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
+        }
+      }
+      engine = { databases, users: engineUsers };
+    }
+
+    if (servers.size === 0 && cam === undefined && engine === undefined) throw this.error("nothing to run: add tm1.servers, tm1Engine and/or cognos");
+    const ports: number[] = [];
+    if (enginePort !== undefined) ports.push(enginePort);
+    if (datastorePort !== undefined) ports.push(datastorePort);
+    ports.push(...[...servers.values()].map((s) => s.port));
     if (admin !== undefined) ports.push(admin);
     if (webPort !== undefined) ports.push(webPort);
     if (cam !== undefined) {
@@ -226,14 +295,25 @@ class PaEnvironmentFile {
       }
     }
 
-    return configure(b, servers, admin !== undefined, heap, cam, pawPort !== undefined, {
+    configure(b, servers, admin !== undefined, heap, cam, pawPort !== undefined, {
       ibm,
       pawZip,
       tm1Image: image(images, "tm1Server"),
       tm1WebImage: image(images, "tm1Web"),
       cognosImage: image(images, "cognosServer"),
       keycloakImage: image(images, "keycloak"),
+      // images.mongo is checked and not used: the engine's MongoDB is the container's own here
+      tm1EngineImage: engine === undefined ? undefined : image(images, "tm1Engine"),
     });
+    if (engine !== undefined) {
+      const wanted = engine;
+      b.tm1Engine((container) => {
+        for (const [name, instance] of wanted.databases) container.withDatabase(instance, name);
+        // TM1 v12 keeps no passwords: a user's is checked and not used
+        for (const u of wanted.users) container.withUser(u.name, ...u.groups);
+      });
+    }
+    return b;
   }
 
   /** pa_setup.check_keys: a mapping with only the allowed settings. */
@@ -301,6 +381,44 @@ class PaEnvironmentFile {
       groupNames.push(g);
     }
     return new CognosContainer.User(name, password, groupNames);
+  }
+
+  /** pa_setup.parse_user with password_optional: an engine's user, whose password may be left out
+   * or empty, since TM1 v12 keeps none. */
+  engineUser(entry: unknown, where: string): EngineUser {
+    let name: unknown;
+    let password: unknown;
+    const groups: unknown[] = [];
+    if (typeof entry === "string") {
+      const parts = entry.split(":");
+      if (parts.length === 2 && parts[1] !== "") {
+        // The image's own form has groups there; here the second part is a password
+        throw this.error(`${where}: '${entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write ${parts[0]}::${parts[1]}`);
+      }
+      if (parts.length > 3) throw this.error(`${where}: expected user, user::group,group or user:password:group,group, not '${entry}'`);
+      name = parts[0]!;
+      password = parts.length > 1 ? parts[1] : "";
+      if (parts.length === 3) groups.push(...parts[2]!.split(",").filter((g) => g !== ""));
+    } else if (entry instanceof Map) {
+      const map = this.keys(entry, ["name", "password", "groups"], where);
+      name = map.get("name");
+      password = map.get("password") == null ? "" : map.get("password");
+      const listed = or(map.get("groups"), []);
+      if (!Array.isArray(listed)) throw this.error(where + ": groups must be a list, e.g. groups: [Analysts]");
+      groups.push(...(listed as unknown[]));
+    } else {
+      throw this.error(where + ": a user is user:password[:groups] or a mapping");
+    }
+    if (typeof name !== "string" || !USER.test(name)) throw this.error(where + ": user name '" + str(name) + "' must be letters, digits, '.', '_' and '-'");
+    if (typeof password !== "string" || /[:\s]/.test(password)) {
+      throw this.error(where + ": " + name + "'s password must be text without ':' or spaces (quote a number)");
+    }
+    const groupNames: string[] = [];
+    for (const g of groups) {
+      if (typeof g !== "string" || !USER.test(g)) throw this.error(where + ": group '" + str(g) + "' must be letters, digits, '.', '_' and '-'");
+      groupNames.push(g);
+    }
+    return { name, groups: groupNames };
   }
 
   /** A tm1s.cfg value as pa_setup writes it, with Python's str(): true is True. */

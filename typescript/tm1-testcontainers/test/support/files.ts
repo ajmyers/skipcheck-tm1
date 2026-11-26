@@ -81,6 +81,14 @@ export const Repo = {
   get paEnvironmentFixtures(): string {
     return join(this.root, "spec", "conformance", "pa-environment");
   },
+  /** The pa-environment.yaml files for TM1 v12, shared with the other languages. */
+  get paEnvironmentEngineFixtures(): string {
+    return join(this.root, "testcontainers-conformance", "pa-environment");
+  },
+  /** The scenarios every language's container conformance test starts. */
+  get containerConformanceScenarios(): string {
+    return join(this.root, "testcontainers-conformance", "scenarios");
+  },
   get paEnvironmentExamples(): string {
     return join(this.root, "docker", "pa-setup", "examples");
   },

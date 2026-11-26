@@ -68,3 +68,16 @@ export async function fromConfig(): Promise<string> {
   return env.tm1("planning").getRestUrl();
   // @end
 }
+
+export async function engine(): Promise<string> {
+  // @start region = engine
+  // TM1 11 and TM1 v12 side by side: a server, and an engine with two databases
+  await using env = PlanningAnalyticsEnvironment.builder()
+    .tm1("legacy")
+    .tm1Engine((engine) => engine.withDatabase("planning").withDatabase("sales").withUser("analyst", "Analysts"))
+    .build();
+  await env.start();
+  const planning = env.tm1Database("planning");
+  return planning.getRestUrl() + " and " + env.tm1("legacy").getRestUrl();
+  // @end
+}

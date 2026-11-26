@@ -22,6 +22,8 @@ const REQUEST_TIMEOUT = 30_000;
 // The image's own rule: at least three characters, and nothing the commands or a URL would need
 // quoting for
 const NAME = /^[A-Za-z0-9][A-Za-z0-9_-]{2,}$/;
+// An instance's name has no least length: only a database's does
+const INSTANCE = /^[A-Za-z0-9][A-Za-z0-9_-]*$/;
 const USER = /^[A-Za-z0-9._-]+$/;
 
 // The datastore is this engine's alone and goes with it: nothing else is given the password
@@ -146,6 +148,8 @@ export class Tm1EngineContainer extends GenericContainer {
     this.#datastore = new Datastore();
     this.withEnv("TM1_DATASTORE_URL", `mongodb://${DATASTORE_USER}:${DATASTORE_PASSWORD}@${Tm1EngineContainer.DATASTORE_ALIAS}:27017`);
     this.dependsOn(this.#datastore);
+    // A network of their own unless one is given. It's made in Docker only when used.
+    this.withNetwork(Network.newNetwork());
     this.#mountSource();
   }
 
@@ -173,6 +177,16 @@ export class Tm1EngineContainer extends GenericContainer {
       throw e;
     });
     return shared;
+  }
+
+  /** Puts the engine, and its datastore with it, on a network. They have one of their own unless
+   * this is called. */
+  override withNetwork(network: Network | undefined): this {
+    super.withNetwork(network);
+    // At once, not when the engine starts: whatever starts the engine may start what it depends
+    // on first, and the datastore must be here by then
+    this.#datastore.withNetwork(network);
+    return this;
   }
 
   /** Adds a database, in the instance `tm1`. Without any, the container has one called `tm1`.
@@ -478,9 +492,16 @@ export class Tm1EngineContainer extends GenericContainer {
   }
 }
 
-/** `instance/name`, each checked against the image's rule for a name. */
+/** `instance/name`, each checked against the image's rule for its name. */
 function qualified(instance: string, name: string): string {
-  return requireName(instance, "instance") + "/" + requireName(name, "database");
+  return requireInstance(instance) + "/" + requireName(name, "database");
+}
+
+function requireInstance(name: string): string {
+  if (typeof name !== "string" || !INSTANCE.test(name)) {
+    throw new IllegalArgumentException(`A TM1 instance's name is letters, digits, '_' and '-', starting with a letter or digit: ${name}`);
+  }
+  return name;
 }
 
 function requireName(name: string, what: string): string {
