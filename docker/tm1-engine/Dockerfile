@@ -38,7 +38,7 @@ COPY docker/entrypoint.sh /usr/local/bin/tm1-engine-entrypoint
 COPY docker/install-tm1-engine.sh /usr/local/bin/tm1-engine-install
 COPY docker/engine.py /usr/local/bin/tm1-engine
 COPY docker/healthcheck.sh /usr/local/bin/tm1-engine-healthcheck
-COPY docker/unpack-tm1-engine.py docker/mongod-wrapper.sh docker/banner.txt /usr/local/lib/tm1-engine/
+COPY docker/unpack-tm1-engine.py docker/mongod-wrapper.sh docker/banner.txt docker/processes.sh /usr/local/lib/tm1-engine/
 RUN chmod 755 /usr/local/bin/tm1-engine*
 
 # Deliberately no VOLUME: unmounted folders live in the container and go away with it,

@@ -51,6 +51,9 @@ BIN="$TM1_ENGINE_HOME/bin"
 DEPLOYMENT=${TM1_ENGINE_DEPLOYMENT:-/tm1/deployment}
 CREDENTIALS=${TM1_ENGINE_CREDENTIALS:-/tm1/credentials}
 LIB=/usr/local/lib/tm1-engine
+# kill_install <install folder>: kills what runs from it (processes.sh says how it's found)
+# shellcheck source=processes.sh
+. "$LIB/processes.sh"
 
 log() { echo "[tm1-engine-entrypoint] $*"; }
 die() { echo "[tm1-engine-entrypoint] ERROR: $*" >&2; exit 2; }
@@ -191,9 +194,8 @@ stop_tm1() {
     kill -TERM "$TM1_PID" 2>/dev/null || true
     for _ in $(seq 1 30); do running || break; sleep 1; done
   fi
-  # Anything of TM1's still here would be killed with the container anyway. Its
-  # processes run from where the install really is (the cache, behind a link).
-  pkill -KILL -f "^$(readlink -f "$TM1_ENGINE_HOME")/" 2>/dev/null || true
+  # Anything of TM1's still here would be killed with the container anyway
+  kill_install "$TM1_ENGINE_HOME"
   kill "$TAIL_PID" 2>/dev/null || true
 }
 
