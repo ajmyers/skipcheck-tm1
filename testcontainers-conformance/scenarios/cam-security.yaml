@@ -1,0 +1,14 @@
+# Two TM1 servers in CAM security, with Cognos and its Keycloak for OIDC logins.
+# unordered: tm1/planning tm1/reporting
+# unordered: cognos keycloak
+version: 1
+tm1:
+  servers:
+    planning: {}
+    reporting: {}
+cognos:
+  users:
+    - admin:adminpw:Admins
+    - viewer:viewerpw:Readers
+  oidc: { keycloakPort: 8180 }
+  cam: { namespace: OIDC, admins: [admin] }

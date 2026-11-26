@@ -1,0 +1,8 @@
+# Two TM1 servers, the Admin Server they share, and TM1 Web listing both.
+# unordered: tm1/planning tm1/reporting
+version: 1
+tm1:
+  servers:
+    planning: { seed: sdata }
+    reporting: {}
+tm1Web: { heap: 2g }
