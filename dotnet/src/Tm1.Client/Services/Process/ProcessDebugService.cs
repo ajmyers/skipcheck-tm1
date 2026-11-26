@@ -227,16 +227,14 @@ public sealed class ProcessDebugService : Tm1Service
     /// 2.1.2 to 2.1.16) refuses a <c>GET</c> of the navigation itself, though its <c>$metadata</c>
     /// declares it; every version tried answers the expand.</summary>
     [Tm1Endpoint("Navigation ProcessDebugContext/CurrentBreakpoint")]
-    public async Task<ProcessDebugContextBreakpoint?> CurrentBreakpointAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default)
+    public Task<ProcessDebugContextBreakpoint?> CurrentBreakpointAsync(string id, ODataQuery? query = null, CancellationToken cancellationToken = default)
     {
+        // The request first, so a bad id throws at the call, as the other methods' do
         var nested = query ?? ODataQuery.None();
-        var context = await Session
-            .ExecuteAsync(
-                Tm1Request.Get<ProcessDebugContext>(ContextPath(id), ODataQuery.None().Select("ID").Expand("CurrentBreakpoint", _ => nested)),
-                cancellationToken
-            )
-            .ConfigureAwait(false);
-        return context?.CurrentBreakpoint;
+        var request = Tm1Request.Get<ProcessDebugContext>(ContextPath(id), ODataQuery.None().Select("ID").Expand("CurrentBreakpoint", _ => nested));
+        return Read();
+
+        async Task<ProcessDebugContextBreakpoint?> Read() => (await Session.ExecuteAsync(request, cancellationToken).ConfigureAwait(false))?.CurrentBreakpoint;
     }
 
     /// <summary><c>GET ProcessDebugContexts('id')/CallStack</c>: where the run is, innermost first, streamed.</summary>

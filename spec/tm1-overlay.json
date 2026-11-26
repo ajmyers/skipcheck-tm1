@@ -12,6 +12,9 @@
 		}
 	},
 	"endpoints": {
+		"Navigation ProcessDebugContext/CurrentBreakpoint": {
+			"note": "TM1 before 11.8.035 (Planning Analytics 2.1.2 to 2.1.16) refuses a `GET` of it (400, \"GET not supported on this resource!\"), though `$metadata` declares it; every version answers it as the context's `$expand=CurrentBreakpoint`, which is how the services' `currentBreakpoint` reads it."
+		},
 		"Navigation User/Groups": {
 			"forbid": [
 				"create",

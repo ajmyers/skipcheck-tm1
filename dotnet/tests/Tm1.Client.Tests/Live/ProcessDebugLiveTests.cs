@@ -78,6 +78,7 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
     private async Task StopsAndRunsToTheEnd(string id)
     {
         Assert.Equal(ProcessDebugContextStatus.Paused, (await Settled(id)).Status); // paused before the first line
+        Assert.Null(await Debug.CurrentBreakpointAsync(id)); // at no breakpoint yet
         await Debug.AddBreakpointAsync(id, Line(1, 3));
         var breakpoint = Assert.IsType<ProcessDebugContextLineBreakpoint>(Assert.Single(await Debug.BreakpointsAsync(id).ToListAsync()));
         Assert.Equal(3, breakpoint.LineNumber);
