@@ -6,24 +6,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
+import io.skipcheck.tm1.client.Tm1Operation;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
+import io.skipcheck.tm1.client.error.Tm1UnsupportedOperationException;
 import io.skipcheck.tm1.client.model.EncryptionAtRestValidationReport;
 import io.skipcheck.tm1.client.model.EncryptionFileType;
 import io.skipcheck.tm1.client.model.LocalKeyFileProviderSettingsPatch;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import io.skipcheck.tm1.testcontainers.Tm1Source;
+import reactor.core.publisher.Mono;
 
 /**
- * EncryptionService, on a TM1 of its own, since encryption changes the server. The image
- * has no GSKit command line, so the local key file provider can't make a key, and nothing
- * here gets encrypted: the test pins how TM1 says so.
+ * EncryptionService, on a TM1 of its own, since encryption changes the server. Before TM1
+ * 11.8.040 the image's missing GSKit command line stops the local key file provider from
+ * making a key, so the settings check as invalid and every change is refused: the test
+ * pins how TM1 says so. From 11.8.040 the server makes the key itself, the settings check
+ * as valid, and configuring would really convert the server and stop it, so the test
+ * doesn't try that.
  */
 @RequiresTm1
 class EncryptionServiceTm1Test {
@@ -57,29 +66,63 @@ class EncryptionServiceTm1Test {
 
 	@Test
 	void validatesSettingsWithoutChangingAnything() {
+		ServerAssumptions.assumeSupports(tm1, Tm1Operations.VALIDATE_ENCRYPTION_AT_REST_SETTINGS);
 		EncryptionAtRestValidationReport report = tm1.encryption().validate(LOCAL).block(WAIT);
-		assertThat(report.isValid()).isFalse();
-		assertThat(report.issues()).singleElement()
-			.asString()
-			.contains("Could not generate a new key using the local GSKit installation");
+		if (makesItsOwnKey()) {
+			assertThat(report.isValid()).isTrue();
+			assertThat(report.issues()).isEmpty();
+		}
+		else {
+			assertThat(report.isValid()).isFalse();
+			assertThat(report.issues()).singleElement()
+				.asString()
+				.contains("Could not generate a new key using the local GSKit installation");
+		}
 	}
 
 	@Test
 	void refusesChangesWithBareCodeNames() {
-		assertThatThrownBy(() -> tm1.encryption().configure(LOCAL).block(WAIT))
-			.isInstanceOf(Tm1BadRequestException.class)
-			.hasMessageContaining("DataModelConversion");
-		assertThatThrownBy(() -> tm1.encryption().disable().block(WAIT)).hasMessageContaining("DataModelConversion");
-		assertThatThrownBy(() -> tm1.encryption().rotateDataEncryptionKey().block(WAIT))
-			.hasMessageContaining("DataEncryptionKeyRotationFailed");
-		assertThatThrownBy(() -> tm1.encryption().rotateDataModelKey().block(WAIT))
-			.hasMessageContaining("RotateDataModelKey");
-		assertThatThrownBy(() -> tm1.encryption()
-			.encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.OBJECT)
-			.block(WAIT)).hasMessageContaining("DataFileConversion");
-		assertThatThrownBy(() -> tm1.encryption()
-			.decryptFile("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.OBJECT)
-			.block(WAIT)).hasMessageContaining("DataFileConversion");
+		// Configuring with settings the server takes would convert it and stop it, so
+		// only where they check as invalid, whatever the version
+		boolean takesThem = ServerAssumptions.capabilities(tm1)
+			.supports(Tm1Operations.VALIDATE_ENCRYPTION_AT_REST_SETTINGS.capability())
+				&& tm1.encryption().validate(LOCAL).block(WAIT).isValid();
+		if (!takesThem) {
+			refuses(Tm1Operations.CONFIGURE_ENCRYPTION_AT_REST, () -> tm1.encryption().configure(LOCAL),
+					"DataModelConversion");
+		}
+		refuses(Tm1Operations.DISABLE_ENCRYPTION_AT_REST, () -> tm1.encryption().disable(), "DataModelConversion");
+		refuses(Tm1Operations.ROTATE_DATA_ENCRYPTION_KEY, () -> tm1.encryption().rotateDataEncryptionKey(),
+				"DataEncryptionKeyRotationFailed");
+		refuses(Tm1Operations.ROTATE_DATA_MODEL_KEY, () -> tm1.encryption().rotateDataModelKey(), "RotateDataModelKey");
+		refuses(Tm1Operations.ENCRYPT_DATA_FILE,
+				() -> tm1.encryption().encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.OBJECT),
+				"DataFileConversion");
+		refuses(Tm1Operations.DECRYPT_DATA_FILE,
+				() -> tm1.encryption()
+					.decryptFile("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.OBJECT),
+				"DataFileConversion");
+	}
+
+	/**
+	 * TM1's refusal, with its bare code name in the message, where the server defines the
+	 * operation; the client's own refusal, sending nothing, where it doesn't.
+	 */
+	private static void refuses(Tm1Operation operation, Supplier<Mono<?>> call, String code) {
+		if (ServerAssumptions.capabilities(tm1).supports(operation.capability())) {
+			assertThatThrownBy(() -> call.get().block(WAIT)).as(operation.endpoint())
+				.isInstanceOf(Tm1BadRequestException.class)
+				.hasMessageContaining(code);
+		}
+		else {
+			assertThatThrownBy(() -> call.get().block(WAIT)).as(operation.endpoint())
+				.isInstanceOf(Tm1UnsupportedOperationException.class);
+		}
+	}
+
+	/** Whether the server's settings are expected to check as valid. */
+	private static boolean makesItsOwnKey() {
+		return ServerAssumptions.isAtLeast(tm1, ServerAssumptions.MAKES_OWN_KEY_FROM);
 	}
 
 }

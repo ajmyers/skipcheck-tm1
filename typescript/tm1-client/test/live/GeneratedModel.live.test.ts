@@ -20,10 +20,12 @@ import {
   Server,
   Tm1Request,
   type Tm1Session,
+  Tm1Capabilities,
   typeOf,
   View,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { ownSnapshot } from "./server-assumptions.js";
 import { sessions } from "./raw-tm1.js";
 
 const rules = async (session: Tm1Session, cube: ODataPath): Promise<string | null | undefined> =>
@@ -162,12 +164,17 @@ describe("The generated model on TM1" + liveReason, () => {
     }
   });
 
-  tm1Test("the server has every operation in the catalog", async () => {
+  tm1Test("the server has every operation in the catalog", async (context) => {
     const session = (await sessions()).build();
     try {
       const capabilities = await session.capabilities();
       expect(allOperations).not.toEqual([]);
-      expect(allOperations.filter((op) => !capabilities.supports(op.capability())).map((op) => op.endpoint())).toEqual([]);
+      // Every operation the snapshot of the server's own schema defines: an older server lacks what
+      // came later (Reserve in 11.8.34, encryption at rest in 11.8.35)
+      const ownXml = ownSnapshot(capabilities);
+      if (ownXml === undefined) return context.skip("No metadata snapshot is committed for schema " + capabilities.schemaVersion);
+      const own = Tm1Capabilities.parse(ownXml);
+      expect(allOperations.filter((op) => capabilities.supports(op.capability()) !== own.supports(op.capability())).map((op) => op.endpoint())).toEqual([]);
     } finally {
       await session.close();
     }

@@ -105,6 +105,10 @@ public class ElementServiceLiveTests
         var (tm1, d) = (made.Tm1, made.Name);
         await tm1.Elements.LockAsync(d, d, "North");
         await tm1.Elements.UnlockAsync(d, d, "North");
+        if (!await ServerAssumptions.SupportsAsync(tm1, Tm1Operations.ElementReserve))
+        {
+            return; // the server doesn't define it (xUnit 2 can't skip a test once it runs)
+        }
         await tm1.Elements.ReserveAsync(d, d, "North");
         await tm1.Elements.ReleaseAsync(d, d, "North");
     }

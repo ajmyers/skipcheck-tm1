@@ -74,6 +74,11 @@ public sealed class CubeRulesLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task ChecksFeedersUnderAConsolidation()
     {
+        // Both needs Selection, which servers before schema 11.8.32 don't have
+        if (!await ServerAssumptions.SupportsParameterAsync(_tm1, Tm1Operations.CubeCheckFeeders, "Selection"))
+        {
+            return; // the server has no Selection (xUnit 2 can't skip a test once it runs)
+        }
         await LiveModel.WriteAsync(_tm1, _cube, [LiveModel.Element(Region, "North"), LiveModel.Element(Measure, "Amount")], "5");
         var cells = await Cubes.CheckFeedersAsync(_cube, Tuple("Total", "Double"), CheckFeedersSelection.Both, ODataQuery.None().Expand("Tuple")).ToListAsync();
         Assert.Contains(cells, c => c.Tuple!.Select(e => e.Name).SequenceEqual(["North", "Double"]) && c.Fed == true);

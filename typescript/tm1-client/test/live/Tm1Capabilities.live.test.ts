@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFileSync } from "node:fs";
 import { describe, expect } from "vitest";
 import {
   ODataPath,
@@ -9,33 +8,37 @@ import {
   Tm1Capability,
   Tm1Identity,
   Tm1Request,
+  type Tm1Session,
   Tm1SessionPool,
   Tm1UnsupportedOperationException,
   Tm1Version,
 } from "../../src/index.js";
-import { Repo } from "../support/repo.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { ownSnapshot, schemaVersionIn } from "./server-assumptions.js";
 import { sessions, SERVER, failure } from "./raw-tm1.js";
 
 /** The Java client's `Tm1CapabilitiesTm1Test`. */
-describe("Tm1 capabilities on TM1" + liveReason, () => {
-  const snapshot = (): string => readFileSync(Repo.snapshot, "utf8");
+const metadata = (s: Tm1Session): Promise<string> => s.execute(Tm1Request.text(ODataPath.metadata()).withHeader("Accept", "application/xml"));
 
-  tm1Test("reads the version and the capabilities the snapshot describes", async () => {
+describe("Tm1 capabilities on TM1" + liveReason, () => {
+  tm1Test("reads the version and the capabilities the snapshot describes", async (context) => {
     const s = (await sessions()).build();
     try {
       const reported = (await s.execute(SERVER)).ProductVersion;
       expect((await s.version()).equals(Tm1Version.parse(reported))).toBe(true);
       const capabilities = await s.capabilities();
-      const xml = snapshot();
-      expect(capabilities.schemaVersion).toBe(Tm1Capabilities.parse(xml).schemaVersion);
+      // The schema its $metadata says, read from the text, not by the client
+      expect(capabilities.schemaVersion).toBe(schemaVersionIn(await metadata(s)));
+      const xml = ownSnapshot(capabilities);
+      if (xml === undefined) return context.skip("No metadata snapshot is committed for schema " + capabilities.schemaVersion);
       const container = xml.slice(xml.indexOf("<EntityContainer"), xml.indexOf("</EntityContainer>"));
       for (const [, kind, n] of container.matchAll(/<(EntitySet|Singleton|ActionImport) Name="([^"]+)"/g)) {
         const capability =
           kind === "EntitySet" ? Tm1Capability.entitySet(n!) : kind === "Singleton" ? Tm1Capability.singleton(n!) : Tm1Capability.unboundOperation(n!);
         expect(capabilities.supports(capability), `${kind} ${n}`).toBe(true);
       }
-      expect(capabilities.supports(Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve"))).toBe(true);
+      const reserve = Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve");
+      expect(capabilities.supports(reserve), "Reserve, from schema 11.8.34").toBe(Tm1Capabilities.parse(xml).supports(reserve));
     } finally {
       await s.close();
     }
@@ -50,7 +53,7 @@ describe("Tm1 capabilities on TM1" + liveReason, () => {
       expect(e).toBeInstanceOf(Tm1UnsupportedOperationException);
       const message = (e as Error).message;
       expect(message).toContain("added in schema 99.0");
-      expect(message).toContain("reports schema " + Tm1Capabilities.parse(snapshot()).schemaVersion);
+      expect(message).toContain("reports schema " + schemaVersionIn(await metadata(s)));
       expect(message).toContain("product version " + version.toString());
     } finally {
       await s.close();

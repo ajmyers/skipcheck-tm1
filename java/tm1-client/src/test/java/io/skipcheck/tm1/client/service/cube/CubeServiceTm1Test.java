@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
@@ -27,6 +28,7 @@ import io.skipcheck.tm1.client.model.DimensionCreate;
 import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.Filter;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -128,6 +130,7 @@ class CubeServiceTm1Test {
 	void loadsUnloadsLocksAndReserves() {
 		cubes.unload(cube).then(cubes.load(cube)).block(WAIT);
 		cubes.lock(cube).then(cubes.unlock(cube)).block(WAIT);
+		ServerAssumptions.assumeSupports(tm1, Tm1Operations.CUBE_RESERVE);
 		cubes.reserve(cube).then(cubes.release(cube)).block(WAIT);
 	}
 

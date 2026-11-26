@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.DimensionCreate;
@@ -92,11 +93,13 @@ class GitServiceTm1Test {
 				tm1.git().execute(skip).block(WAIT);
 
 				remote.commitCopyOf(dimension, copy);
-				GitPullPlan stale = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
-				assertThat(stale.commit().summary())
-					.as("the first pull after the remote moves plans the commit TM1 had")
-					.isEqualTo("Add a dimension");
+				// The first pull after the remote moves: from 11.8.035 the commit TM1
+				// had, then the new one; before, the new one at once
 				GitPullPlan pull = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
+				if (ServerAssumptions.isAtLeast(tm1, ServerAssumptions.STALE_FIRST_PULL_FROM)) {
+					assertThat(pull.commit().summary()).as("the commit TM1 had").isEqualTo("Add a dimension");
+					pull = tm1.git().pull("main", GitCredentials.none(), null, true).block(WAIT);
+				}
 				assertThat(pull.commit().summary()).isEqualTo("Copy " + dimension);
 				assertThat(pull.operations()).contains("Create Dimensions('" + copy + "')");
 				tm1.git().execute(pull).block(WAIT);

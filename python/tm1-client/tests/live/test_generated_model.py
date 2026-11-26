@@ -9,7 +9,7 @@ import uuid
 
 import pytest
 
-from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Error, Tm1Request, Tm1Session
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Capabilities, Tm1Error, Tm1Request, Tm1Session
 from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Cube,
@@ -28,6 +28,7 @@ from skipcheck_tm1.model import (
 )
 
 from .conftest import CONFIGURED, REASON, session, started_version
+from .support import own_snapshot
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -117,8 +118,11 @@ def test_creates_a_dimension_and_a_cube_from_patches_then_patches_and_clears_its
 def test_the_server_has_every_operation_in_the_catalog() -> None:
     with session() as s:
         capabilities = s.capabilities()
-        missing = [op.endpoint() for op in Tm1Operations.ALL if not capabilities.supports(op.capability())]
-        assert missing == []
+        # Every operation the snapshot of the server's own schema defines: an older server lacks what
+        # came later (Reserve in 11.8.34, encryption at rest in 11.8.35)
+        own = Tm1Capabilities.parse(own_snapshot(capabilities))
+        differ = [op.endpoint() for op in Tm1Operations.ALL if capabilities.supports(op.capability()) != own.supports(op.capability())]
+        assert differ == []
 
 
 def _quietly(s: Tm1Session, request: Tm1Request[None]) -> None:

@@ -18,7 +18,9 @@ import {
   Tm1PreconditionFailedException,
   type Tm1Stream,
 } from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { lacks } from "./server-assumptions.js";
 
 const dim = (name: string): ODataPath => ODataPath.of("Dimensions").key(name);
 
@@ -105,11 +107,13 @@ describe("CubeService on TM1" + liveReason, () => {
     expect(await names(tm1.cubes.dimensions(cube)), "presentation order unchanged").toEqual(["Sandboxes", region, measure]);
   });
 
-  tm1Test("loads, unloads, locks and reserves", async () => {
+  tm1Test("loads, unloads, locks and reserves", async (context) => {
     await tm1.cubes.unload(cube);
     await tm1.cubes.load(cube);
     await tm1.cubes.lock(cube);
     await tm1.cubes.unlock(cube);
+    const why = await lacks(tm1, Tm1Operations.CubeReserve);
+    if (why) return context.skip(why);
     await tm1.cubes.reserve(cube);
     await tm1.cubes.release(cube);
   });

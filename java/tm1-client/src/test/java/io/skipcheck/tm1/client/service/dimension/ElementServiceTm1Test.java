@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
@@ -32,6 +33,7 @@ import io.skipcheck.tm1.client.model.ElementCreate;
 import io.skipcheck.tm1.client.model.ElementPatch;
 import io.skipcheck.tm1.client.model.ElementType;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
+import io.skipcheck.tm1.client.model.Tm1Operations;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.RequiresTm1;
@@ -154,6 +156,7 @@ class ElementServiceTm1Test {
 	@Test
 	void locksAndReservesAnElement() {
 		elements.lock(d, d, "North").then(elements.unlock(d, d, "North")).block(WAIT);
+		ServerAssumptions.assumeSupports(tm1, Tm1Operations.ELEMENT_RESERVE);
 		elements.reserve(d, d, "North").then(elements.release(d, d, "North")).block(WAIT);
 	}
 

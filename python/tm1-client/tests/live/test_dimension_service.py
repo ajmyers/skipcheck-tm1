@@ -15,6 +15,7 @@ from skipcheck_tm1 import (
     Tm1PreconditionFailedError,
     Tm1Request,
 )
+from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import (
     Dimension,
     DimensionCreate,
@@ -24,6 +25,7 @@ from skipcheck_tm1.model import (
 
 from .conftest import CONFIGURED, REASON
 from .support import (
+    assume_supports,
     dimension_of,
     made,
     names,
@@ -82,5 +84,6 @@ def test_locks_and_reserves(tm1: Tm1Client, name: str) -> None:
     with made(tm1, name, dimension_of(name, [numeric("North")])) as d:
         tm1.dimensions.lock(d)
         tm1.dimensions.unlock(d)
+        assume_supports(tm1, Tm1Operations.DIMENSION_RESERVE)
         tm1.dimensions.reserve(d)
         tm1.dimensions.release(d)
