@@ -123,8 +123,12 @@ public class ContentServiceLiveTests
             // A name of its own: see KeepsADocumentInBlobsBehindAReference
             var made = await tm1.Contents.CreateAsync(folder, ContentScope.Public, DocumentCreate.Builder().Name(name + "-notes.txt").Build());
             var (url, user, password) = Live.Target();
-            using var http = new HttpClient();
-            using var chunked = new HttpRequestMessage(HttpMethod.Put, url + folder.Child(made.Id!).Path() + "/tm1.DocumentReference/Document/Content")
+            // TM1_VERIFY and TM1_URL as the other requests take them: RawTm1's handler, and a / after the URL
+            using var http = new HttpClient(RawTm1.Handler());
+            using var chunked = new HttpRequestMessage(
+                HttpMethod.Put,
+                url.TrimEnd('/') + "/" + folder.Child(made.Id!).Path() + "/tm1.DocumentReference/Document/Content"
+            )
             {
                 Content = new StreamContent(new System.IO.MemoryStream(Encoding.UTF8.GetBytes("hello"))),
             };

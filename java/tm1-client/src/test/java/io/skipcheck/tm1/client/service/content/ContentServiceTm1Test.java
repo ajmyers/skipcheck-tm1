@@ -99,9 +99,9 @@ class ContentServiceTm1Test {
 		tm1.contents()
 			.create(ContentPath.applications(), ContentScope.PUBLIC, FolderCreate.builder().name(name).build())
 			.block(WAIT);
-		// TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two made
-		// with
-		// one name in one second collide (400, code 226), so each test names its own
+		// TM1 keeps a document as }externals/<name>_<second>.<ext>, server-wide: two
+		// made with one name in one second collide (400, code 226), so each test names
+		// its own
 		String doc = name + "-notes";
 		try {
 			Entry made = tm1.contents()

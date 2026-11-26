@@ -395,11 +395,11 @@
 					"name": "PUBLIC",
 					"json": "PUBLIC"
 				},
-				"${doc}_copy.txt"
+				"${doc}-copy.txt"
 			],
 			"expect": {
 				"fields": {
-					"ID": "${doc}_copy.txt.blob"
+					"ID": "${doc}-copy.txt.blob"
 				}
 			}
 		},

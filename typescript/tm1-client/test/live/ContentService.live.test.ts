@@ -85,7 +85,7 @@ describe("ContentService on TM1" + liveReason, () => {
       const document = await tm1.contents.document(notes, ODataQuery.none());
       expect(document.Size).toBe(11);
       // Named by TM1, with a timestamp
-      expect(document.Name).toMatch(new RegExp(`^${doc}_.*\\.txt$`));
+      expect(document.Name?.startsWith(doc + "_") && document.Name.endsWith(".txt"), document.Name).toBe(true);
       const blob = ContentPath.blobs().child(document.ID!);
       expect(await text(tm1.contents.content(blob))).toBe("hello there");
 
