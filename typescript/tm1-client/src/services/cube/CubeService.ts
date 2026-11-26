@@ -3,7 +3,7 @@
 import { Primitive, type Tm1Model } from "../../model.js";
 import {
   CalculationComponent,
-  type CheckFeedersSelection,
+  CheckFeedersSelection,
   Cube,
   type CubeCreate,
   type CubePatch,
@@ -190,7 +190,8 @@ export class CubeService extends Tm1Service {
   }
 
   /** `tm1.CheckFeeders`: the cells under a consolidated cell that aren't fed though they have
-   * values, chosen by `selection`. */
+   * values, chosen by `selection`. Servers before schema 11.8.32 have no `Selection` and list only
+   * the unfed cells: there `Unfed` works and the others fail with `Tm1UnsupportedOperationException`. */
   checkFeeders(
     name: string,
     tuple: Tm1Map<string>,
@@ -201,7 +202,12 @@ export class CubeService extends Tm1Service {
     const operation = Tm1Operations.CubeCheckFeeders;
     const body = { "Tuple@odata.bind": bindings(tuple), Selection: required(selection, "selection") };
     return this.session.stream(
-      Tm1Request.postList(cubePath(name).action(operation.name), body, FedCellDescriptor).withQuery(query).requires(operation.capability()),
+      // Servers before schema 11.8.32 have no Selection, and answer as for Unfed: so Unfed is sent
+      // without it there, and Both and Fed are refused
+      Tm1Request.postList(cubePath(name).action(operation.name), body, FedCellDescriptor)
+        .withQuery(query)
+        .requires(operation)
+        .withParameterDefault("Selection", CheckFeedersSelection.Unfed),
       options,
     );
   }

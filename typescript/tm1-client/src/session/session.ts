@@ -5,6 +5,7 @@ import { ODataError, Tm1ErrorClassifier, Tm1ProtocolException } from "../errors/
 import { readAs, writeJson } from "../json.js";
 import { Json } from "../model.js";
 import { ODataEncoding, ODataPath, ODataQuery } from "../odata/index.js";
+import type { Tm1Operation } from "../operation.js";
 import { Tm1Request } from "../request.js";
 import { Tm1Stream } from "../stream.js";
 import { delay } from "../util.js";
@@ -178,9 +179,9 @@ export class Tm1Session implements AsyncDisposable {
     // A batched request joins the batch as it is, as Java's: TM1 answers for it in the batch. What it
     // requires is checked when the batch runs.
     if (this.queue) return (await this.queue.add(this, request, (r) => this.read(request, r))) as T;
-    await this.check(request.requirement(), options);
-    const reply = await this.send(request, this.target(request.relativeUri()), options?.signal);
-    return this.read(request, reply);
+    const ready = await this.prepare(request, options);
+    const reply = await this.send(ready, this.target(ready.relativeUri()), options?.signal);
+    return this.read(ready, reply);
   }
 
   /** The items of a collection, fetching pages as they're needed (Java's `stream`). In a batch, the
@@ -201,9 +202,9 @@ export class Tm1Session implements AsyncDisposable {
       });
     }
     return Tm1Stream.from(async function* () {
-      await self.check(request.requirement(), options);
-      const reply = await self.send(request, self.target(request.relativeUri()), signal);
-      yield* self.items(request, readPage(request, reply), signal);
+      const ready = await self.prepare(request, options);
+      const reply = await self.send(ready, self.target(ready.relativeUri()), signal);
+      yield* self.items(ready, readPage(ready, reply), signal);
     });
   }
 
@@ -228,11 +229,26 @@ export class Tm1Session implements AsyncDisposable {
     }
   }
 
-  /** @internal Fails if the server doesn't define what a request requires, unless the session was told not to check. */
-  async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<void> {
-    if (!requirement || !this.connection.checkCapabilities) return;
-    const refused = (await this.connection.capabilities(options?.signal)).check(requirement, this.connection.root);
+  /** @internal Fails if the server doesn't define what a request requires, unless the session was
+   * told not to check; the server's capabilities if it checked. */
+  async check(requirement: Tm1Capability | undefined, options: Tm1CallOptions | undefined): Promise<Tm1Capabilities | undefined> {
+    if (!requirement || !this.connection.checkCapabilities) return undefined;
+    const capabilities = await this.connection.capabilities(options?.signal);
+    const refused = capabilities.check(requirement, this.connection.root);
     if (refused) throw refused;
+    return capabilities;
+  }
+
+  /** The request as it can be sent to this server, as Java's `Connection.prepare`: what it needs is
+   * checked first, and so are the parameters its body sends, for a request that names its operation.
+   * A parameter the server lacks fails the call, unless its default is what the body sends, in which
+   * case it's left out of the body. */
+  private async prepare<T>(request: Tm1Request<T>, options: Tm1CallOptions | undefined): Promise<Tm1Request<T>> {
+    const capabilities = await this.check(request.requirement(), options);
+    const operation = request.operation();
+    if (!capabilities || operation?.kind !== "Action" || !isPlainObject(request.body)) return request;
+    const sent = checkParameters(capabilities, request.requirement()!, operation, request.parameterDefaults(), request.body, this.connection.root);
+    return sent === request.body ? request : request.withBody(sent);
   }
 
   /** @internal The URL of a path and query, with the view's `!sandbox` and `!ChangeSet` unless the
@@ -418,6 +434,9 @@ interface Entry {
   body: unknown;
   /** What the server must define for the request, checked when the batch runs. */
   requirement: Tm1Capability | undefined;
+  /** The operation whose parameters are checked when the batch runs, and their defaults. */
+  operation: Tm1Operation | undefined;
+  parameterDefaults: Readonly<Record<string, unknown>>;
   read: (reply: Reply) => unknown;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
@@ -464,6 +483,8 @@ export class BatchQueue {
       headers: request.headers,
       body,
       requirement: request.requirement(),
+      operation: request.operation(),
+      parameterDefaults: request.parameterDefaults(),
       read,
       resolve,
       reject,
@@ -483,7 +504,12 @@ export class BatchQueue {
     const all: Entry[] = [];
     for (const e of this.entries) {
       try {
-        await this.sender.check(e.requirement, { signal });
+        const capabilities = await this.sender.check(e.requirement, { signal });
+        // As outside a batch: the body may lose a parameter the server lacks whose value is what
+        // leaving it out means
+        if (capabilities && e.operation?.kind === "Action" && isPlainObject(e.body)) {
+          e.body = checkParameters(capabilities, e.requirement!, e.operation, e.parameterDefaults, e.body, this.sender.connection.root);
+        }
         all.push(e);
       } catch (error) {
         e.reject(error);
@@ -691,4 +717,36 @@ export function checkImpersonated(user: string): string {
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f-\x9f]/.test(user)) throw new RangeError("The user to impersonate has a control character in its name, which can't be sent in a header");
   return user;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Uint8Array) && Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+/** @internal Checks each of the operation's parameters `body` sends against the server's
+ * definition: one the server lacks whose default is what the body sends is left out, any other the
+ * server lacks fails. The body itself if nothing is left out, otherwise a copy without them. */
+export function checkParameters(
+  capabilities: Tm1Capabilities,
+  needed: Tm1Capability,
+  operation: Tm1Operation,
+  defaults: Readonly<Record<string, unknown>>,
+  body: Record<string, unknown>,
+  server: string,
+): Record<string, unknown> {
+  let sent = body;
+  for (const parameter of operation.parameters) {
+    const name = parameter.name;
+    const key = name in sent ? name : name + "@odata.bind" in sent ? name + "@odata.bind" : undefined;
+    if (key === undefined || capabilities.supportsParameter(needed, name)) continue;
+    if (name in defaults && writeJson(defaults[name]) === writeJson(sent[key])) {
+      sent = { ...sent };
+      delete sent[key];
+      continue;
+    }
+    throw capabilities.checkParameter(needed, name, server)!;
+  }
+  return sent;
 }

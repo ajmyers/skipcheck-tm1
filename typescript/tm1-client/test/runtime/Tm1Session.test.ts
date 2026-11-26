@@ -28,6 +28,7 @@ import {
   Tm1Version,
   type Tm1Exception,
 } from "../../src/index.js";
+import { Tm1Operations } from "../../src/generated/index.js";
 import { asyncResult } from "../../src/session/connection.js";
 import { Repo } from "../support/repo.js";
 import { eventually, Pending, ScriptedTm1, seeded, settle } from "../support/scripted-tm1.js";
@@ -1056,6 +1057,60 @@ describe("Tm1Session capabilities", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.text).toContain("Server");
     expect(sent[0]!.text).not.toContain("Bananas");
+  });
+
+  const CHECK_FEEDERS = "POST Cubes('Sales')/tm1.CheckFeeders";
+  /** A server whose CheckFeeders has no Selection, as before schema 11.8.32. */
+  const withoutSelection = (tm1: ScriptedTm1): ScriptedTm1 => {
+    const metadata = SNAPSHOT.replace(/(<Action Name="CheckFeeders"[\s\S]*?)<Parameter Name="Selection"[\s\S]*?<\/Parameter>/, "$1");
+    expect(metadata).not.toBe(SNAPSHOT);
+    return tm1.on(METADATA, () => ScriptedTm1.xml(metadata));
+  };
+  const checkFeeders = (selection: string): Tm1Request<unknown> =>
+    Tm1Request.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), {
+      "Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"],
+      Selection: selection,
+    })
+      .requires(Tm1Operations.CubeCheckFeeders)
+      .withParameterDefault("Selection", "Unfed");
+
+  it("sends every parameter the server defines", async () => {
+    const tm1 = scripted().on(CHECK_FEEDERS, () => ScriptedTm1.json(200, '{"value":[]}'));
+    await tm1.session().stream(checkFeeders("Both")).toArray();
+    expect(tm1.requests(CHECK_FEEDERS)[0]!.text).toContain('"Selection":"Both"');
+  });
+
+  it("refuses a parameter the server doesn't define without sending it", async () => {
+    const tm1 = withoutSelection(scripted());
+    const e = await failure(tm1.session().stream(checkFeeders("Both")).toArray());
+    expect(e).toBeInstanceOf(Tm1UnsupportedOperationException);
+    expect((e as Tm1UnsupportedOperationException).missing).toBe("parameter Selection of Cube.CheckFeeders");
+    expect((e as Tm1UnsupportedOperationException).message).toContain("reports schema 11.8.35");
+    expect(tm1.requests(CHECK_FEEDERS)).toHaveLength(0);
+  });
+
+  it("leaves out a parameter the server doesn't define when its value is what leaving it out means", async () => {
+    const tm1 = withoutSelection(scripted()).on(CHECK_FEEDERS, () => ScriptedTm1.json(200, '{"value":[]}'));
+    await tm1.session().stream(checkFeeders("Unfed")).toArray();
+    const sent = tm1.requests(CHECK_FEEDERS)[0]!.text;
+    expect(sent).toContain("Tuple@odata.bind");
+    expect(sent).not.toContain("Selection");
+  });
+
+  it("leaves out a parameter in a batch too", async () => {
+    const tm1 = withoutSelection(scripted()).on("POST $batch", () =>
+      ScriptedTm1.json(200, '{"responses":[{"id":"1","status":200,"body":{"value":[]}},{"id":"2","status":200,"body":{"value":[]}}]}'),
+    );
+    const batch = tm1.session().batch();
+    const unfed = batch.session.stream(checkFeeders("Unfed")).toArray();
+    const both = batch.session.stream(checkFeeders("Both")).toArray();
+    await batch.run();
+    expect(await unfed).toEqual([]);
+    expect(await Promise.race([failure(both), settle().then(() => "still waiting")])).toBeInstanceOf(Tm1UnsupportedOperationException);
+    const sent = tm1.requests("POST $batch");
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.text).toContain("tm1.CheckFeeders");
+    expect(sent[0]!.text).not.toContain("Selection");
   });
 
   it("fails the calls that need the capabilities when they can't be read, and sends the rest", async () => {

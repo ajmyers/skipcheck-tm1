@@ -2,6 +2,7 @@
 
 import type { Tm1Model } from "./model.js";
 import { ODataQuery, type ODataPath } from "./odata/index.js";
+import { Tm1Operation } from "./operation.js";
 import type { Tm1Capability } from "./version/index.js";
 
 /** How a request's answer is read: one JSON value, a collection (`{"value": […]}`, maybe paged)
@@ -27,6 +28,8 @@ interface Parts<T> {
   type: Tm1Model<T> | undefined;
   timeout: number | undefined;
   requirement: Tm1Capability | undefined;
+  operation: Tm1Operation | undefined;
+  parameterDefaults: Readonly<Record<string, unknown>>;
 }
 
 /** A request of the REST API, and how its answer is read: what services send through the session,
@@ -50,6 +53,8 @@ export class Tm1Request<T> {
   /** How long to wait for the answer, in milliseconds, instead of the session's request timeout. */
   readonly timeout: number | undefined;
   private readonly requirementValue: Tm1Capability | undefined;
+  private readonly operationValue: Tm1Operation | undefined;
+  private readonly parameterDefaultsValue: Readonly<Record<string, unknown>>;
 
   private constructor(parts: Parts<T>) {
     this.method = parts.method;
@@ -61,6 +66,8 @@ export class Tm1Request<T> {
     this.type = parts.type;
     this.timeout = parts.timeout;
     this.requirementValue = parts.requirement;
+    this.operationValue = parts.operation;
+    this.parameterDefaultsValue = Object.freeze({ ...parts.parameterDefaults });
   }
 
   private static make<T>(
@@ -82,6 +89,8 @@ export class Tm1Request<T> {
       type,
       timeout: undefined,
       requirement: undefined,
+      operation: undefined,
+      parameterDefaults: {},
     });
   }
 
@@ -150,6 +159,8 @@ export class Tm1Request<T> {
       type: this.type,
       timeout: this.timeout,
       requirement: this.requirementValue,
+      operation: this.operationValue,
+      parameterDefaults: this.parameterDefaultsValue,
       ...change,
     });
   }
@@ -171,10 +182,43 @@ export class Tm1Request<T> {
     return this.copy({ timeout });
   }
 
-  /** The request, checked against the server's `$metadata` before it's sent. */
-  requires(capability: Tm1Capability): Tm1Request<T> {
-    if (!capability) throw new TypeError("capability is required");
-    return this.copy({ requirement: capability });
+  /** The request, checked against the server's `$metadata` before it's sent.
+   *
+   * For an operation, as `requires(operation.capability())`, and only with parameters the server's
+   * definition of it has: each of the operation's parameters the body sends (a key named after it,
+   * or after it with `@odata.bind`) is checked against the server's own `$metadata`, and one the
+   * server lacks fails the call with `Tm1UnsupportedOperationException` without calling the server,
+   * unless {@link withParameterDefault} says what leaving it out means and the body sends just that,
+   * in which case it's left out. Only an action's body is checked; a function's parameters are in
+   * its path. */
+  requires(needed: Tm1Capability | Tm1Operation): Tm1Request<T> {
+    if (!needed) throw new TypeError("capability is required");
+    if (needed instanceof Tm1Operation) return this.copy({ requirement: needed.capability(), operation: needed });
+    return this.copy({ requirement: needed });
+  }
+
+  /** A copy that says what the server assumes when `parameter` is left out: on a server whose
+   * {@link requires} operation lacks the parameter, a body that sends `value` for it is sent
+   * without it, rather than refused, since that asks for the same thing. */
+  withParameterDefault(parameter: string, value: unknown): Tm1Request<T> {
+    if (typeof parameter !== "string" || value === undefined || value === null) throw new TypeError("a parameter default is a name and a value");
+    return this.copy({ parameterDefaults: { ...this.parameterDefaultsValue, [parameter]: value } });
+  }
+
+  /** A copy with another body, for the session to send in place of this one's. */
+  withBody(body: unknown): Tm1Request<T> {
+    return this.copy({ body });
+  }
+
+  /** The operation whose parameters are checked against the server, if any. */
+  operation(): Tm1Operation | undefined {
+    return this.operationValue;
+  }
+
+  /** What the server assumes for each parameter left out, by parameter name, as
+   * {@link withParameterDefault} sets them. */
+  parameterDefaults(): Readonly<Record<string, unknown>> {
+    return this.parameterDefaultsValue;
   }
 
   /** What the server must define for the request, if anything. */
