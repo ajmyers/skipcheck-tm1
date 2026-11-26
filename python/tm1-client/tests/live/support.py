@@ -77,9 +77,10 @@ def is_at_least(tm1: Tm1Client, version: Tm1Version) -> bool:
 
 
 def own_snapshot(capabilities: Tm1Capabilities) -> bytes:
-    """The committed snapshot of the server's own schema version. Every supported version has one; a
-    server of a schema without one (a release between those committed, or a newer TM1) skips the rest
-    of the test, as Java's MetadataDriftTm1Test passes it by."""
+    """The committed snapshot of the server's own schema version: its first document, whose elements a
+    later document of the schema has too (Java's MetadataSnapshotTest holds them to it). Every
+    supported version has one; a server of a schema without one (a newer TM1) skips the rest of the
+    test, as Java's MetadataDriftTm1Test passes it by."""
     path = REPO / "java" / "tm1-client" / "src" / "model" / "metadata" / f"tm1-schema-{capabilities.schema_version}.xml"
     if not path.exists():
         pytest.skip(f"No metadata snapshot is committed for schema {capabilities.schema_version}")

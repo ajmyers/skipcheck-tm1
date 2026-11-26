@@ -75,10 +75,11 @@ public final class ServerAssumptions {
 	}
 
 	/**
-	 * The committed snapshot of the server's own schema version. Every supported version
-	 * has one; a server of a schema without one (a release between those committed, or a
-	 * newer TM1) skips the rest of the test, as {@code MetadataDriftTm1Test} passes it
-	 * by.
+	 * The committed snapshot of the server's own schema version: its first document,
+	 * whose elements a later document of the schema has too ({@code MetadataSnapshotTest}
+	 * holds them to it). Every supported version has one; a server of a schema without
+	 * one (a newer TM1) skips the rest of the test, as {@code MetadataDriftTm1Test}
+	 * passes it by.
 	 */
 	public static CsdlDocument ownSnapshot(Tm1Capabilities capabilities) {
 		String schema = capabilities.schemaVersion().orElseThrow();

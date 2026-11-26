@@ -9,6 +9,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -38,15 +42,20 @@ class MetadataSnapshotTest {
 
 	@Test
 	void holdsEachCommittedSnapshotToTheSchemaItsNameSays() throws Exception {
-		// Each tm1-schema-<v>.xml is the document of schema <v>, and the newest is
-		// VERSION
+		// Each tm1-schema-<v>.xml is the first document of schema <v>, and the newest is
+		// VERSION; each tm1-schema-<v>-<build>.xml a later one, of schema <v> too
 		List<String> versions = new ArrayList<>();
-		try (Stream<Path> files = Files.list(Path.of("src/model/metadata"))) {
-			files.map(f -> f.getFileName().toString())
-				.filter(n -> n.startsWith("tm1-schema-") && n.endsWith(".xml"))
-				.forEach(n -> versions.add(n.substring("tm1-schema-".length(), n.length() - ".xml".length())));
+		Map<String, Set<String>> later = new TreeMap<>();
+		for (String name : committed()) {
+			int dash = name.indexOf('-');
+			if (dash < 0) {
+				versions.add(name);
+			}
+			else {
+				later.computeIfAbsent(name.substring(0, dash), v -> new TreeSet<>()).add(name.substring(dash + 1));
+			}
 		}
-		assertThat(versions).contains("11.8.20", "11.8.32", MetadataSnapshot.VERSION);
+		assertThat(versions).contains("11.8.20", "11.8.32", "11.8.34", MetadataSnapshot.VERSION);
 		for (String version : versions) {
 			assertThat(CsdlParser.parse(MetadataSnapshot.text(version).orElseThrow()).schemaVersion()).as(version)
 				.contains(version);
@@ -54,6 +63,45 @@ class MetadataSnapshotTest {
 		assertThat(versions.stream().map(Tm1Version::parse).max(Comparator.naturalOrder()))
 			.contains(Tm1Version.parse(MetadataSnapshot.VERSION));
 		assertThat(MetadataSnapshot.text("0.0")).isEmpty();
+
+		// The later documents committed are the ones declared, each of its schema and
+		// with
+		// its first document's elements: what a schema defines can be read from either
+		Map<String, Set<String>> declared = new TreeMap<>();
+		MetadataSnapshot.LATER_DOCUMENTS.forEach((schema, builds) -> declared.put(schema, new TreeSet<>(builds)));
+		assertThat(later).isEqualTo(declared);
+		later.forEach((schema, builds) -> builds.forEach(build -> {
+			CsdlDocument document = CsdlParser.parse(MetadataSnapshot.text(schema + "-" + build).orElseThrow());
+			assertThat(document.schemaVersion()).as(schema + "-" + build).contains(schema);
+			assertThat(Signatures.of(document)).as(schema + "-" + build)
+				.isEqualTo(Signatures.of(CsdlParser.parse(MetadataSnapshot.text(schema).orElseThrow())));
+			assertThat(MetadataSnapshot.text(schema + "-" + build)).isNotEqualTo(MetadataSnapshot.text(schema));
+		}));
+	}
+
+	@Test
+	void picksTheDocumentAServersBuildServes() {
+		String first = MetadataSnapshot.text("11.8.20").orElseThrow();
+		String later = MetadataSnapshot.text("11.8.20-11.8.02900.8").orElseThrow();
+		// 2.1.2 and 2.1.7; 2.1.8 and 2.1.12
+		assertThat(MetadataSnapshot.text("11.8.20", Tm1Version.parse("11.8.02400.7"))).contains(first);
+		assertThat(MetadataSnapshot.text("11.8.20", Tm1Version.parse("11.8.02800.9"))).contains(first);
+		assertThat(MetadataSnapshot.text("11.8.20", Tm1Version.parse("11.8.02900.8"))).contains(later);
+		assertThat(MetadataSnapshot.text("11.8.20", Tm1Version.parse("11.8.03100.4"))).contains(later);
+		// A schema with one document, and one with none
+		assertThat(MetadataSnapshot.text("11.8.35", Tm1Version.parse("11.8.04000.1")))
+			.isEqualTo(MetadataSnapshot.text("11.8.35"));
+		assertThat(MetadataSnapshot.text("0.0", Tm1Version.parse("11.8.04000.1"))).isEmpty();
+	}
+
+	private static List<String> committed() throws Exception {
+		try (Stream<Path> files = Files.list(Path.of("src/model/metadata"))) {
+			return files.map(f -> f.getFileName().toString())
+				.filter(n -> n.startsWith("tm1-schema-") && n.endsWith(".xml"))
+				.map(n -> n.substring("tm1-schema-".length(), n.length() - ".xml".length()))
+				.sorted()
+				.toList();
+		}
 	}
 
 	@Test

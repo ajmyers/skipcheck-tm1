@@ -48,9 +48,10 @@ export async function isAtLeast(tm1: Tm1Client, version: Tm1Version): Promise<bo
   return (await productVersion(tm1)).isAtLeast(version);
 }
 
-/** The committed snapshot of the server's own schema version, or undefined. Every supported version
- * has one; a server of a schema without one (a release between those committed, or a newer TM1)
- * skips the rest of the test (`context.skip`), as Java's `MetadataDriftTm1Test` passes it by. */
+/** The committed snapshot of the server's own schema version, or undefined: its first document,
+ * whose elements a later document of the schema has too (Java's `MetadataSnapshotTest` holds them
+ * to it). Every supported version has one; a server of a schema without one (a newer TM1) skips the
+ * rest of the test (`context.skip`), as Java's `MetadataDriftTm1Test` passes it by. */
 export function ownSnapshot(capabilities: Tm1Capabilities): string | undefined {
   const path = join(Repo.root, "java", "tm1-client", "src", "model", "metadata", `tm1-schema-${capabilities.schemaVersion}.xml`);
   return existsSync(path) ? readFileSync(path, "utf8") : undefined;
