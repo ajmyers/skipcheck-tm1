@@ -169,11 +169,22 @@ grep -q "New deployment in /tm1/deployment" <<<"$out" && grep -q "Created applic
   || fail "the first start didn't set TM1 up: $out"
 ! grep -q "d4tast0rePW" <<<"$out" || fail "the datastore password was logged: $out"
 [ "$(docker exec "$name" tm1-engine session tm1 analyst)" = "TM1SessionId=tm1:analyst" ] || fail "tm1-engine session didn't log in"
-docker exec "$name" tm1-engine credentials | grep -qF "/tm1/api/v1/Databases('planning')/" || fail "tm1-engine credentials doesn't list the database"
+# Captured, then grepped, rather than "| grep -q": with pipefail, grep stopping at the first match
+# can fail the pipeline though the line was there. Captured with its own check, so a command that
+# fails after printing the line still fails the test
+creds=$(docker exec "$name" tm1-engine credentials) || fail "tm1-engine credentials failed: $creds"
+grep -qF "/tm1/api/v1/Databases('planning')/" <<<"$creds" || fail "tm1-engine credentials doesn't list the database: $creds"
 pass "the container sets TM1 up and becomes healthy (behind a proxy setting, too)"
 docker stop -t 60 "$name" >/dev/null
 [ "$(docker inspect -f '{{.State.ExitCode}}' "$name")" = 0 ] || fail "stopping didn't exit 0: $(docker logs "$name" 2>&1 | tail -15)"
-docker logs "$name" 2>&1 | grep -q "Stopped 1 database(s) cleanly" || fail "the database wasn't stopped through TM1: $(docker logs "$name" 2>&1 | tail -15)"
+# Read whole (see above), for up to 10 s in case Docker hasn't written the last lines yet, and the
+# message shows the log the check read, not a later one
+for _ in $(seq 1 10); do
+  logs=$(docker logs "$name" 2>&1) || fail "couldn't read the container's log"
+  grep -q "Stopped 1 database(s) cleanly" <<<"$logs" && break
+  sleep 1
+done
+grep -q "Stopped 1 database(s) cleanly" <<<"$logs" || fail "the database wasn't stopped through TM1: $(tail -15 <<<"$logs")"
 pass "stopping stops each database through TM1 first, and exits 0"
 docker start "$name" >/dev/null
 healthy "$name" || fail "the container didn't become healthy again: $(docker logs "$name" 2>&1 | tail -30)"
