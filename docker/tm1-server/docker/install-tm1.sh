@@ -136,6 +136,9 @@ fi
 
 log "Installing TM1 Server from $SHOWN into $TARGET (one-time)"
 find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
+# Until it's done: an install that fails partway (a full disk) leaves this, so the next run
+# installs again rather than refusing a folder it didn't make, or starting half a TM1
+echo incomplete > "$MARKER"
 
 # Detect the type from the contents: gzip (1f8b) = the IBM bundle or the older full installer,
 # told apart by its first entries; zip (504b) = the repository zip.
@@ -143,6 +146,7 @@ zip=
 case "$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')" in
   1f8b)
     if python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py detect "$bundle"; then
+      [ -z "${TM1_INSTALLABLES:-}" ] || log "TM1_INSTALLABLES doesn't apply to IBM's full installer: every component but the language packs is installed"
       TMPDIR=$work python3 /usr/local/lib/tm1-server/unpack-tm1-issetup.py install "$bundle" "$TARGET" >&2 \
         || die "couldn't install from the full installer $SHOWN"
     else

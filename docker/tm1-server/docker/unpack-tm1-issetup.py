@@ -37,15 +37,23 @@ def components(name):
     return base
 
 
+INSTALLER_DIRS = ("zipfiles", "linuxi38664h")
+
+
 def detect(bundle):
-    """An issetup installer has its components under zipfiles/: look at the first members only."""
-    with tarfile.open(bundle, "r|gz") as tar:
-        for i, member in enumerate(tar):
-            name = member.name.removeprefix("./")
-            if name.startswith(("zipfiles/", "linuxi38664h/")):
-                return True
-            if i >= 20:
-                return False
+    """Whether it's an issetup installer, from its first entries: its components are under
+    zipfiles/ and its installer under linuxi38664h/. A tm1server bundle's first entry is a file
+    (its zip, or IBM's installer binary), so this reads one header for it, not the archive."""
+    try:
+        with tarfile.open(bundle, "r|gz") as tar:
+            for member in tar:
+                name = member.name.removeprefix("./").rstrip("/")
+                if name.split("/")[0] in INSTALLER_DIRS:
+                    return True
+                if member.isfile():
+                    return False
+    except (tarfile.TarError, EOFError, OSError):
+        return False  # not a tar at all: install-tm1.sh says so when it tries the other format
     return False
 
 

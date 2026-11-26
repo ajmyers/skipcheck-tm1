@@ -95,7 +95,8 @@ def tar_with(files):
             info = tarfile.TarInfo(name); info.size = len(data); info.mode = 0o755; t.addfile(info, io.BytesIO(data))
     return buf.getvalue()
 parts = {
-    "tm1server-linuxi38664h-app-11.9.00100.1-inst.tar.gz": {"bin64/tm1s.exe": b"#!/bin/sh\n", "bin64/tm1server-linuxi38664h-app-11.9.00100.1.txt": b""},
+    "tm1server-linuxi38664h-app-11.9.00100.1-inst.tar.gz": {"bin64/tm1s.exe": b"#!/bin/sh\nexit 3\n", "bin64/tm1server-linuxi38664h-app-11.9.00100.1.txt": b""},
+    "tm1adminserver-linuxi38664h-app-11.9.00100.1-inst.tar.gz": {"bin64/tm1admsrv.exe": b"#!/bin/sh\nexit 3\n"},
     "zlib-linuxi38664h-gate-1.2.3-inst.tar.gz": {"bin64/libz.so": b"z"},
     "langpack_de-linuxi38664h-app-11.0.1-inst.tar.gz": {"bin64/de/tm1s.lng": b"de"},
     "verxml-linuxi38664h-app-9.9.9.1-inst.tar.gz": {"bin64/version.xml": b'<version productMajor="9" productMinor="9" releaseMinor="1"/>'},
@@ -108,14 +109,60 @@ with tarfile.open(sys.argv[1], "w:gz") as bundle:
         bundle.addfile(info, io.BytesIO(data))
 PY
 out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
-  tm1-install --target /t >/dev/null 2>&1 &&
+  tm1-install --target /t >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
   test -x /t/bin64/tm1s.exe && test -f /t/bin64/libz.so && test ! -e /t/bin64/de/tm1s.lng && cat /t/versions.txt' 2>&1) || true
 grep -qx "Planning Analytics 9.9.9" <<<"$out" && grep -qx "tm1server = 11.9.00100.1" <<<"$out" \
   || fail "full installer not installed: $out"
 out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c 'tm1-install /ibm/tm1_linuxi38664h_9.9.9.1_ml.tar.gz --target /t 2>&1 | tail -1' 2>&1) || true
 grep -q "Installed: tm1server = 11.9.00100.1" <<<"$out" || fail "full installer by name not installed: $out"
+# Through the entrypoint, as a container starts: the bundle folder holds only the installer
+out=$(run -v "$fake:/ibm:ro" "$image" 2>&1) || true
+grep -q "\[tm1-install\] Installed: tm1server = 11.9.00100.1" <<<"$out" || fail "the entrypoint didn't install the full installer: $out"
+# An install that fails partway (here, a damaged component) is marked unfinished, and the next
+# install into the same folder goes ahead rather than refusing a folder it didn't make
+python3 - "$fake/tm1_linuxi38664h_9.9.8.1_ml.tar.gz" <<'PY'
+import io, sys, tarfile
+with tarfile.open(sys.argv[1], "w:gz") as bundle:
+    for name, data in (("./zipfiles/linuxi38664h/tm1server-linuxi38664h-app-11.9.00100.1-inst.tar.gz", b"not a tar"),):
+        info = tarfile.TarInfo(name); info.size = len(data); bundle.addfile(info, io.BytesIO(data))
+PY
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
+  tm1-install /ibm/tm1_linuxi38664h_9.9.8.1_ml.tar.gz --target /t >/dev/null 2>&1 && echo "damaged install succeeded"
+  echo "marker: $(cat /t/.tm1-server-install)"
+  tm1-install /ibm/tm1_linuxi38664h_9.9.9.1_ml.tar.gz --target /t 2>&1 | tail -1' 2>&1) || true
+grep -qx "marker: incomplete" <<<"$out" && grep -q "Installed: tm1server = 11.9.00100.1" <<<"$out" \
+  && ! grep -q "damaged install succeeded" <<<"$out" || fail "an unfinished install wasn't installed again: $out"
 rm -rf "$fake"
 pass "IBM's older full installer is found, installed without language packs, with its versions"
+
+# 7a2. A tm1server bundle (a fake, built here) still installs through its manifest
+fake=$(mktemp -d)
+python3 - "$fake/tm1server-9.9.9-1-linuxi38664h_bundle.tar.gz" <<'PY'
+import io, json, sys, tarfile, zipfile
+def tar_with(name, data):
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as t:
+        info = tarfile.TarInfo(name); info.size = len(data); info.mode = 0o755; t.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+repo = io.BytesIO()
+with zipfile.ZipFile(repo, "w") as z:
+    empty = [{"name": n, "parts": []} for n in ("TM1_Admin_Server", "TM1_Tools", "TM1_Samples", "TM1_NON-PROD_SWTAG")]
+    z.writestr("manifest/tm1server-manifest/9.9.9/m.json", json.dumps({
+        "productName": "Fake TM1", "productVersion": "9.9.9", "platform": "linuxi38664h",
+        "license": {"name": "license", "version": "1", "repositoryPath": "p/license.tar.gz"},
+        "installables": [{"name": "TM1_Server", "parts": [{"name": "tm1s", "version": "9.9.9", "repositoryPath": "p/tm1s.tar.gz"}]}] + empty}))
+    z.writestr("p/license.tar.gz", tar_with("license/LA_en", b"license"))
+    z.writestr("p/tm1s.tar.gz", tar_with("bin64/tm1s.exe", b"#!/bin/sh\nexit 3\n"))
+data = repo.getvalue()
+with tarfile.open(sys.argv[1], "w:gz") as bundle:
+    info = tarfile.TarInfo("tm1server-9.9.9-1-linuxi38664h.zip"); info.size = len(data); bundle.addfile(info, io.BytesIO(data))
+PY
+out=$(run -v "$fake:/ibm:ro" --entrypoint sh "$image" -c '
+  tm1-install --target /t >/tmp/install.log 2>&1 || { cat /tmp/install.log; exit 1; }
+  test -x /t/bin64/tm1s.exe && test -f /t/license/LA_en && echo installed' 2>&1) || true
+grep -qx installed <<<"$out" || fail "a tm1server bundle didn't install through its manifest: $out"
+rm -rf "$fake"
+pass "a tm1server bundle installs through its manifest"
 
 # 7b. CAM setup builds CAMIDs from short names and keeps full CAMIDs as given
 out=$(run -e 'TM1_CAM_ADMINS=admin,CAMID("AD:u:uid=x, ou=people,dc=a")' -e 'TM1_CAM_GROUPS=Analysts,Readers' --entrypoint python3 "$image" /usr/local/lib/tm1-server/cam-setup.py --print 2>&1) \
