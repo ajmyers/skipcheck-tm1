@@ -69,7 +69,7 @@ Last checked on 2026-11-26, every client's live tests on each release ([`scripts
 | 2.1.24 | 11.8.03900.1 | 11.8.35 | Pass, but for `settings` |
 | 2.1.25 | 11.8.04000.1 | 11.8.35 | Pass, but for `settings` |
 
-What a release's schema lacks is skipped there, not failed. "But for `settings`": that conformance scenario failed in one client's run, nearly always .NET's, when TM1 read back a setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). It isn't a release's: it fails and passes on releases with the same TM1 build (2.1.19 and 2.1.20, 2.1.21 and 2.1.23), and passes alone. Everything else passed, and every client sent TM1 the same requests in every other scenario.
+What a release's schema lacks is skipped there, not failed. "But for `settings`": that conformance scenario failed in one client's run, nearly always .NET's, when TM1 read back a setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). It isn't a release's: it fails and passes on releases with the same TM1 build (2.1.8 passed and 2.1.9 failed on 11.8.02900.8; 2.1.13 and 2.1.14 on 11.8.03200.3; 2.1.21 and 2.1.23 on 11.8.03700.2), and passes alone. Everything else passed, and every client sent TM1 the same requests in every other scenario.
 
 Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine), and isn't covered by this table.
 
