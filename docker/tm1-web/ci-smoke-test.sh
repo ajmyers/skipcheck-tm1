@@ -80,6 +80,7 @@ pass "tm1web_config.xml settings applied"
 # 9. A tm1web bundle (fakes, built here) installs through its manifest, gzipped as 2.1.25's
 #    is and uncompressed as 2.1.2 to 2.1.16's are, whatever the name says
 fake=$(mktemp -d)
+trap 'rm -rf "$fake"' EXIT
 python3 - "$fake" <<'PY'
 import io, json, sys, tarfile, zipfile
 def tar_with(name, data):

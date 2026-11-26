@@ -140,9 +140,12 @@ find "$TARGET" -mindepth 1 -maxdepth 1 ! -name .install.lock -exec rm -rf {} +
 # repository zip, and a plain tar (ustar at byte 257) = the IBM bundle too: Planning
 # Analytics 2.1.2 to 2.1.16's TM1 Web bundles are uncompressed whatever their name says.
 # The bundle also holds IBM's installer, which isn't needed.
-kind=$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')
-if [ "$kind" != 1f8b ] && [ "$kind" != 504b ] && [ "$(dd if="$bundle" bs=1 skip=257 count=5 2>/dev/null)" = ustar ]; then
+# The tar header first: a plain tar's first two bytes are its first file's name, which could
+# read as either magic number
+if [ "$(dd if="$bundle" bs=1 skip=257 count=5 2>/dev/null)" = ustar ]; then
   kind=tar
+else
+  kind=$(head -c2 "$bundle" | od -An -tx1 | tr -d ' \n')
 fi
 case "$kind" in
   1f8b|tar)
