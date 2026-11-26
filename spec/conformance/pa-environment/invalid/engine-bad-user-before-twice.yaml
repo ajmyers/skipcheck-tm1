@@ -1,0 +1,4 @@
+# error: tm1Engine.users[2]: user name
+# A bad entry is reported before a name listed twice: every user is read first
+version: 1
+tm1Engine: { users: [analyst, Analyst, 'bad user'] }

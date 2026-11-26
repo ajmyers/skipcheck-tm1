@@ -33,6 +33,11 @@ def test_servers_in_cam_security() -> None:
     _record("cam-security")
 
 
+@pytest.mark.requires_tm1_engine(share_database=True)
+def test_engine() -> None:
+    _record("engine")
+
+
 def _record(scenario: str) -> None:
     home = ROOT / "testcontainers-conformance" / "scenarios"
     env = PlanningAnalyticsEnvironment.from_config(home / f"{scenario}.yaml").build()
@@ -45,6 +50,9 @@ def _record(scenario: str) -> None:
             containers["adminServer"] = admin
         if scenario == "servers-and-web":
             containers["tm1Web"] = env.tm1_web()
+        if scenario == "engine":
+            containers["tm1Engine"] = env.tm1_engine()
+            containers["tm1EngineDatastore"] = env.tm1_engine().datastore
         if scenario == "cam-security":
             containers["cognos"] = env.cognos()
             containers["keycloak"] = env.keycloak()

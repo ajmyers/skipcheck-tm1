@@ -15,9 +15,11 @@ from . import _pa_environment
 from ._container import GenericContainer, Network, reuse_enabled
 from .cognos import NO_SOURCE_MESSAGE as NO_COGNOS_MESSAGE
 from .cognos import CognosContainer, KeycloakContainer, Namespace
+from .engine import NO_SOURCE_MESSAGE as NO_TM1_ENGINE_MESSAGE
+from .engine import Tm1Database, Tm1EngineContainer
 from .paw import NO_SOURCE_MESSAGE as NO_PAW_MESSAGE
 from .paw import PawContainer
-from .sources import CognosSource, PawSource, Tm1Source, Tm1WebSource
+from .sources import CognosSource, PawSource, Tm1EngineSource, Tm1Source, Tm1WebSource
 from .tm1 import NO_SOURCE_MESSAGE as NO_TM1_MESSAGE
 from .tm1 import Tm1AdminServerContainer, Tm1ServerContainer
 from .web import NO_SOURCE_MESSAGE as NO_TM1_WEB_MESSAGE
@@ -29,11 +31,14 @@ REUSE_LABEL = "io.skipcheck.tm1.environment"
 """The label on a reused environment's containers and network. Its value is the environment's
 identity, a hash of its configuration."""
 
+ENGINE_ALIAS = "tm1-engine"
+"""The TM1 v12 engine's name on the environment's network."""
+
 NETWORK_PREFIX = "tm1-environment-"
 """The start of a reused environment's network name; the identity follows."""
 
 T = TypeVar("T")
-Part = KeycloakContainer | CognosContainer | Tm1AdminServerContainer | Tm1ServerContainer | Tm1WebContainer | PawContainer
+Part = KeycloakContainer | CognosContainer | Tm1AdminServerContainer | Tm1ServerContainer | Tm1WebContainer | Tm1EngineContainer | PawContainer
 
 
 def _nothing(_: Any) -> None:
@@ -43,6 +48,10 @@ def _nothing(_: Any) -> None:
 class PlanningAnalyticsEnvironment:
     """TM1 servers, and optionally a shared Admin Server, TM1 Web, PAW, Cognos (CAM security) and
     Keycloak (OIDC), on one network and wired to each other. Build one with :meth:`builder`.
+
+    A TM1 v12 engine (:meth:`Builder.tm1_engine`) runs beside the TM1 servers, or alone: an
+    environment needs a server or an engine. The Admin Server, TM1 Web, PAW and Cognos security are
+    TM1 11's, and need a TM1 server. An environment with an engine can't be reused.
 
     Cognos takes minutes to start, and PAW longer. With :meth:`Builder.reuse`, the environment
     keeps its containers running between test runs, so the next run starts in seconds. Reuse also
@@ -94,11 +103,21 @@ class PlanningAnalyticsEnvironment:
             # First: the TM1 servers' CAM security is wired from the test users
             b._cognos(cognos)
         self._cognos = cognos
-        tm1_source = b._get(b._tm1_source, lambda ibm: Tm1Source.Bundle(ibm), Tm1Source.discover, Tm1Source.PrivateImage, b._tm1_image, NO_TM1_MESSAGE)
+        # TM1 11's parts, when there's a server: an environment may be a TM1 v12 engine alone
+        tm1_source = (
+            b._get(b._tm1_source, lambda ibm: Tm1Source.Bundle(ibm), Tm1Source.discover, Tm1Source.PrivateImage, b._tm1_image, NO_TM1_MESSAGE)
+            if b._tm1
+            else None
+        )
         tm1_image = b._tm1_image if _runs(b._tm1_image, isinstance(tm1_source, Tm1Source.PrivateImage)) else None
-        self._admin_server = Tm1AdminServerContainer(tm1_source, tm1_image).with_network(network) if b._admin_server is not None or len(b._tm1) > 1 else None
+        self._admin_server = (
+            Tm1AdminServerContainer(tm1_source, tm1_image).with_network(network)
+            if tm1_source is not None and (b._admin_server is not None or len(b._tm1) > 1)
+            else None
+        )
         servers: dict[str, Tm1ServerContainer] = {}
         for name in b._tm1:
+            assert tm1_source is not None
             server = Tm1ServerContainer(tm1_source, tm1_image).with_network(network).with_network_aliases(name).with_env("TM1_SERVER_NAME", name)
             if self._admin_server is not None:
                 server.with_admin_server(self._admin_server)
@@ -106,9 +125,10 @@ class PlanningAnalyticsEnvironment:
                 server.with_cam_security(cognos, b._cam_namespace, *b._cam_admins_for(cognos))
             servers[name] = server
         self._tm1_servers = servers
-        first = next(iter(servers.values()))
+        # _build has checked that TM1 Web and PAW come with a server
+        first = next(iter(servers.values()), None)
         web: Tm1WebContainer | None = None
-        if b._tm1_web is not None:
+        if b._tm1_web is not None and first is not None:
             web_source = b._get(
                 b._tm1_web_source, lambda ibm: Tm1WebSource.Bundle(ibm), Tm1WebSource.discover, Tm1WebSource.PrivateImage, b._tm1_web_image, NO_TM1_WEB_MESSAGE
             )
@@ -120,11 +140,28 @@ class PlanningAnalyticsEnvironment:
             web.depends_on(*servers.values())
         self._tm1_web = web
         paw: PawContainer | None = None
-        if b._paw is not None:
+        if b._paw is not None and first is not None:
             paw = PawContainer(b._get(b._paw_source, b._paw_from_ibm, PawSource.discover, None, None, NO_PAW_MESSAGE)).with_tm1_server(first)
             if self._admin_server is not None:
                 paw.with_admin_server(self._admin_server)
         self._paw = paw
+        engine: Tm1EngineContainer | None = None
+        if b._tm1_engine is not None:
+            engine_source = b._get(
+                b._tm1_engine_source,
+                lambda ibm: Tm1EngineSource.Bundle(ibm),
+                Tm1EngineSource.discover,
+                Tm1EngineSource.PrivateImage,
+                b._tm1_engine_image,
+                NO_TM1_ENGINE_MESSAGE,
+            )
+            engine_image = b._tm1_engine_image if _runs(b._tm1_engine_image, isinstance(engine_source, Tm1EngineSource.PrivateImage)) else None
+            # Its datastore joins the same network with it, and the network stays the environment's to remove
+            # Its name on the network is the one it has in the compose project pa-setup writes
+            engine = Tm1EngineContainer(engine_source, engine_image).with_network(network).with_network_aliases(ENGINE_ALIAS)
+            # What the file said first; then, below, what the caller says
+            _apply(b._file_tm1_engine, engine)
+        self._tm1_engine = engine
         # The callers' own settings last, so they can change anything set above
         _apply(b._admin_server, self._admin_server)
         for name, customizer in b._tm1.items():
@@ -132,6 +169,7 @@ class PlanningAnalyticsEnvironment:
         _apply(b._tm1_web, self._tm1_web)
         _apply(b._paw, self._paw)
         _apply(b._keycloak, self._keycloak)
+        _apply(b._tm1_engine, self._tm1_engine)
 
     @staticmethod
     def builder() -> PlanningAnalyticsEnvironment.Builder:
@@ -159,8 +197,12 @@ class PlanningAnalyticsEnvironment:
           the first user as administrator;
         * ``paw``: :meth:`Builder.paw` with :meth:`PawContainer.accept_license`, which the file
           must say (``acceptLicense: true``); the zip is ``zip`` in ``ibm``, or the newest there;
+        * ``tm1Engine``: :meth:`Builder.tm1_engine`, with each of ``databases`` as
+          :meth:`Tm1EngineContainer.with_database` in its ``instance``, and ``users`` as
+          :meth:`Tm1EngineContainer.with_user` (a user's password is checked and not used: TM1 v12
+          keeps none). It runs beside ``tm1``, or alone;
         * ``ibm``: each part's source, the folder as :class:`Tm1Source.Bundle`,
-          :class:`Tm1WebSource.Bundle` and :class:`CognosSource.Zip`. A relative path is from the
+          :class:`Tm1WebSource.Bundle`, :class:`CognosSource.Zip` and :class:`Tm1EngineSource.Bundle`. A relative path is from the
           file's folder; ``~`` is the user's home;
         * ``images``: the image each part runs, as a container's image argument. A part with no
           other source takes its image as the private image with IBM's software built in
@@ -172,7 +214,8 @@ class PlanningAnalyticsEnvironment:
 
         Ignored, because they place things on the host that Testcontainers manages itself:
         ``name`` (the compose project; the environment has its own network), every ``port``,
-        ``adminPort`` and ``keycloakPort`` (Testcontainers maps random host ports), and
+        ``adminPort`` and ``keycloakPort`` (Testcontainers maps random host ports),
+        ``tm1Engine.datastore`` and ``images.mongo`` (the engine's MongoDB is its own here), and
         ``files`` (the host folder pa-setup keeps databases in; each test environment starts from a
         new database, or one copied in with :meth:`Tm1ServerContainer.with_data`). They're still
         checked as ``pa-setup`` checks them.
@@ -187,7 +230,8 @@ class PlanningAnalyticsEnvironment:
         return _pa_environment.read(path)
 
     def start(self) -> None:
-        """Starts every part, each after what it depends on; PAW last."""
+        """Starts every part, each after what it depends on; PAW last. A TM1 v12 engine starts with
+        its MongoDB, beside TM1 11's parts and before PAW."""
         if self._reused:
             self._prepare_for_reuse()
         for part in self.containers():
@@ -249,6 +293,16 @@ class PlanningAnalyticsEnvironment:
         """Keycloak, the OIDC provider. A RuntimeError if it wasn't added."""
         return _require(self._keycloak, "Keycloak", "keycloak()")
 
+    def tm1_engine(self) -> Tm1EngineContainer:
+        """The TM1 v12 engine. A RuntimeError if the environment has none."""
+        return _require(self._tm1_engine, "TM1 v12 engine", "tm1_engine()")
+
+    def tm1_database(self, name: str) -> Tm1Database:
+        """A database of the TM1 v12 engine, in the instance ``tm1``; for another instance's, use
+        ``tm1_engine().database(instance, name)``. A RuntimeError if the environment has no engine,
+        and a ValueError if the engine has no such database."""
+        return self.tm1_engine().database(name)
+
     def network(self) -> Any:
         """The Docker network every part is on."""
         return self._network
@@ -285,6 +339,9 @@ class PlanningAnalyticsEnvironment:
         parts.extend(self._tm1_servers.values())
         if self._tm1_web is not None:
             parts.append(self._tm1_web)
+        # Beside TM1 11's parts: nothing of theirs depends on it, nor it on them
+        if self._tm1_engine is not None:
+            parts.append(self._tm1_engine)
         if self._paw is not None:
             parts.append(self._paw)
         return parts
@@ -299,6 +356,8 @@ class PlanningAnalyticsEnvironment:
             self._paw: Callable[[PawContainer], Any] | None = None
             self._cognos: Callable[[CognosContainer], Any] | None = None
             self._keycloak: Callable[[KeycloakContainer], Any] | None = None
+            self._tm1_engine: Callable[[Tm1EngineContainer], Any] | None = None
+            self._tm1_engine_source: Tm1EngineSource | None = None
             self._cam_namespace = Namespace.LDAP
             self._cam_admins: list[str] = []
             self._tm1_source: Tm1Source | None = None
@@ -315,6 +374,9 @@ class PlanningAnalyticsEnvironment:
             self._tm1_web_image: str | None = None
             self._cognos_image: str | None = None
             self._keycloak_image: str | None = None
+            self._tm1_engine_image: str | None = None
+            # The file's own settings for the engine, kept when the caller adds theirs
+            self._file_tm1_engine: Callable[[Tm1EngineContainer], Any] | None = None
 
         def tm1(self, name: str, customizer: Callable[[Tm1ServerContainer], Any] = _nothing) -> Self:
             """A TM1 server, its network alias and server name ``name``."""
@@ -354,6 +416,15 @@ class PlanningAnalyticsEnvironment:
             self._keycloak = _required(customizer)
             return self
 
+        def tm1_engine(self, customizer: Callable[[Tm1EngineContainer], Any] = _nothing) -> Self:
+            """Adds a TM1 v12 engine, with one database, ``tm1``, unless ``customizer`` configures it:
+            its databases and users, for instance. It runs beside the TM1 servers, or alone: an
+            environment needs a server or an engine. On a builder from
+            :meth:`PlanningAnalyticsEnvironment.from_config`, the file's databases and users stay,
+            and the customizer adds to them."""
+            self._tm1_engine = _required(customizer)
+            return self
+
         def cam_security(self, namespace: Namespace, *admins: str) -> Self:
             """The namespace TM1 authenticates against, and its administrators (default: the
             first test user)."""
@@ -383,6 +454,12 @@ class PlanningAnalyticsEnvironment:
             self._cognos_source = _required(source)
             return self
 
+        def tm1_engine_source(self, source: Tm1EngineSource) -> Self:
+            """Where the engine gets TM1 v12 from, instead of what :meth:`Tm1EngineSource.discover`
+            finds."""
+            self._tm1_engine_source = _required(source)
+            return self
+
         def network(self, network: Any) -> Self:
             """The Docker network to put everything on; a new one, removed by
             :meth:`PlanningAnalyticsEnvironment.close`, by default."""
@@ -395,7 +472,8 @@ class PlanningAnalyticsEnvironment:
             ``TESTCONTAINERS_REUSE_ENABLE=true``). A later run with the same configuration finds
             them, and objects tests left behind are still there. Without the switch it has no
             effect. See :class:`PlanningAnalyticsEnvironment` for what's reused and how to start
-            clean.
+            clean. An environment with a TM1 v12 engine can't be reused: :meth:`build` refuses it,
+            whatever the switch says.
 
             With your own :meth:`network`, reuse only works if it's the same network each run: a
             container is found by everything it's created with, including its network's name."""
@@ -410,8 +488,22 @@ class PlanningAnalyticsEnvironment:
 
         def _build(self, reuse_enabled: bool) -> PlanningAnalyticsEnvironment:
             """Builds, with the developer's reuse switch given, so tests needn't set it."""
-            if not self._tm1:
-                raise RuntimeError("Add at least one TM1 server with tm1(name)")
+            if not self._tm1 and self._tm1_engine is None:
+                raise RuntimeError("Add at least one TM1 server with tm1(name), or a TM1 v12 engine with tm1_engine()")
+            if not self._tm1 and (self._admin_server is not None or self._tm1_web is not None or self._paw is not None or self._cognos is not None):
+                raise RuntimeError("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: add a TM1 server with tm1(name)")
+            if self._tm1_engine is not None:
+                for name in self._tm1:
+                    # Two containers would answer to the name on the network
+                    if name.lower() in (Tm1EngineContainer.DATASTORE_ALIAS.lower(), ENGINE_ALIAS.lower()):
+                        raise RuntimeError(
+                            f"A TM1 server can't be named {name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network"
+                        )
+            if self._reuse and self._tm1_engine is not None:
+                raise RuntimeError(
+                    "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, "
+                    "and a kept one keeps every database tests left"
+                )
             if self._keycloak is not None and self._cognos is None:
                 raise RuntimeError("Keycloak gives Cognos its OIDC namespace: add cognos(...) too")
             if self._cam_namespace is Namespace.OIDC and self._keycloak is None:

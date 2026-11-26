@@ -1,0 +1,4 @@
+# error: database names are letters, digits, _ and -, starting with a letter or digit
+# A name that ends in a newline isn't one
+version: 1
+tm1Engine: { databases: { "abc\n": {} } }

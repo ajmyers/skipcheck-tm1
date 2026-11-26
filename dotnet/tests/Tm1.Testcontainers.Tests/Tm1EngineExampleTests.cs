@@ -165,6 +165,44 @@ public class S2sUsersExampleTests(S2sUsersExampleTests.OwnEngine own) : IClassFi
     }
 }
 
+/// <summary>Java's Tm1EngineEnvironmentExampleTest: TM1 11 and TM1 v12 in one environment.
+/// <see cref="PlanningAnalyticsEnvironment"/> starts a TM1 server and a TM1 v12 engine on one network, for tests of
+/// both versions, or of moving from one to the other. It needs a source for each.</summary>
+[Collection(OwnContainers.Name)]
+public class Tm1EngineEnvironmentExampleTests
+{
+    [RequiresTm1AndTm1EngineFact]
+    public async Task AServerAndAnEngineSideBySide()
+    {
+        await using var env = PlanningAnalyticsEnvironment
+            .Builder()
+            .Tm1("legacy")
+            .Tm1Engine(engine => engine.WithDatabase("planning").WithUser("analyst", "Analysts"))
+            .Build();
+        await env.StartAsync();
+
+        await using (var legacy = new Tm1Rest(env.Tm1("legacy")))
+        {
+            Assert.Equal(0, await legacy.ModelCubeCountAsync());
+        }
+        var planning = env.Tm1Database("planning");
+        var (status, body) = await Tm1EngineRest.GetAsync(planning, planning.Login("analyst"), "ActiveUser?$select=Name");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Name\":\"analyst\"", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>A test that needs both a TM1 11 and a TM1 v12 source, as Java's <c>@RequiresTm1</c> with
+    /// <c>@RequiresTm1Engine</c>.</summary>
+    [AttributeUsage(AttributeTargets.Method)]
+    private sealed class RequiresTm1AndTm1EngineFactAttribute : RequiresTm1EngineFactAttribute
+    {
+        public RequiresTm1AndTm1EngineFactAttribute()
+        {
+            Skip ??= RequiresTm1FactAttribute.Tm1SkipReason();
+        }
+    }
+}
+
 /// <summary>A test's place among its class's, as JUnit's <c>@Order</c>; for a class with <see cref="InOrder"/>.</summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class OrderAttribute(int value) : Attribute

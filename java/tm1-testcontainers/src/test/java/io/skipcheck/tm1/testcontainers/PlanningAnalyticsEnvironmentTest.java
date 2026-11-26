@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -323,18 +324,145 @@ class PlanningAnalyticsEnvironmentTest {
 	}
 
 	@Test
+	void anEngineRunsBesideTheTm1Servers() {
+		var env = engineBuilder().tm1("legacy")
+			.tm1Engine(engine -> engine.withDatabase("planning").withUser("analyst", "Analysts"))
+			.build();
+		var engine = env.tm1Engine();
+		assertThat(engine.getNetwork()).isSameAs(env.network()).isSameAs(env.tm1("legacy").getNetwork());
+		assertThat(engine.getSource()).isEqualTo(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
+		// Before anything configures or starts it: the environment starts its datastore
+		// first
+		assertThat(engine.getDatastore().getNetwork()).isSameAs(env.network());
+		// Its name on the network, as in pa-setup's compose project
+		assertThat(engine.getNetworkAliases()).contains("tm1-engine");
+		engine.configure();
+		// Its datastore is the engine's own, on the environment's network with it
+		assertThat(engine.getDatastore().getNetwork()).isSameAs(env.network());
+		assertThat(engine.getEnvMap()).containsEntry("TM1_DATABASES", "tm1/planning")
+			.containsEntry("TM1_USERS", "analyst:Analysts");
+		assertThat(env.tm1Database("planning").getName()).isEqualTo("planning");
+		// Started with TM1 11's parts, and before PAW
+		assertThat(env.containers()).containsExactly(env.tm1("legacy"), engine);
+	}
+
+	@Test
+	void anEngineAloneIsAnEnvironment() {
+		var env = engineBuilder().tm1Engine().build();
+		assertThat(env.tm1Servers()).isEmpty();
+		assertThat(env.adminServer()).isEmpty();
+		assertThat(env.containers()).containsExactly(env.tm1Engine());
+		assertThat(env.tm1Database("tm1").getInstance()).isEqualTo("tm1");
+		assertThatIllegalStateException().isThrownBy(() -> builder().tm1("planning").build().tm1Engine())
+			.withMessageContaining("no TM1 v12 engine; add it with tm1Engine()");
+		assertThatIllegalStateException().isThrownBy(() -> PlanningAnalyticsEnvironment.builder().build())
+			.withMessageContaining("tm1(name), or a TM1 v12 engine with tm1Engine()");
+	}
+
+	@Test
+	void theAdminServerTm1WebPawAndCognosNeedATm1ServerNotAnEngine() {
+		for (var incomplete : List.of(engineBuilder().tm1Engine().tm1Web(), engineBuilder().tm1Engine().adminServer(),
+				engineBuilder().tm1Engine().pawSource(pawSource()).paw(PawContainer::acceptLicense),
+				engineBuilder().tm1Engine().cognos(cognos -> cognos.withUser("admin", "adminpw")))) {
+			assertThatIllegalStateException().isThrownBy(incomplete::build)
+				.withMessageContaining("are TM1 11's: add a TM1 server with tm1(name)");
+		}
+	}
+
+	@Test
+	void aServerCantTakeTheEnginesNamesOnTheNetwork() {
+		for (String name : List.of("tm1-datastore", "TM1-Engine")) {
+			assertThatIllegalStateException().isThrownBy(() -> engineBuilder().tm1(name).tm1Engine().build())
+				.withMessageContaining("A TM1 server can't be named " + name + " beside a TM1 v12 engine");
+		}
+		// Without an engine the names are free
+		assertThat(builder().tm1("tm1-datastore").build().tm1Servers()).containsKey("tm1-datastore");
+	}
+
+	@Test
+	void fromConfigKeepsTheFilesEngineUnderACustomizerAndItsImageWithoutASection() {
+		// A customizer adds to the file's databases and users; it doesn't replace them
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("tm1-engine.yaml"))
+			.tm1Engine(engine -> engine.withUser("extra"))
+			.build();
+		env.tm1Engine().configure();
+		assertThat(env.tm1Engine().getEnvMap()).containsEntry("TM1_DATABASES", "tm1/planning,tm1/Sales,other/sales")
+			.containsEntry("TM1_USERS", "analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners,extra");
+
+		// images.tm1Engine is the image of an engine added in code too
+		var added = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-image-only.yaml")).tm1Engine().build();
+		assertThat(image(added.tm1Engine())).isEqualTo("registry.example.com/tm1-engine:local");
+		assertThat(added.tm1Engine().getSource())
+			.isEqualTo(new Tm1EngineSource.Bundle(fixture("ibm").toAbsolutePath().normalize(), null));
+	}
+
+	@Test
+	void anEnvironmentWithAnEngineCantBeReused() {
+		// Whatever the developer's switch says: the same code must do the same everywhere
+		for (boolean enabled : new boolean[] { true, false }) {
+			assertThatIllegalStateException()
+				.isThrownBy(() -> engineBuilder().tm1("legacy").tm1Engine().reuse(true).build(enabled))
+				.withMessageContaining("An environment with a TM1 v12 engine can't be reused");
+		}
+	}
+
+	@Test
+	void fromConfigAddsTheEngineWithItsDatabasesAndUsers() {
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("tm1-engine.yaml")).build();
+		Path ibm = fixture("ibm").toAbsolutePath().normalize();
+		var engine = env.tm1Engine();
+		engine.configure();
+		// Sales and sales are two databases to TM1 v12, and each is in its instance
+		assertThat(engine.getEnvMap()).containsEntry("TM1_DATABASES", "tm1/planning,tm1/Sales,other/sales")
+			// A user's password isn't TM1 v12's to keep
+			.containsEntry("TM1_USERS", "analyst:Analysts:Planners,viewer,boss:ADMIN,planner:Planners");
+		assertThat(env.tm1Database("Sales").getInstance()).isEqualTo("tm1");
+		assertThat(engine.database("other", "sales").getName()).isEqualTo("sales");
+		// ibm is every part's source; images are what they run
+		assertThat(engine.getSource()).isEqualTo(new Tm1EngineSource.Bundle(ibm, null));
+		assertThat(image(engine)).isEqualTo("registry.example.com/tm1-engine:local");
+		assertThat(env.tm1("legacy").getSource()).isEqualTo(new Tm1Source.Bundle(ibm, null));
+	}
+
+	@Test
+	void fromConfigRunsAnEngineAlone() {
+		var env = PlanningAnalyticsEnvironment
+			.fromConfig(Path.of(System.getProperty("tm1.containerConformance.scenarios")).resolve("engine.yaml"))
+			.tm1EngineSource(new Tm1EngineSource.PrivateImage("tm1-engine:test"))
+			.build();
+		assertThat(env.tm1Servers()).isEmpty();
+		env.tm1Engine().configure();
+		assertThat(env.tm1Engine().getEnvMap()).containsEntry("TM1_DATABASES", "tm1/planning,tm1/sales")
+			.containsEntry("TM1_USERS", "analyst:Analysts");
+	}
+
+	@Test
+	void fromConfigTakesOidcTrueAsOn() {
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("oidc-true.yaml")).build();
+		assertThat(env.keycloak()).isNotNull();
+		var planning = env.tm1("planning");
+		planning.configure();
+		assertThat(planning.getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "OIDC");
+	}
+
+	private PlanningAnalyticsEnvironment.Builder engineBuilder() {
+		return builder().tm1EngineSource(new Tm1EngineSource.PrivateImage("tm1-engine:test"));
+	}
+
+	@Test
 	void fromConfigRefusesWhatItCannotRun() throws IOException {
+		List<Path> invalid = new ArrayList<>();
 		try (var files = Files.list(fixture("invalid"))) {
-			List<Path> invalid = files.filter(f -> f.toString().endsWith(".yaml")).sorted().toList();
-			assertThat(invalid).isNotEmpty();
-			for (Path file : invalid) {
-				String first = Files.readAllLines(file).get(0);
-				assertThat(first).as(file.toString()).startsWith("# error: ");
-				assertThatIllegalArgumentException().as(file.toString())
-					.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(file))
-					.withMessageStartingWith(file.getFileName() + ": ")
-					.withMessageContaining(first.substring("# error: ".length()));
-			}
+			invalid.addAll(files.filter(f -> f.toString().endsWith(".yaml")).sorted().toList());
+		}
+		assertThat(invalid).hasSizeGreaterThan(40);
+		for (Path file : invalid) {
+			String first = Files.readAllLines(file).get(0);
+			assertThat(first).as(file.toString()).startsWith("# error: ");
+			assertThatIllegalArgumentException().as(file.toString())
+				.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(file))
+				.withMessageStartingWith(file.getFileName() + ": ")
+				.withMessageContaining(first.substring("# error: ".length()));
 		}
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> PlanningAnalyticsEnvironment.fromConfig(fixture("missing.yaml")))

@@ -51,8 +51,10 @@ class Tm1EngineWiringTest {
 	@Test
 	void refusesNamesTheImageCantTake() {
 		var engine = new Tm1EngineContainer(SOURCE);
-		// TM1 wants at least three characters
+		// TM1 wants at least three characters of a database's name; an instance's may be
+		// shorter
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("ab"));
+		assertThat(new Tm1EngineContainer(SOURCE).withDatabase("qa", "sales").configured()).containsExactly("qa/sales");
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("two words"));
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withDatabase("a/b", "sales"));
 		assertThatIllegalArgumentException().isThrownBy(() -> engine.withUser("two words"));
@@ -76,6 +78,19 @@ class Tm1EngineWiringTest {
 		// Both are this library's, like every container it starts
 		assertThat(engine.getLabels()).containsEntry("io.skipcheck.tm1.testcontainers", "java");
 		assertThat(datastore.getLabels()).containsEntry("io.skipcheck.tm1.testcontainers", "java");
+	}
+
+	@Test
+	void itsDatastoreIsOnItsNetworkBeforeAnythingStarts() {
+		// Not only once the engine starts or is configured: an environment starts what
+		// the
+		// engine depends on first, and TM1 couldn't reach a datastore left off the
+		// network
+		var engine = new Tm1EngineContainer(SOURCE);
+		assertThat(engine.getNetwork()).isNotNull().isSameAs(engine.getDatastore().getNetwork());
+		Network network = Network.newNetwork();
+		engine.withNetwork(network);
+		assertThat(engine.getDatastore().getNetwork()).isSameAs(network);
 	}
 
 	@Test

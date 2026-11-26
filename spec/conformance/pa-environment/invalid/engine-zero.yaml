@@ -1,0 +1,5 @@
+# error: tm1Engine must be a mapping
+# 0 isn't false: a section is off only when it's absent, null or false
+version: 1
+tm1: { servers: { tm1: {} } }
+tm1Engine: 0

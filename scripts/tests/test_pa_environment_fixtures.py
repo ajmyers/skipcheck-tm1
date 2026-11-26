@@ -21,6 +21,10 @@ VALID = [
     FIXTURES / "paw.yaml",
     FIXTURES / "paw-cognos.yaml",
     REPO / "docker" / "pa-setup" / "examples" / "everything.yaml",
+    REPO / "docker" / "pa-setup" / "examples" / "tm1-engine.yaml",
+    FIXTURES / "tm1-engine.yaml",
+    FIXTURES / "oidc-true.yaml",
+    FIXTURES / "engine-image-only.yaml",
 ]
 INVALID = sorted((FIXTURES / "invalid").glob("*.yaml"))
 

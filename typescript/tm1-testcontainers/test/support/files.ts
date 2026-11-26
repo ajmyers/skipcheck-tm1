@@ -81,6 +81,10 @@ export const Repo = {
   get paEnvironmentFixtures(): string {
     return join(this.root, "spec", "conformance", "pa-environment");
   },
+  /** The scenarios every language's container conformance test starts. */
+  get containerConformanceScenarios(): string {
+    return join(this.root, "testcontainers-conformance", "scenarios");
+  },
   get paEnvironmentExamples(): string {
     return join(this.root, "docker", "pa-setup", "examples");
   },

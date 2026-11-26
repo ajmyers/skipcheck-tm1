@@ -1,0 +1,8 @@
+# An engine's image with no tm1Engine section: the image of an engine a test adds in code
+version: 1
+ibm: ibm
+images:
+  tm1Engine: registry.example.com/tm1-engine:local
+tm1:
+  servers:
+    legacy: {}

@@ -1,0 +1,11 @@
+# cognos.oidc: true is OIDC on, with the default Keycloak port: the namespace needs it
+version: 1
+ibm: ibm
+tm1:
+  servers:
+    planning: {}
+cognos:
+  users:
+    - admin:adminpw:Admins
+  oidc: true
+  cam: { namespace: oidc }

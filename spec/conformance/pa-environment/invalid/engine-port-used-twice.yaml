@@ -1,0 +1,4 @@
+# error: port(s) 8010 used by more than one service
+version: 1
+tm1: { servers: { tm1: {} } }
+tm1Engine: { port: 8010 }

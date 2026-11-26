@@ -14,6 +14,9 @@ import { PawContainer } from "./PawContainer.js";
 import { PawSource } from "./PawSource.js";
 import { IllegalArgumentException, IllegalStateException, Settings } from "./settings.js";
 import { Tm1AdminServerContainer } from "./Tm1AdminServerContainer.js";
+import type { Tm1Database } from "./Tm1Database.js";
+import { Tm1EngineContainer } from "./Tm1EngineContainer.js";
+import { Tm1EngineSource } from "./Tm1EngineSource.js";
 import { Tm1ServerContainer } from "./Tm1ServerContainer.js";
 import { Tm1Source } from "./Tm1Source.js";
 import { Tm1WebContainer } from "./Tm1WebContainer.js";
@@ -23,7 +26,8 @@ type Customizer<T> = (part: T) => unknown;
 
 /** A whole Planning Analytics setup on one Docker network, as the Java
  * `PlanningAnalyticsEnvironment`: any mix of TM1 servers (by name), a shared Admin Server, TM1
- * Web, PAW, Cognos and Keycloak, wired together, every part optional but one TM1 server.
+ * Web, PAW, Cognos and Keycloak, and a TM1 v12 engine, wired together. Every part is optional, but
+ * there's a TM1 server or an engine.
  *
  * ```ts
  * await using env = PlanningAnalyticsEnvironment.builder()
@@ -46,6 +50,9 @@ type Customizer<T> = (part: T) => unknown;
  *   PAW list them all.
  * - With `cognos(...)`, every server runs in CAM security. PAW with CAM security isn't supported
  *   yet.
+ * - With `tm1Engine(...)`, a TM1 v12 engine ({@link Tm1EngineContainer}) and its MongoDB run on the
+ *   same network, beside the TM1 servers or alone. The Admin Server, TM1 Web, PAW and Cognos
+ *   security are TM1 11's, and need a TM1 server. An environment with an engine can't be reused.
  * - Sources are discovered from the environment, as for each container, unless set with
  *   `tm1Source(...)` and so on. {@link start} starts parts in dependency order, in parallel where
  *   it can; {@link stop} stops everything and removes the network.
@@ -97,6 +104,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
   readonly #paw: PawContainer | undefined;
   readonly #cognos: CognosContainer | undefined;
   readonly #keycloak: KeycloakContainer | undefined;
+  readonly #tm1Engine: Tm1EngineContainer | undefined;
 
   /** @internal */
   constructor(parts: BuilderParts, reuseEnabled: boolean) {
@@ -129,22 +137,27 @@ export class PlanningAnalyticsEnvironment implements Startable {
       parts.cognos(cognos);
       this.#cognos = cognos;
     }
-    const tm1Source = get(
-      parts,
-      parts.tm1Source,
-      (ibm) => new Tm1Source.Bundle(ibm),
-      () => Tm1Source.discover(),
-      (image) => new Tm1Source.PrivateImage(image),
-      parts.tm1Image,
-      Messages.TM1_NO_SOURCE,
-    );
+    // TM1 11's parts, when there's a server: an environment may be a TM1 v12 engine alone
+    const tm1Source =
+      parts.tm1.size === 0
+        ? undefined
+        : get(
+            parts,
+            parts.tm1Source,
+            (ibm) => new Tm1Source.Bundle(ibm),
+            () => Tm1Source.discover(),
+            (image) => new Tm1Source.PrivateImage(image),
+            parts.tm1Image,
+            Messages.TM1_NO_SOURCE,
+          );
     const tm1Image = runs(parts.tm1Image, tm1Source instanceof Tm1Source.PrivateImage);
     this.#adminServer =
-      parts.adminServer !== undefined || parts.tm1.size > 1
+      tm1Source !== undefined && (parts.adminServer !== undefined || parts.tm1.size > 1)
         ? (tm1Image !== undefined ? new Tm1AdminServerContainer(tm1Image, tm1Source) : new Tm1AdminServerContainer(tm1Source)).withNetwork(network)
         : undefined;
     const servers = new Map<string, Tm1ServerContainer>();
     for (const name of parts.tm1.keys()) {
+      if (tm1Source === undefined) throw new IllegalStateException("A TM1 server needs a TM1 source");
       const server = (tm1Image !== undefined ? new Tm1ServerContainer(tm1Image, tm1Source) : new Tm1ServerContainer(tm1Source))
         .withNetwork(network)
         .withNetworkAliases(name)
@@ -154,8 +167,9 @@ export class PlanningAnalyticsEnvironment implements Startable {
       servers.set(name, server);
     }
     this.#tm1Servers = servers;
-    const first = servers.values().next().value!;
-    if (parts.tm1Web !== undefined) {
+    // build() has checked that TM1 Web and PAW come with a server
+    const first = servers.values().next().value;
+    if (parts.tm1Web !== undefined && first !== undefined) {
       const source = get(
         parts,
         parts.tm1WebSource,
@@ -172,7 +186,7 @@ export class PlanningAnalyticsEnvironment implements Startable {
       for (const server of servers.values()) web.dependsOn(server);
       this.#tm1Web = web;
     }
-    if (parts.paw !== undefined) {
+    if (parts.paw !== undefined && first !== undefined) {
       const paw = new PawContainer(
         get(
           parts,
@@ -187,12 +201,32 @@ export class PlanningAnalyticsEnvironment implements Startable {
       if (this.#adminServer) paw.withAdminServer(this.#adminServer);
       this.#paw = paw;
     }
+    if (parts.tm1Engine !== undefined) {
+      const source = get(
+        parts,
+        parts.tm1EngineSource,
+        (ibm) => new Tm1EngineSource.Bundle(ibm),
+        () => Tm1EngineSource.discover(),
+        (image) => new Tm1EngineSource.PrivateImage(image),
+        parts.tm1EngineImage,
+        Messages.TM1_ENGINE_NO_SOURCE,
+      );
+      const image = runs(parts.tm1EngineImage, source instanceof Tm1EngineSource.PrivateImage);
+      // Its datastore joins the same network with it
+      this.#tm1Engine = (image !== undefined ? new Tm1EngineContainer(image, source) : new Tm1EngineContainer(source))
+        .withNetwork(network)
+        // Its name on the network, as in the compose project pa-setup writes
+        .withNetworkAliases(ENGINE_ALIAS);
+      // What the file said first; then, below, what the caller says
+      apply(parts.fileTm1Engine, this.#tm1Engine);
+    }
     // The callers' own settings last, so they can change anything set above
     apply(parts.adminServer, this.#adminServer);
     for (const [name, customizer] of parts.tm1) customizer(servers.get(name)!);
     apply(parts.tm1Web, this.#tm1Web);
     apply(parts.paw, this.#paw);
     apply(parts.keycloak, this.#keycloak);
+    apply(parts.tm1Engine, this.#tm1Engine);
   }
 
   /** A builder for an environment. */
@@ -221,8 +255,12 @@ export class PlanningAnalyticsEnvironment implements Startable {
    * - `paw`: {@link PlanningAnalyticsEnvironment.Builder.paw} with {@link PawContainer.acceptLicense},
    *   which the file must say (`acceptLicense: true`); the zip is `zip` in `ibm`, or the newest
    *   there;
-   * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle}
-   *   and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
+   * - `tm1Engine`: {@link PlanningAnalyticsEnvironment.Builder.tm1Engine}, with each of `databases`
+   *   as {@link Tm1EngineContainer.withDatabase} in its `instance`, and `users` as
+   *   {@link Tm1EngineContainer.withUser} (a user's password is checked and not used: TM1 v12 keeps
+   *   none). It runs beside `tm1`, or alone;
+   * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle},
+   *   {@link Tm1EngineSource.Bundle} and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
    *   home;
    * - `images`: the image each part runs, as a container's `image` argument. A part with no other
    *   source takes its image as the private image with IBM's software built in
@@ -234,7 +272,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
    *
    * Ignored, because they place things on the host that Testcontainers manages itself: `name` (the
    * compose project; the environment has its own network), every `port`, `adminPort` and
-   * `keycloakPort` (Testcontainers maps random host ports), and `files` (the host folder pa-setup
+   * `keycloakPort` (Testcontainers maps random host ports), `tm1Engine.datastore` and
+   * `images.mongo` (the engine's MongoDB is its own here), and `files` (the host folder pa-setup
    * keeps databases in; each test environment starts from a new database, or one copied in with
    * {@link Tm1ServerContainer.withData}). They're still checked as `pa-setup` checks them.
    *
@@ -249,7 +288,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
     return readPaEnvironment(path, new PlanningAnalyticsEnvironment.Builder());
   }
 
-  /** Starts everything, what's depended on first and in parallel where it can, then PAW. */
+  /** Starts everything, what's depended on first and in parallel where it can, then PAW. A TM1 v12
+   * engine starts with its MongoDB, beside TM1 11's parts and before PAW. */
   async start(): Promise<void> {
     if (this.#reused) this.prepareForReuse();
     await Promise.all(
@@ -321,6 +361,20 @@ export class PlanningAnalyticsEnvironment implements Startable {
     return required(this.#keycloak, "Keycloak", "keycloak()");
   }
 
+  /** The TM1 v12 engine.
+   * @throws IllegalStateException if the environment has none */
+  tm1Engine(): Tm1EngineContainer {
+    return required(this.#tm1Engine, "TM1 v12 engine", "tm1Engine()");
+  }
+
+  /** A database of the TM1 v12 engine, in the instance `tm1`; for another instance's, use
+   * `tm1Engine().database(instance, name)`.
+   * @throws IllegalStateException if the environment has no engine
+   * @throws IllegalArgumentException if the engine has no such database */
+  tm1Database(name: string): Tm1Database {
+    return this.tm1Engine().database(name);
+  }
+
   /** The network everything is on. */
   network(): Network {
     return this.#network;
@@ -363,7 +417,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
     }
   }
 
-  /** Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, PAW.
+  /** Every part, in start order: Keycloak, Cognos, the Admin Server, the TM1 servers, TM1 Web, the
+   * TM1 v12 engine, PAW.
    * @internal */
   containers(): Startable[] {
     const all: Startable[] = [];
@@ -372,6 +427,8 @@ export class PlanningAnalyticsEnvironment implements Startable {
     if (this.#adminServer) all.push(this.#adminServer);
     all.push(...this.#tm1Servers.values());
     if (this.#tm1Web) all.push(this.#tm1Web);
+    // Beside TM1 11's parts: nothing of theirs depends on it, nor it on them
+    if (this.#tm1Engine) all.push(this.#tm1Engine);
     if (this.#paw) all.push(this.#paw);
     return all;
   }
@@ -392,6 +449,10 @@ export interface BuilderParts {
   cognos?: Customizer<CognosContainer>;
   /** Keycloak's settings, if it's in the environment. */
   keycloak?: Customizer<KeycloakContainer>;
+  /** The TM1 v12 engine's settings, if it's in the environment. */
+  tm1Engine?: Customizer<Tm1EngineContainer>;
+  /** Where TM1 v12 comes from, if given rather than discovered. */
+  tm1EngineSource?: Tm1EngineSource;
   /** The Cognos namespace TM1's users log on through. */
   camNamespace: CognosContainer.Namespace;
   /** The Cognos test users who are TM1 administrators. */
@@ -421,6 +482,10 @@ export interface BuilderParts {
   cognosImage?: string;
   /** Keycloak's image, from pa-environment.yaml. */
   keycloakImage?: string;
+  /** The TM1 v12 engine's image, from pa-environment.yaml. */
+  tm1EngineImage?: string;
+  /** The file's own settings for the engine, kept when the caller adds theirs. */
+  fileTm1Engine?: Customizer<Tm1EngineContainer>;
 }
 
 /** The label on a reused environment's containers and network. Its value is the environment's
@@ -429,6 +494,9 @@ const REUSE_LABEL = "io.skipcheck.tm1.environment";
 
 /** The start of a reused environment's network name; the identity follows. */
 const NETWORK_PREFIX = "tm1-environment-";
+
+/** The TM1 v12 engine's name on the environment's network. */
+const ENGINE_ALIAS = "tm1-engine";
 
 const SERVER_NAME = /^[A-Za-z0-9_-]+$/;
 const none = (): void => {};
@@ -482,6 +550,17 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
+    /** Adds a TM1 v12 engine, with one database, `tm1`, unless `customizer` names others: it
+     * configures the engine, its databases and users for instance. The engine runs beside the TM1
+     * servers, or alone: an environment needs a server or an engine. On a builder from
+     * {@link PlanningAnalyticsEnvironment.fromConfig}, the file's databases and users stay, and the
+     * customizer adds to them. */
+    tm1Engine(customizer: Customizer<Tm1EngineContainer> = none): this {
+      if (typeof customizer !== "function") throw new TypeError("customizer must be a function");
+      this.#parts.tm1Engine = customizer;
+      return this;
+    }
+
     /** The CAM namespace TM1's users log on through, and the TM1 administrators (by default, the
      * first test user). */
     camSecurity(namespace: CognosContainer.Namespace, ...admins: string[]): this {
@@ -514,6 +593,13 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
+    /** Where the engine gets TM1 v12 from, rather than {@link Tm1EngineSource.discover}. */
+    tm1EngineSource(source: Tm1EngineSource): this {
+      if (!(source instanceof Tm1EngineSource)) throw new TypeError("source must be a Tm1EngineSource");
+      this.#parts.tm1EngineSource = source;
+      return this;
+    }
+
     /** The network to use, rather than a new one (which the environment removes when it stops). */
     network(network: Network): this {
       this.#parts.network = network;
@@ -524,7 +610,8 @@ export namespace PlanningAnalyticsEnvironment {
      * (`testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or
      * `TESTCONTAINERS_REUSE_ENABLE=true`). A later run with the same configuration finds them, and
      * objects tests left behind are still there. Without the switch it has no effect. See
-     * {@link PlanningAnalyticsEnvironment} for what's reused and how to start clean.
+     * {@link PlanningAnalyticsEnvironment} for what's reused and how to start clean. An environment
+     * with a TM1 v12 engine can't be reused: {@link build} refuses it, whatever the switch says.
      *
      * With your own {@link network}, reuse only works if it's the same network each run: its name
      * is part of the environment's identity.
@@ -550,7 +637,27 @@ export namespace PlanningAnalyticsEnvironment {
     build(reuseEnabled: boolean): PlanningAnalyticsEnvironment;
     build(reuseEnabled: boolean = DockerHost.reuseEnabled()): PlanningAnalyticsEnvironment {
       const p = this.#parts;
-      if (p.tm1.size === 0) throw new IllegalStateException("Add at least one TM1 server with tm1(name)");
+      if (p.tm1.size === 0 && p.tm1Engine === undefined) {
+        throw new IllegalStateException("Add at least one TM1 server with tm1(name), or a TM1 v12 engine with tm1Engine()");
+      }
+      if (p.tm1.size === 0 && (p.adminServer !== undefined || p.tm1Web !== undefined || p.paw !== undefined || p.cognos !== undefined)) {
+        throw new IllegalStateException("The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: add a TM1 server with tm1(name)");
+      }
+      if (p.tm1Engine !== undefined) {
+        for (const name of p.tm1.keys()) {
+          // Two containers would answer to the name on the network
+          if ([Tm1EngineContainer.DATASTORE_ALIAS, ENGINE_ALIAS].includes(name.toLowerCase())) {
+            throw new IllegalStateException(
+              `A TM1 server can't be named ${name} beside a TM1 v12 engine: that's the engine's name, or its datastore's, on the network`,
+            );
+          }
+        }
+      }
+      if (p.reuse && p.tm1Engine !== undefined) {
+        throw new IllegalStateException(
+          "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, and a kept one keeps every database tests left",
+        );
+      }
       if (p.keycloak !== undefined && p.cognos === undefined) throw new IllegalStateException("Keycloak gives Cognos its OIDC namespace: add cognos(...) too");
       if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined)
         throw new IllegalStateException("CAM security through OIDC needs keycloak()");
@@ -581,6 +688,8 @@ function describe(part: Startable): string {
     d.push("source=" + source(part.getSource()));
   } else if (part instanceof Tm1WebContainer) {
     d.push("source=" + source(part.getSource()), "tm1=" + String(serverName(part.getTm1Server())));
+  } else if (part instanceof Tm1EngineContainer) {
+    d.push("source=" + source(part.getSource()));
   } else if (part instanceof CognosContainer) {
     d.push("source=" + source(part.getSource()), "users=" + part.usersSpec());
   }

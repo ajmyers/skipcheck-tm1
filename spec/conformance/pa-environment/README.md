@@ -9,7 +9,10 @@ pa-setup's: [`docker/pa-setup`](../../../docker/pa-setup/README.md).
 | `settings.yaml` | Every setting the environment maps, with values other than the defaults |
 | `paw.yaml` | PAW, its license, and its zip in the `ibm` folder |
 | `paw-cognos.yaml` | PAW with Cognos: PAW logs users on through Cognos |
-| `ibm/` | The `ibm` folder of both: an empty stand-in for the PAW Local zip |
+| `tm1-engine.yaml` | Every `tm1Engine` setting (TM1 v12), with values other than the defaults, beside a TM1 11 server |
+| `engine-image-only.yaml` | `images.tm1Engine` without a `tm1Engine` section: the image of an engine added in code |
+| `oidc-true.yaml` | `cognos.oidc: true` turns OIDC on, as a mapping does |
+| `ibm/` | The `ibm` folder of those: empty stand-ins for the PAW Local zip and IBM's TM1 v12 package |
 | `invalid/*.yaml` | Files `fromConfig` refuses. The first line is `# error: <part of the message>` |
 
 `docker/pa-setup/examples/everything.yaml` is read too. `scripts/tests/test_pa_setup.py` checks

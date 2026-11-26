@@ -14,6 +14,7 @@ import io.skipcheck.tm1.client.model.Cube;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.testcontainers.CognosContainer;
 import io.skipcheck.tm1.testcontainers.PlanningAnalyticsEnvironment;
+import io.skipcheck.tm1.testcontainers.Tm1Database;
 import io.skipcheck.tm1.testcontainers.Tm1Seed;
 
 /**
@@ -108,6 +109,20 @@ final class PlanningAnalyticsEnvironmentExamples {
 	}
 
 	private PlanningAnalyticsEnvironmentExamples() {
+	}
+
+	String engine() {
+		// @start region = engine
+		// TM1 11 and TM1 v12 side by side: a server, and an engine with two databases
+		try (var env = PlanningAnalyticsEnvironment.builder()
+			.tm1("legacy")
+			.tm1Engine(engine -> engine.withDatabase("planning").withDatabase("sales").withUser("analyst", "Analysts"))
+			.build()) {
+			env.start();
+			Tm1Database planning = env.tm1Database("planning");
+			return planning.getRestUrl() + " and " + env.tm1("legacy").getRestUrl();
+		}
+		// @end
 	}
 
 }

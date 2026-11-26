@@ -147,6 +147,27 @@ with env:
 Several servers share an Admin Server (`Tm1AdminServerContainer`); Cognos puts every server in
 CAM security, and `keycloak()` with `cam_security(Namespace.OIDC, ...)` uses OIDC.
 
+`tm1_engine()` adds a [TM1 v12](#tm1-v12) engine, beside the TM1 servers or alone: an environment
+needs a server or an engine.
+
+```python
+env = PlanningAnalyticsEnvironment.builder().tm1("legacy").tm1_engine(lambda e: e.with_database("planning").with_user("analyst", "Analysts")).build()
+with env:
+    env.tm1_database("planning").rest_url  # and env.tm1_engine(), the container
+```
+
+- The engine and its MongoDB are on the environment's network, and start with TM1 11's parts,
+  before PAW. `tm1_engine_source(...)` sets where TM1 v12 comes from, instead of
+  `Tm1EngineSource.discover()`.
+- The engine's name on the network is `tm1-engine`, and its MongoDB's `tm1-datastore`: a TM1 server
+  can't have either name beside an engine.
+- On a builder from `from_config`, `tm1_engine(customizer)` adds to the file's databases and users,
+  and `images.tm1Engine` is the image of an engine added in code too.
+- The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.
+- An environment with an engine can't be reused: `reuse(True)` is refused at `build()`, whatever
+  your reuse switch says. An engine and its datastore belong together, and a kept one keeps every
+  database tests left.
+
 ### From pa-environment.yaml
 
 `from_config` reads the [`pa-environment.yaml`](../../docker/pa-setup/README.md#pa-environmentyaml)
@@ -162,12 +183,15 @@ checked as `pa-setup` checks it, with the same defaults and messages.
 
 - **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`,
   `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `cam_security`,
-  `memory`) and `paw` (`acceptLicense`, `zip`).
+  `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (`databases` with their `instance`, and
+  `users` with their groups; a user's password is checked and not used, as TM1 v12 keeps none).
+  `cognos.oidc: true` turns OIDC on, as a mapping does.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads;
   then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's
   `images` entry, as a private image with IBM's software built in. With another source, an
   `images` entry is the image the part runs.
-- **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own
+- **Ignored:** `name`, every port, `tm1Engine.datastore` and `images.mongo` (the engine's MongoDB
+  is its own here), and `files`. Testcontainers gives the environment its own
   network, random host ports and a new database each time.
 - **Refused** with a `ValueError` naming the setting: `cognos` without `tm1.servers`, and
   `seed: 24retail`, which the environment can't run yet.

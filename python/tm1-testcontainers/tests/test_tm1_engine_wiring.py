@@ -75,6 +75,17 @@ def test_runs_its_datastore_on_its_own_network() -> None:
     assert datastore._labels["io.skipcheck.tm1.testcontainers"] == "python"
 
 
+def test_its_datastore_is_on_its_network_before_anything_starts() -> None:
+    # Not only once the engine starts or is configured: an environment starts what the engine
+    # depends on first, and TM1 couldn't reach a datastore left off the network
+    engine = Tm1EngineContainer(SOURCE)
+    assert engine.network is not None
+    assert engine.network is engine.datastore.network
+    network = Network.new_network()
+    engine.with_network(network)
+    assert engine.datastore.network is network
+
+
 def test_joins_a_network_it_is_given() -> None:
     network = Network.new_network()
     engine = Tm1EngineContainer(SOURCE).with_network(network)
@@ -116,6 +127,56 @@ def test_names_a_classes_database_after_the_class() -> None:
 
 
 # Python's own: what Java's types and JUnit give, and here is code
+
+
+def test_an_instances_name_has_no_least_length() -> None:
+    # Where a database's has three characters
+    engine = Tm1EngineContainer(SOURCE)
+    assert engine.with_database("e", "sales").database("e", "sales").instance == "e"
+    with pytest.raises(ValueError, match="A TM1 instance's name is letters, digits, '_' and '-'"):
+        engine.with_database("_eu", "sales")
+    with pytest.raises(ValueError, match="A TM1 database's name is at least three"):
+        engine.with_database("eu", "sa")
+
+
+def test_stops_its_datastore_and_closes_its_network_when_removing_the_engine_fails() -> None:
+    class Unremovable:
+        def remove(self, **_: object) -> None:
+            raise OSError("the Docker daemon went away")
+
+    class Recording(Network):
+        closed = 0
+
+        def close(self) -> None:
+            self.closed += 1
+
+    engine = Tm1EngineContainer(SOURCE)
+    own = Recording()
+    engine._own_network = own
+    engine.with_network(own)
+    stopped: list[bool] = []
+    engine.datastore.stop = lambda *_, **__: stopped.append(True)  # type: ignore[method-assign]
+    engine._container = Unremovable()
+    with pytest.raises(OSError, match="went away"):
+        engine.stop()
+    assert stopped == [True]
+    assert own.closed == 1
+
+    # And a datastore that can't be removed still leaves the network closed; one the engine was
+    # given stays
+    def failing(*_: object, **__: object) -> None:
+        raise OSError("the datastore is stuck")
+
+    engine.datastore.stop = failing  # type: ignore[method-assign]
+    engine._container = None
+    with pytest.raises(OSError, match="stuck"):
+        engine.stop()
+    assert own.closed == 2
+    given = Recording()
+    engine.with_network(given)
+    with pytest.raises(OSError, match="stuck"):
+        engine.stop()
+    assert given.closed == 0 and own.closed == 2
 
 
 def test_picks_the_image_as_tm1_server_does(monkeypatch: pytest.MonkeyPatch) -> None:

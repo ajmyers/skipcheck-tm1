@@ -35,6 +35,8 @@ _REQUEST_TIMEOUT = 30.0
 # The image's own rule: at least three characters, and nothing the commands or a URL would need
 # quoting for
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{2,}")
+# An instance's name has no least length: only a database's does
+_INSTANCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 _USER = re.compile(r"[A-Za-z0-9._-]+")
 
 # The datastore is this engine's alone and goes with it: nothing else is given the password
@@ -63,6 +65,12 @@ def database_name(unit: str, suffix: str | None = None) -> str:
     letters = re.sub(r"[^a-z0-9]", "", unit.lower())
     # A short suffix is padded, so the name is always long enough for TM1
     return f"{letters[:24] or 'test'}_{suffix.rjust(4, '0')}"
+
+
+def _require_instance(name: str) -> str:
+    if not isinstance(name, str) or _INSTANCE.fullmatch(name) is None:
+        raise ValueError(f"A TM1 instance's name is letters, digits, '_' and '-', starting with a letter or digit: {name}")
+    return name
 
 
 def _require_name(name: str, what: str) -> str:
@@ -121,7 +129,6 @@ class Tm1EngineContainer(GenericContainer):
         self._credentials: dict[str, Any] | None = None
         self._credentials_lock = threading.Lock()
         self._version: Tm1Version | None = None
-        self._own_network: Network | None = None
         self.with_exposed_ports(self.PORT)
         # TM1 only exists for x86-64. On Apple Silicon this runs under Rosetta.
         self.with_platform("linux/amd64")
@@ -139,7 +146,19 @@ class Tm1EngineContainer(GenericContainer):
         )
         self.with_env("TM1_DATASTORE_URL", f"mongodb://{_DATASTORE_USER}:{_DATASTORE_PASSWORD}@{self.DATASTORE_ALIAS}:27017")
         self.depends_on(self._datastore)
+        # A network of their own unless one is given. It's made in Docker only when used.
+        self._own_network = Network.new_network()
+        self.with_network(self._own_network)
         self._mount_source()
+
+    def with_network(self, network: Any) -> Self:
+        """Puts the engine, and its datastore with it, on a network. They have one of their own
+        unless this is called; a network that's given is never removed by the engine."""
+        super().with_network(network)
+        # At once, not when the engine starts: whatever starts the engine may start what it
+        # depends on first, as an environment does, and the datastore must be here by then
+        self._datastore.with_network(network)
+        return self
 
     @classmethod
     def shared(cls) -> Tm1EngineContainer:
@@ -164,10 +183,11 @@ class Tm1EngineContainer(GenericContainer):
         """Adds a database: ``with_database(name)`` in the instance ``tm1``, or
         ``with_database(instance, name)`` in a named instance, which is created with an application
         of its own. An instance's users, sessions and applications are separate from another's.
-        Without any, the container has one database called ``tm1``. A name is at least three
-        letters, digits, ``_`` or ``-``; ``Sales`` and ``sales`` are two databases."""
+        Without any, the container has one database called ``tm1``. A database's name is at least
+        three letters, digits, ``_`` or ``-``, and an instance's at least one; ``Sales`` and ``sales``
+        are two databases."""
         instance, name = _instance_and_name(instance_or_name, name)
-        entry = _require_name(instance, "instance") + "/" + _require_name(name, "database")
+        entry = _require_instance(instance) + "/" + _require_name(name, "database")
         if entry not in self._databases:
             self._databases.append(entry)
         return self
@@ -252,7 +272,7 @@ class Tm1EngineContainer(GenericContainer):
         ``create_database(name)`` in the instance ``tm1``, or ``create_database(instance, name)`` in a
         named instance, which must exist. Takes about 10 seconds."""
         instance, name = _instance_and_name(instance_or_name, name)
-        path = _require_name(instance, "instance") + "/" + _require_name(name, "database")
+        path = _require_instance(instance) + "/" + _require_name(name, "database")
         try:
             self._engine_command("database", "create", path, timeout=_CREATE_TIMEOUT)
         except RuntimeError:
@@ -299,13 +319,9 @@ class Tm1EngineContainer(GenericContainer):
             raise
 
     def _join_network(self) -> None:
-        """Puts the engine and its datastore on one network: the one given, or a new one."""
-        if self.network is None:
-            self._own_network = Network.new_network()
-            self.with_network(self._own_network)
-        network = self.network
-        assert network is not None
-        self._datastore.with_network(network)
+        """Puts the engine and its datastore on one network: the one given, or their own. They
+        are on it since it was set (with_network); this holds it if either was moved since."""
+        self.with_network(self.network if self.network is not None else self._own_network)
 
     def configure(self) -> None:
         """Called before the container is created: passes the databases and the users to the image."""
@@ -322,13 +338,19 @@ class Tm1EngineContainer(GenericContainer):
 
     def stop(self, force: bool = True, delete_volume: bool = True) -> None:
         """Stops the engine, then its datastore, and removes the network if the engine made it."""
-        super().stop(force, delete_volume)
-        # Not a dependent: what this depends on is started for it, and stopping is left to us
-        self._datastore.stop(force, delete_volume)
-        self._credentials = None
-        self._version = None
-        if self._own_network is not None and self.network is self._own_network:
-            self._own_network.close()
+        try:
+            super().stop(force, delete_volume)
+        finally:
+            # Whatever removing the engine said: its datastore and its network aren't left behind
+            try:
+                # Not a dependent: what this depends on is started for it, and stopping is left to us
+                self._datastore.stop(force, delete_volume)
+            finally:
+                self._credentials = None
+                self._version = None
+                # Only its own: a network it was given is whoever gave it's to remove
+                if self.network is self._own_network:
+                    self._own_network.close()
 
     def _await_setup(self) -> None:
         """Waits until the image has created every instance, application, database and user, and

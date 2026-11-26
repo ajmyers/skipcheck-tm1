@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { type GenericContainer, PlanningAnalyticsEnvironment } from "../src/index.js";
-import { requiresCognos, requiresTm1, requiresTm1Web } from "../src/vitest.js";
+import { requiresCognos, requiresTm1, requiresTm1Engine, requiresTm1Web } from "../src/vitest.js";
 import { Repo } from "./support/files.js";
 
 /** Java's ContainerConformanceTest: starts each scenario of testcontainers-conformance/scenarios, a
@@ -25,6 +25,11 @@ describe("The containers Docker is asked for", () => {
   requiresCognos("servers in CAM security", { timeout: 45 * 60_000 }, async () => {
     await record("cam-security");
   });
+
+  // No database of the file's own is asked for: the environment starts its own engine
+  requiresTm1Engine("engine", { timeout: 30 * 60_000 }, async () => {
+    await record("engine");
+  });
 });
 
 async function record(scenario: string): Promise<void> {
@@ -37,6 +42,10 @@ async function record(scenario: string): Promise<void> {
   const admin = env.adminServer();
   if (admin) containers.set("adminServer", admin);
   if (scenario === "servers-and-web") containers.set("tm1Web", env.tm1Web());
+  if (scenario === "engine") {
+    containers.set("tm1Engine", env.tm1Engine());
+    containers.set("tm1EngineDatastore", env.tm1Engine().getDatastore());
+  }
   if (scenario === "cam-security") {
     containers.set("cognos", env.cognos());
     containers.set("keycloak", env.keycloak());

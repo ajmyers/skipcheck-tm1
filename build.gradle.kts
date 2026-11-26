@@ -227,8 +227,9 @@ val containerLogs = layout.buildDirectory.dir("container-conformance")
 
 val containerConformancePrepare = tasks.register("containerConformancePrepare") {
 	description = "Checks a TM1 is configured for the container conformance run, and clears the run before's logs."
-	// Not TM1_URL: a server that's already running has no container to compare
-	val names = liveSources - "TM1_URL"
+	// Not TM1_URL: a server that's already running has no container to compare. And TM1 v12's
+	// sources: the engine scenario needs only those
+	val names = liveSources - "TM1_URL" + listOf("TM1_ENGINE_PRIVATE_IMAGE", "TM1_ENGINE_HOME_DIR", "TM1_ENGINE_INSTALL_VOLUME", "TM1_ENGINE_BUNDLE_DIR", "TM1_ENGINE_BUNDLE_URL")
 	val configured = names.map { providers.environmentVariable(it) }
 	val directory = containerLogs
 	outputs.upToDateWhen { false }

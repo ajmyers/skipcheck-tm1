@@ -57,14 +57,14 @@ internal sealed partial class PaEnvironmentFile
     private PlanningAnalyticsEnvironment.EnvironmentBuilder Apply(object root, string dir)
     {
         // pa_setup.normalize: the same checks, in the same order
-        var cfg = Keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos"], "the file");
+        var cfg = Keys(root, ["version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos", "tm1Engine"], "the file");
         if (Get(cfg, "version") is not 1L)
         {
             throw Error("version: must be 1");
         }
         var ibm = Truthy(Get(cfg, "ibm")) ? HostPath(Get(cfg, "ibm"), "ibm", dir) : null;
         HostPath(Or(Get(cfg, "files"), "pa-files"), "files", dir);
-        var images = Keys(Or(Get(cfg, "images"), new Map()), ["tm1Server", "tm1Web", "cognosServer", "keycloak"], "images");
+        var images = Keys(Or(Get(cfg, "images"), new Map()), ["tm1Server", "tm1Web", "cognosServer", "keycloak", "tm1Engine", "mongo"], "images");
 
         var tm1 = Section(cfg, "tm1");
         var servers = new List<(string Name, Server Server)>();
@@ -165,7 +165,8 @@ internal sealed partial class PaEnvironmentFile
                 oidc = new Map();
             }
             int? keycloakPort = null;
-            if (Truthy(oidc))
+            // On with true or a mapping, an empty one too: only absent or false is off
+            if (oidc is not null and not false)
             {
                 var o = Keys(oidc, ["keycloakPort"], "cognos.oidc");
                 if (users.Count == 0)
@@ -238,11 +239,92 @@ internal sealed partial class PaEnvironmentFile
             pawZip = Truthy(Get(paw, "zip")) ? Str(Get(paw, "zip")) : null;
         }
 
-        if (servers.Count == 0 && cam is null)
+        var engineSection = Section(cfg, "tm1Engine");
+        Engine? engine = null;
+        int? enginePort = null;
+        int? datastorePort = null;
+        if (engineSection is not null)
         {
-            throw Error("nothing to run: add tm1.servers and/or cognos");
+            Keys(engineSection, ["port", "databases", "users", "datastore"], "tm1Engine");
+            // name and instance, in the file's order
+            var databases = new List<(string Name, string Instance)>();
+            var raw = Get(engineSection, "databases");
+            if (raw is null)
+            {
+                databases.Add((Tm1EngineContainer.DefaultDatabase, Tm1EngineContainer.DefaultInstance));
+            }
+            else if (raw is not Map named || named.Count == 0)
+            {
+                throw Error("tm1Engine.databases: name at least one database, e.g. tm1Engine: {databases: {planning: {}}}");
+            }
+            else
+            {
+                foreach (var (key, value) in named)
+                {
+                    var where = "tm1Engine.databases." + Str(key);
+                    // No check for names that differ only in case, as tm1.servers has: Sales and sales are two databases to TM1 v12
+                    if (key is not string name)
+                    {
+                        throw Error(where + ": YAML reads this name as a number or true/false: put it in quotes");
+                    }
+                    if (!EngineName().IsMatch(name))
+                    {
+                        throw Error(where + ": database names are letters, digits, _ and -, starting with a letter or digit");
+                    }
+                    if (name.Length < 3)
+                    {
+                        throw Error(where + ": TM1 needs database names of at least 3 characters");
+                    }
+                    var d = Keys(Or(value, new Map()), ["instance"], where);
+                    if ((Get(d, "instance") ?? Tm1EngineContainer.DefaultInstance) is not string instance || !EngineName().IsMatch(instance))
+                    {
+                        throw Error(where + ".instance: instance names are letters, digits, _ and -, starting with a letter or digit");
+                    }
+                    databases.Add((name, instance));
+                }
+            }
+            if ((Truthy(Get(engineSection, "users")) ? Get(engineSection, "users") : new List<object?>()) is not List<object?> list)
+            {
+                throw Error("tm1Engine.users must be a list, e.g. users: [analyst::Analysts]");
+            }
+            // Every user first, then the names, as pa_setup: a bad entry is reported before a name listed twice
+            var engineUsers = new List<EngineUser>();
+            for (var i = 0; i < list.Count; i++)
+            {
+                engineUsers.Add(ParseEngineUser(list[i], "tm1Engine.users[" + i + "]"));
+            }
+            var engineNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var user in engineUsers)
+            {
+                if (!engineNames.Add(user.Name.ToLowerInvariant()))
+                {
+                    throw Error("tm1Engine.users: a user is listed twice");
+                }
+            }
+            var datastore = Get(engineSection, "datastore");
+            var ds = datastore is null or bool ? new Map() : Keys(datastore, ["port"], "tm1Engine.datastore");
+            enginePort = Port(Get(engineSection, "port"), "tm1Engine", 4444);
+            // Published only when a port is given
+            datastorePort = Get(ds, "port") is null ? null : Port(Get(ds, "port"), "tm1Engine.datastore", 27017);
+            foreach (var (name, _) in servers)
+            {
+                // The engine's two compose services in pa-setup: a server of that name would be replaced by them
+                if (name.ToLowerInvariant() is "tm1-engine" or "tm1-engine-mongo")
+                {
+                    throw Error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
+                }
+            }
+            engine = new Engine(databases, engineUsers);
         }
-        var ports = servers.Select(s => s.Server.Port).ToList();
+
+        if (servers.Count == 0 && cam is null && engine is null)
+        {
+            throw Error("nothing to run: add tm1.servers, tm1Engine and/or cognos");
+        }
+        var ports = new List<int>();
+        AddIfSet(ports, enginePort);
+        AddIfSet(ports, datastorePort);
+        ports.AddRange(servers.Select(s => s.Server.Port));
         AddIfSet(ports, admin);
         AddIfSet(ports, webPort);
         if (cam is not null)
@@ -267,7 +349,27 @@ internal sealed partial class PaEnvironmentFile
             throw Error("tm1.servers." + name + ".seed: 24retail isn't available in tm1-testcontainers (Tm1Seed has empty and sdata)");
         }
 
-        return Configure(servers, admin is not null, heap, cam, pawPort is not null, ibm, pawZip, images);
+        var b = Configure(servers, admin is not null, heap, cam, pawPort is not null, ibm, pawZip, images);
+        if (engine is not null)
+        {
+            b.Tm1Engine();
+            // Kept apart from the caller's customizer, which a later Tm1Engine(...) sets
+            b.FileTm1Engine = container =>
+            {
+                foreach (var (name, instance) in engine.Databases)
+                {
+                    container.WithDatabase(instance, name);
+                }
+                // TM1 v12 keeps no passwords: a user's is checked and not used
+                foreach (var user in engine.Users)
+                {
+                    container.WithUser(user.Name, [.. user.Groups]);
+                }
+            };
+        }
+        // Whatever the file's sections: an engine added in code runs the file's image too
+        b.Tm1EngineImage = Image(images, "tm1Engine");
+        return b;
     }
 
     private static PlanningAnalyticsEnvironment.EnvironmentBuilder Configure(
@@ -445,6 +547,67 @@ internal sealed partial class PaEnvironmentFile
         return new CognosContainer.User(userName, pw, [.. groupNames]);
     }
 
+    /// <summary>pa_setup.parse_user with password_optional: an engine's user, whose password may be left out or empty,
+    /// since TM1 v12 keeps none.</summary>
+    private EngineUser ParseEngineUser(object? entry, string where)
+    {
+        object? name;
+        object? password;
+        var groups = new List<object?>();
+        if (entry is string text)
+        {
+            var parts = text.Split(':');
+            if (parts.Length == 2 && parts[1].Length > 0)
+            {
+                // The image's own form has groups there; here the second part is a password
+                throw Error(where + ": '" + text + "' reads as a password, which TM1 v12 doesn't keep: for a group, write " + parts[0] + "::" + parts[1]);
+            }
+            if (parts.Length > 3)
+            {
+                throw Error(where + ": expected user, user::group,group or user:password:group,group, not '" + text + "'");
+            }
+            name = parts[0];
+            password = parts.Length > 1 ? parts[1] : "";
+            if (parts.Length == 3)
+            {
+                groups.AddRange(parts[2].Split(',').Where(g => g.Length > 0));
+            }
+        }
+        else if (entry is Map)
+        {
+            var map = Keys(entry, ["name", "password", "groups"], where);
+            name = Get(map, "name");
+            password = Get(map, "password") ?? "";
+            if ((Truthy(Get(map, "groups")) ? Get(map, "groups") : new List<object?>()) is not List<object?> list)
+            {
+                throw Error(where + ": groups must be a list, e.g. groups: [Analysts]");
+            }
+            groups.AddRange(list);
+        }
+        else
+        {
+            throw Error(where + ": a user is user:password[:groups] or a mapping");
+        }
+        if (name is not string userName || !UserName().IsMatch(userName))
+        {
+            throw Error(where + ": user name '" + Str(name) + "' must be letters, digits, '.', '_' and '-'");
+        }
+        if (password is not string pw || PasswordBreak().IsMatch(pw))
+        {
+            throw Error(where + ": " + userName + "'s password must be text without ':' or spaces (quote a number)");
+        }
+        var groupNames = new List<string>();
+        foreach (var g in groups)
+        {
+            if (g is not string group || !UserName().IsMatch(group))
+            {
+                throw Error(where + ": group '" + Str(g) + "' must be letters, digits, '.', '_' and '-'");
+            }
+            groupNames.Add(group);
+        }
+        return new EngineUser(userName, groupNames);
+    }
+
     /// <summary>A tm1s.cfg value as pa_setup writes it, with Python's <c>str()</c>: true is True.</summary>
     private string CfgValue(object? value, string where) =>
         value switch
@@ -488,14 +651,23 @@ internal sealed partial class PaEnvironmentFile
 
     private ArgumentException Error(string message) => new(file + ": " + message);
 
-    [GeneratedRegex("^[A-Za-z0-9_-]+$")]
+    [GeneratedRegex(@"\A[A-Za-z0-9_-]+\z")]
     private static partial Regex Name();
 
-    [GeneratedRegex("^[A-Za-z0-9._-]+$")]
+    // To the very end: $ would take a name that ends in a newline
+    [GeneratedRegex(@"\A[A-Za-z0-9._-]+\z")]
     private static partial Regex UserName();
+
+    // The tm1-engine image's rule for a database's and an instance's name
+    [GeneratedRegex(@"\A[A-Za-z0-9][A-Za-z0-9_-]*\z")]
+    private static partial Regex EngineName();
 
     [GeneratedRegex(@"[:\s]")]
     private static partial Regex PasswordBreak();
+
+    private sealed record Engine(List<(string Name, string Instance)> Databases, List<EngineUser> Users);
+
+    private sealed record EngineUser(string Name, List<string> Groups);
 
     private sealed record Server(int Port, string Seed, List<(string Key, string Value)> Cfg);
 

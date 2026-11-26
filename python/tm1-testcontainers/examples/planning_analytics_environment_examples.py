@@ -8,7 +8,7 @@ from pathlib import Path
 
 from skipcheck_tm1 import ODataQuery, Tm1Client, auth
 from skipcheck_tm1.model import Cube
-from skipcheck_tm1_testcontainers import CognosContainer, PlanningAnalyticsEnvironment, Tm1Seed
+from skipcheck_tm1_testcontainers import CognosContainer, PlanningAnalyticsEnvironment, Tm1Database, Tm1Seed
 
 
 def servers() -> dict[str, list[str | None]]:
@@ -58,4 +58,18 @@ def from_config() -> str:
     # The environment pa-setup runs from the same file, with random host ports
     with PlanningAnalyticsEnvironment.from_config(Path("pa-environment.yaml")).build() as env:
         return env.tm1("planning").rest_url
+    # @end
+
+
+def engine() -> str:
+    # @start region = engine
+    # TM1 11 and TM1 v12 side by side: a server, and an engine with two databases
+    builder = (
+        PlanningAnalyticsEnvironment.builder()
+        .tm1("legacy")
+        .tm1_engine(lambda engine: engine.with_database("planning").with_database("sales").with_user("analyst", "Analysts"))
+    )
+    with builder.build() as env:
+        planning: Tm1Database = env.tm1_database("planning")
+        return planning.rest_url + " and " + env.tm1("legacy").rest_url
     # @end

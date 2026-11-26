@@ -152,6 +152,9 @@ public class Tm1EngineWiringTests : TempDir
         Assert.Throws<ArgumentException>(() => engine.WithDatabase("ab"));
         Assert.Throws<ArgumentException>(() => engine.WithDatabase("two words"));
         Assert.Throws<ArgumentException>(() => engine.WithDatabase("a/b", "sales"));
+        // An instance's name needs no three characters, as a database's does
+        Assert.Throws<ArgumentException>(() => engine.WithDatabase("i", "ab"));
+        Assert.Equal("i", new Tm1EngineContainer(Source).WithDatabase("i", "sales").Database("i", "sales").Instance);
         Assert.Throws<ArgumentException>(() => engine.WithUser("two words"));
         Assert.Throws<ArgumentException>(() => engine.WithUser("analyst", "a:b"));
         engine.WithUser("analyst");
@@ -183,6 +186,19 @@ public class Tm1EngineWiringTests : TempDir
     }
 
     [Fact]
+    public void ItsDatastoreIsOnItsNetworkBeforeAnythingStarts()
+    {
+        // Not only once the engine starts or is configured: an environment may start what the
+        // engine depends on first, and TM1 couldn't reach a datastore left off the network
+        var engine = new Tm1EngineContainer(Source);
+        Assert.NotNull(engine.Network);
+        Assert.Same(engine.Network, engine.Datastore.Network);
+        var network = Network.NewNetwork();
+        engine.WithNetwork(network);
+        Assert.Same(network, engine.Datastore.Network);
+    }
+
+    [Fact]
     public void JoinsANetworkItIsGiven()
     {
         var network = Network.NewNetwork();
@@ -198,6 +214,8 @@ public class Tm1EngineWiringTests : TempDir
         // What it depends on starts before Configure(), so the datastore has to be on the network
         // by then: TM1 couldn't reach its MongoDB otherwise
         var engine = new Starting(Source);
+        // Taken off its network, it gets one again as it starts
+        engine.WithNetwork(null);
         Assert.Null(engine.Datastore.Network);
         engine.BeforeItsDependenciesStart();
         Assert.NotNull(engine.Network);
@@ -222,9 +240,11 @@ public class Tm1EngineWiringTests : TempDir
         // network this made for them
         var engine = new FailsToStart(Source);
         Assert.Equal("can't start", (await Assert.ThrowsAsync<InvalidOperationException>(() => engine.StartAsync())).Message);
+        // The network it made is gone, and it has another for the next start, its datastore with it
         Assert.NotNull(engine.Made);
-        Assert.Null(engine.Network);
-        Assert.Null(engine.Datastore.Network);
+        Assert.NotNull(engine.Network);
+        Assert.NotSame(engine.Made, engine.Network);
+        Assert.Same(engine.Network, engine.Datastore.Network);
         Assert.Equal(1, engine.Stopped);
         Assert.False(engine.IsRunning);
         Assert.False(engine.Datastore.IsRunning);

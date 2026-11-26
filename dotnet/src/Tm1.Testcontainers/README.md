@@ -73,6 +73,27 @@ Testcontainers for .NET configures containers through immutable builders. Each c
 
 Reuse follows the same switch as Java: set `testcontainers.reuse.enable=true` in `~/.testcontainers.properties`, or `TESTCONTAINERS_REUSE_ENABLE=true`. Without it, Testcontainers' Ryuk removes the containers once the run ends.
 
+### A TM1 v12 engine in an environment
+
+`PlanningAnalyticsEnvironment` runs a TM1 v12 engine beside the TM1 servers, or alone: an environment needs a server or an engine.
+
+```csharp
+await using var env = PlanningAnalyticsEnvironment
+    .Builder()
+    .Tm1("legacy")
+    .Tm1Engine(engine => engine.WithDatabase("planning").WithDatabase("sales").WithUser("analyst", "Analysts"))
+    .Build();
+await env.StartAsync();
+var planning = env.Tm1Database("planning");   // env.Tm1Engine().Database(instance, name) for another instance's
+```
+
+- `Tm1Engine()`, `Tm1Engine(customizer)` and `Tm1EngineSource(source)` on the builder; `Tm1Engine()` and `Tm1Database(name)` on the environment.
+- The engine and its MongoDB are on the environment's network, the engine under the name `tm1-engine` (as in the compose project `pa-setup` writes) and its MongoDB as `tm1-datastore`, and start with TM1 11's parts, before PAW. The environment's network is the environment's to remove, not the engine's.
+- A TM1 server can't be named `tm1-engine` or `tm1-datastore` (in any case) beside an engine: two containers would answer to the name.
+- On a builder from `FromConfig`, `Tm1Engine(customizer)` adds to the file's databases and users rather than replacing them, and `images.tm1Engine` is the image of an engine added in code too.
+- The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.
+- **An environment with an engine can't be reused.** `Reuse(true)` fails at `Build()`, whatever your reuse switch says: the engine and its datastore belong together, and a kept one keeps every database tests left.
+
 ### Reusing a whole environment
 
 Cognos takes minutes to start and PAW longer. A `PlanningAnalyticsEnvironment` keeps its containers between runs when you ask for it with `Reuse(true)` and have turned on reuse as above. Without the switch, `Reuse(true)` has no effect.
@@ -117,9 +138,9 @@ var url = env.Tm1("planning").RestUrl;
 
 It returns the builder, configured, so you can still change it before `Build()`. The file is checked as `pa-setup` checks it, with the same defaults and messages. A file it refuses throws an `ArgumentException`.
 
-- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`) and `paw` (`acceptLicense`, `zip`).
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`), `paw` (`acceptLicense`, `zip`), and `tm1Engine`, the TM1 v12 engine (`databases`, each in its `instance`, as `WithDatabase(instance, name)`; `users` as `WithUser(name, groups…)`, a password checked and not used, since TM1 v12 keeps none). `cognos.oidc: true` or an empty mapping turns OIDC on; only leaving it out or `false` is off.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
-- **Ignored:** `name`, every port, and `files`. Testcontainers gives the environment its own network, random host ports and a new database each time.
+- **Ignored:** `name`, every port, `files`, and `tm1Engine.datastore` and `images.mongo` (the engine's MongoDB is the container's own here). Testcontainers gives the environment its own network, random host ports and a new database each time. They're still checked as `pa-setup` checks them.
 - **Refused** with a message naming the setting: `cognos` without `tm1.servers`, and `seed: 24retail`, which the environment can't run yet.
 - **YAML** is read with [YamlDotNet](https://github.com/aaubry/YamlDotNet), as YAML 1.1, the way pa-setup's PyYAML reads it: `yes`, `no`, `on` and `off` are booleans too.
 
