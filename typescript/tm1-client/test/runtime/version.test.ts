@@ -325,6 +325,14 @@ describe("Tm1Request", () => {
     expect(reserve.isIdempotent()).toBe(false);
   });
 
+  it("keeps a body on a write", () => {
+    const reserve = ODataPath.of("Cubes").key("Sales").action("tm1.Reserve");
+    expect(() => Tm1Request.post(reserve, null).withBody(null)).toThrow(TypeError);
+    expect(() => Tm1Request.patch(ODataPath.of("Cubes").key("x"), {}).withBody(null)).toThrow(TypeError);
+    expect(Tm1Request.delete(ODataPath.of("Cubes").key("x")).withBody(null).body).toBeNull();
+    expect(Tm1Request.post(reserve, null).withBody({ A: 1 }).body).toEqual({ A: 1 });
+  });
+
   it("describes other kinds", () => {
     expect(Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none()).response).toBe("Collection");
     expect(Tm1Request.text(ODataPath.of("Dimensions").count()).response).toBe("Text");

@@ -574,6 +574,16 @@ def test_gives_actions_a_json_body_even_without_parameters() -> None:
     assert not reserve.is_idempotent()
 
 
+def test_keeps_a_body_on_a_write() -> None:
+    reserve = ODataPath.of("Cubes").key("Sales").action("tm1.Reserve")
+    with pytest.raises(ValueError):
+        Tm1Request.post(reserve, None).with_body(None)
+    with pytest.raises(ValueError):
+        Tm1Request.patch(ODataPath.of("Cubes").key("x"), {}).with_body(None)
+    assert Tm1Request.delete(ODataPath.of("Cubes").key("x")).with_body(None).body is None
+    assert Tm1Request.post(reserve, None).with_body({"A": 1}).body == {"A": 1}
+
+
 def test_describes_other_kinds() -> None:
     assert Tm1Request.list(ODataPath.of("Cubes"), ODataQuery.none(), dict).response is Tm1Request.Response.COLLECTION
     assert Tm1Request.text(ODataPath.of("Dimensions").count()).response is Tm1Request.Response.TEXT

@@ -882,7 +882,7 @@ def _without_selection(rt: Runtime) -> None:
     rt.fake.metadata = metadata.encode("utf-8")
 
 
-def _check_feeders(selection: str) -> Tm1Request[Any]:
+def _check_feeders(selection: Any) -> Tm1Request[Any]:
     return (
         Tm1Request.post_list(
             ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
@@ -915,6 +915,16 @@ def test_leaves_out_a_parameter_the_server_doesnt_define_when_its_value_is_what_
     rt.run(rt.session().collect(_check_feeders("Unfed")))
     (sent,) = requests_to(rt, CHECK_FEEDERS)
     assert "Tuple@odata.bind" in sent.content.decode() and "Selection" not in sent.content.decode()
+
+
+def test_compares_a_default_as_json_whatever_its_type_or_key_order(rt: Runtime) -> None:
+    _without_selection(rt)
+    rt.fake.respond = lambda r: {"value": []}
+    rt.run(rt.session().collect(_check_feeders(5).with_parameter_default("Selection", 5)))
+    rt.run(rt.session().collect(_check_feeders({"B": 2, "A": 1}).with_parameter_default("Selection", {"A": 1, "B": 2})))
+    sent = requests_to(rt, CHECK_FEEDERS)
+    assert len(sent) == 2
+    assert all("Tuple@odata.bind" in s.content.decode() and "Selection" not in s.content.decode() for s in sent)
 
 
 def test_leaves_out_a_parameter_in_a_batch_too(rt: Runtime) -> None:

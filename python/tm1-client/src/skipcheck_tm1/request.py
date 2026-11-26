@@ -193,7 +193,10 @@ class Tm1Request(Generic[T]):
         return replace(self, parameter_defaults={**self.parameter_defaults, parameter: value})
 
     def with_body(self, body: Any) -> Tm1Request[T]:
-        """A copy with another body, for the session to send in place of this one's."""
+        """A copy with another body, for the session to send in place of this one's. Only a GET,
+        DELETE or HEAD can go without one, as the constructors have it: ValueError for a write."""
+        if body is None and self.method.upper() not in ("GET", "DELETE", "HEAD"):
+            raise ValueError(f"{self.method} {self.path} needs a body")
         return replace(self, body=body)
 
     def requirement(self) -> Tm1Capability | None:

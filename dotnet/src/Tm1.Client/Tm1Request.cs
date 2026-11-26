@@ -193,8 +193,17 @@ public sealed record Tm1Request<T>
         return this with { ParameterDefaults = new Dictionary<string, object>(ParameterDefaults) { [parameter] = value } };
     }
 
-    /// <summary>A copy with another body, for the session to send in place of this one's.</summary>
-    public Tm1Request<T> WithBody(object? body) => this with { Body = body };
+    /// <summary>A copy with another body, for the session to send in place of this one's. Only a
+    /// <c>GET</c>, <c>DELETE</c> or <c>HEAD</c> can go without one, as the factory methods have
+    /// it.</summary>
+    /// <exception cref="ArgumentNullException">If <paramref name="body"/> is null and the request is a write.</exception>
+    public Tm1Request<T> WithBody(object? body) =>
+        body is null && Method.ToUpperInvariant() is not ("GET" or "DELETE" or "HEAD")
+            ? throw new ArgumentNullException(nameof(body), Method + " " + Path + " needs a body")
+            : this with
+            {
+                Body = body,
+            };
 
     /// <summary>A copy sent with <c>If-Match: etag</c>, failing with 412 if the entity has changed
     /// since.</summary>

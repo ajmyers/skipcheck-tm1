@@ -725,6 +725,21 @@ export function checkImpersonated(user: string): string {
   return user;
 }
 
+/** JSON as written, with every object's keys sorted, so two values that differ only in key order compare equal. */
+function canonicalJson(value: unknown): string {
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(sorted)
+      : v !== null && typeof v === "object"
+        ? Object.fromEntries(
+            Object.entries(v as Record<string, unknown>)
+              .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+              .map(([k, x]) => [k, sorted(x)]),
+          )
+        : v;
+  return JSON.stringify(sorted(JSON.parse(writeJson(value)) as unknown));
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return (
     typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Uint8Array) && Object.getPrototypeOf(value) === Object.prototype
@@ -746,8 +761,8 @@ export function checkParameters(
   for (const parameter of operation.parameters) {
     const name = parameter.name;
     if ((!(name in sent) && !(name + "@odata.bind" in sent)) || capabilities.supportsParameter(needed, name)) continue;
-    // Compared as written JSON, as the other clients compare them
-    if (name + "@odata.bind" in sent || !(name in defaults) || writeJson(defaults[name]) !== writeJson(sent[name])) {
+    // Compared as written JSON with its keys in order, as the other clients compare them
+    if (name + "@odata.bind" in sent || !(name in defaults) || canonicalJson(defaults[name]) !== canonicalJson(sent[name])) {
       throw capabilities.checkParameter(needed, name, server)!;
     }
     sent = { ...sent };

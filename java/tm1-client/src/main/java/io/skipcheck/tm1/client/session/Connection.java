@@ -250,8 +250,11 @@ final class Connection {
 					continue;
 				}
 				Object leftOut = request.parameterDefaults().get(name);
+				// Both read from the JSON they're written as, so a Long default matches a
+				// body's 5:
+				// valueToTree keeps the Java type (LongNode), reading back gives IntNode
 				if (sent.has(name + "@odata.bind") || leftOut == null
-						|| !mapper.valueToTree(leftOut).equals(sent.get(name))) {
+						|| !mapper.readTree(json(leftOut)).equals(sent.get(name))) {
 					return Mono.error(c.checkParameter(needed.get(), name, root).orElseThrow());
 				}
 				sent.remove(name);

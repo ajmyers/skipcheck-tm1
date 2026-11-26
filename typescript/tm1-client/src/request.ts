@@ -207,8 +207,13 @@ export class Tm1Request<T> {
     return this.copy({ parameterDefaults: { ...this.parameterDefaultsValue, [parameter]: value } });
   }
 
-  /** A copy with another body, for the session to send in place of this one's. */
+  /** A copy with another body, for the session to send in place of this one's. Only a `GET`,
+   * `DELETE` or `HEAD` can go without one, as the factory methods have it.
+   * @throws TypeError if `body` is null or undefined and the request is a write */
   withBody(body: unknown): Tm1Request<T> {
+    if ((body === null || body === undefined) && !["GET", "DELETE", "HEAD"].includes(this.method.toUpperCase())) {
+      throw new TypeError(`${this.method} ${this.path.toString()} needs a body`);
+    }
     return this.copy({ body });
   }
 

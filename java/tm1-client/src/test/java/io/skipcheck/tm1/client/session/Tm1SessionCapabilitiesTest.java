@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -143,6 +144,26 @@ class Tm1SessionCapabilitiesTest {
 	}
 
 	@Test
+	void comparesADefaultAsJsonWhateverItsTypeOrKeyOrder() {
+		withoutSelection();
+		tm1.on(CHECK_FEEDERS, r -> Mono.just(FakeTm1.json(200, "{\"value\":[]}")));
+		StepVerifier.create(tm1.session().stream(checkFeeders(5).withParameterDefault("Selection", 5L)))
+			.verifyComplete();
+		Map<String, Object> ab = new LinkedHashMap<>();
+		ab.put("A", 1);
+		ab.put("B", 2);
+		Map<String, Object> ba = new LinkedHashMap<>();
+		ba.put("B", 2);
+		ba.put("A", 1);
+		StepVerifier.create(tm1.session().stream(checkFeeders(ba).withParameterDefault("Selection", ab)))
+			.verifyComplete();
+		assertThat(tm1.requests(CHECK_FEEDERS)).hasSize(2)
+			.allSatisfy(sent -> assertThat(new String(ConformanceTm1.body(sent).block(), StandardCharsets.UTF_8))
+				.contains("Tuple@odata.bind")
+				.doesNotContain("Selection"));
+	}
+
+	@Test
 	void leavesOutAParameterInABatchToo() {
 		withoutSelection();
 		tm1.on("POST $batch", r -> Mono.just(FakeTm1.json(200,
@@ -248,7 +269,7 @@ class Tm1SessionCapabilitiesTest {
 		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
 	}
 
-	private static Tm1Request<JsonNode> checkFeeders(String selection) {
+	private static Tm1Request<JsonNode> checkFeeders(Object selection) {
 		return Tm1Request
 			.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"),
 					Map.of("Tuple@odata.bind", List.of("Dimensions('Region')/Hierarchies('Region')/Elements('Total')"),

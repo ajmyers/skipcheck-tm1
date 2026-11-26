@@ -1068,7 +1068,7 @@ describe("Tm1Session capabilities", () => {
     expect(metadata).not.toBe(SNAPSHOT);
     return tm1.on(METADATA, () => ScriptedTm1.xml(metadata));
   };
-  const checkFeeders = (selection: string): Tm1Request<unknown> =>
+  const checkFeeders = (selection: unknown): Tm1Request<unknown> =>
     Tm1Request.postList(ODataPath.of("Cubes").key("Sales").action("tm1.CheckFeeders"), {
       "Tuple@odata.bind": ["Dimensions('Region')/Hierarchies('Region')/Elements('Total')"],
       Selection: selection,
@@ -1159,6 +1159,21 @@ describe("Tm1Session capabilities", () => {
     const sent = tm1.requests(CHECK_FEEDERS)[0]!.text;
     expect(sent).toContain("Tuple@odata.bind");
     expect(sent).not.toContain("Selection");
+  });
+
+  it("compares a default as JSON whatever its type or key order", async () => {
+    const tm1 = withoutSelection(scripted()).on(CHECK_FEEDERS, () => ScriptedTm1.json(200, '{"value":[]}'));
+    await tm1.session().stream(checkFeeders(5).withParameterDefault("Selection", 5)).toArray();
+    await tm1
+      .session()
+      .stream(checkFeeders({ B: 2, A: 1 }).withParameterDefault("Selection", { A: 1, B: 2 }))
+      .toArray();
+    const sent = tm1.requests(CHECK_FEEDERS);
+    expect(sent).toHaveLength(2);
+    for (const s of sent) {
+      expect(s.text).toContain("Tuple@odata.bind");
+      expect(s.text).not.toContain("Selection");
+    }
   });
 
   it("leaves out a parameter in a batch too", async () => {

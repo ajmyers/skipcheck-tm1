@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.Map;
@@ -37,6 +38,18 @@ class Tm1RequestTest {
 		assertThat(reserve.body()).isEqualTo(Map.of());
 		assertThat(reserve.response()).isEqualTo(Tm1Request.Response.NONE);
 		assertThat(reserve.isIdempotent()).isFalse();
+	}
+
+	@Test
+	void keepsABodyOnAWrite() {
+		ODataPath reserve = ODataPath.of("Cubes").key("Sales").action("tm1.Reserve");
+		assertThatThrownBy(() -> Tm1Request.post(reserve, null, Void.class).withBody(null))
+			.isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> Tm1Request.patch(ODataPath.of("Cubes").key("x"), Map.of()).withBody(null))
+			.isInstanceOf(NullPointerException.class);
+		assertThat(Tm1Request.delete(ODataPath.of("Cubes").key("x")).withBody(null).body()).isNull();
+		assertThat(Tm1Request.post(reserve, null, Void.class).withBody(Map.of("A", 1)).body())
+			.isEqualTo(Map.of("A", 1));
 	}
 
 	@Test

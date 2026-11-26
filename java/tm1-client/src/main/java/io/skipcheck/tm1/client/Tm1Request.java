@@ -312,10 +312,16 @@ public final class Tm1Request<T> {
 
 	/**
 	 * A copy with another body, for the session to send in place of this one's.
-	 * @param body the body to send, or {@code null} for none
+	 * @param body the body to send, or {@code null} for none: only a {@code GET},
+	 * {@code DELETE} or {@code HEAD} can go without one, as the factory methods have it
 	 * @return the copy
+	 * @throws NullPointerException if {@code body} is null and the request is a write
 	 */
 	public Tm1Request<T> withBody(@Nullable Object body) {
+		if (body == null && !(method.equals(HttpMethod.GET) || method.equals(HttpMethod.DELETE)
+				|| method.equals(HttpMethod.HEAD))) {
+			throw new NullPointerException(method + " " + path + " needs a body");
+		}
 		return new Tm1Request<>(method, path, query, headers, body, response, type, timeout, requires, operation,
 				parameterDefaults);
 	}

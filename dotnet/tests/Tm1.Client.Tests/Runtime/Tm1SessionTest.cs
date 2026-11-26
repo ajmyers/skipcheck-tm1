@@ -1137,7 +1137,7 @@ public class Tm1SessionCapabilitiesTest
         _tm1.On(MetadataKey, _ => Xml(metadata));
     }
 
-    private static Tm1Request<JsonElement> CheckFeeders(string selection) =>
+    private static Tm1Request<JsonElement> CheckFeeders(object selection) =>
         Tm1Request
             .PostList<JsonElement>(
                 ODataPath.Of("Cubes").Key("Sales").Action("tm1.CheckFeeders"),
@@ -1272,6 +1272,27 @@ public class Tm1SessionCapabilitiesTest
         var sent = Assert.Single(_tm1.Requests(CheckFeedersKey)).Text;
         Assert.Contains("Tuple@odata.bind", sent);
         Assert.DoesNotContain("Selection", sent);
+    }
+
+    [Fact]
+    public async Task ComparesADefaultAsJsonWhateverItsTypeOrKeyOrder()
+    {
+        WithoutSelection();
+        _tm1.On(CheckFeedersKey, _ => ScriptedTm1.Json(200, "{\"value\":[]}"));
+        await _tm1.Session().StreamAsync(CheckFeeders(5).WithParameterDefault("Selection", 5L)).ToListAsync();
+        await _tm1.Session()
+            .StreamAsync(
+                CheckFeeders(new Dictionary<string, object> { ["B"] = 2, ["A"] = 1 })
+                    .WithParameterDefault("Selection", new Dictionary<string, object> { ["A"] = 1, ["B"] = 2 })
+            )
+            .ToListAsync();
+        var sent = _tm1.Requests(CheckFeedersKey);
+        Assert.Equal(2, sent.Count);
+        Assert.All(sent, s =>
+        {
+            Assert.Contains("Tuple@odata.bind", s.Text);
+            Assert.DoesNotContain("Selection", s.Text);
+        });
     }
 
     [Fact]
