@@ -51,6 +51,43 @@
           }
         }
       ]
+    },
+    "engineName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+    },
+    "engineUser": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+(:[^:\\s]*(:[A-Za-z0-9._,-]*)?)?$",
+          "description": "user, user::group,group or user:password:group,group. TM1 v12 keeps no passwords"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._-]+$"
+            },
+            "password": {
+              "type": "string",
+              "pattern": "^[^:\\s]*$"
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+$"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "properties": {
@@ -84,6 +121,12 @@
           "type": "string"
         },
         "keycloak": {
+          "type": "string"
+        },
+        "tm1Engine": {
+          "type": "string"
+        },
+        "mongo": {
           "type": "string"
         }
       }
@@ -228,6 +271,61 @@
           "type": "integer",
           "minimum": 2048,
           "description": "Dispatcher heap, MB"
+        }
+      }
+    },
+    "tm1Engine": {
+      "type": [
+        "object",
+        "boolean"
+      ],
+      "additionalProperties": false,
+      "description": "A TM1 v12 engine (Planning Analytics 3.x) and its MongoDB. true: one database, tm1",
+      "properties": {
+        "port": {
+          "$ref": "#/$defs/port",
+          "description": "TM1's gateway on the host: the REST API, logins and the management API (4444)"
+        },
+        "databases": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Databases by name: at least 3 characters. Default: one, tm1",
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{2,}$"
+          },
+          "additionalProperties": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "instance": {
+                "$ref": "#/$defs/engineName",
+                "description": "The instance it's in (tm1): an instance has its own credentials, sessions and URL prefix"
+              }
+            }
+          }
+        },
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/engineUser"
+          },
+          "description": "Users for every database, in exactly these groups. admin is always there"
+        },
+        "datastore": {
+          "type": [
+            "object",
+            "boolean"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "port": {
+              "$ref": "#/$defs/port",
+              "description": "Publishes the engine's MongoDB on the host"
+            }
+          }
         }
       }
     }

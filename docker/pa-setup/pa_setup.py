@@ -14,6 +14,14 @@ folder holding pa-environment.yaml mounted at /work:
   pa-setup logs [service...]  recent logs
   pa-setup down               stop and remove the containers (data is kept)
 
+With a TM1 v12 engine (tm1Engine):
+
+  pa-setup credentials            every address and credential of the engine
+  pa-setup session [DATABASE [USER]]
+                                  log in and print the session cookie, for curl -b
+  pa-setup database create NAME   create a database (INSTANCE/NAME for another instance)
+  pa-setup database drop NAME     delete a database
+
 Options: -f FILE (default pa-environment.yaml in the current folder).
 
 The file says what to run; pre-signed download links and other secrets go in .env next
@@ -40,6 +48,13 @@ IMAGE_TAG = os.environ.get("PA_IMAGE_TAG") or "edge"
 NAME = re.compile(r"[A-Za-z0-9_-]+$")
 USER = re.compile(r"[A-Za-z0-9._-]+$")
 SEEDS = ("empty", "sdata", "24retail")
+# The tm1-engine image's own rules: names start with a letter or digit, and TM1 wants a
+# database's to have at least three characters
+ENGINE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*$")
+ENGINE_INSTANCE = "tm1"
+# The engine's MongoDB is its own, on the project's network only unless a port is asked for
+DATASTORE_USER = "tm1"
+DATASTORE_PASSWORD = "tm1-datastore"
 
 
 class ConfigError(Exception):
@@ -100,9 +115,13 @@ def section(cfg, key):
     return value
 
 
-def parse_user(entry, where):
+def parse_user(entry, where, password_optional=False):
+    """A test user. TM1 v12 keeps no passwords, so there (password_optional) one may be left
+    out or empty: analyst, analyst::Analysts or analyst:analystpw:Analysts."""
     if isinstance(entry, str):
         parts = entry.split(":")
+        if password_optional and len(parts) == 1:
+            parts.append("")
         if len(parts) not in (2, 3):
             raise ConfigError(f"{where}: expected user:password[:group,group], not {entry!r}")
         name, password = parts[0], parts[1]
@@ -110,11 +129,13 @@ def parse_user(entry, where):
     elif isinstance(entry, dict):
         check_keys(entry, ("name", "password", "groups"), where)
         name, password, groups = entry.get("name"), entry.get("password"), entry.get("groups") or []
+        if password_optional and password is None:
+            password = ""
     else:
         raise ConfigError(f"{where}: a user is user:password[:groups] or a mapping")
     if not isinstance(name, str) or not USER.match(name):
         raise ConfigError(f"{where}: user name {name!r} must be letters, digits, '.', '_' and '-'")
-    if not isinstance(password, str) or not password or re.search(r"[:\s]", password):
+    if not isinstance(password, str) or (not password and not password_optional) or re.search(r"[:\s]", password):
         raise ConfigError(f"{where}: {name}'s password must be non-empty, without ':' or spaces")
     for g in groups:
         if not isinstance(g, str) or not USER.match(g):
@@ -135,7 +156,8 @@ def load(path):
 
 def normalize(cfg):
     """Checks the file and fills in every default. Returns the model generate() uses."""
-    check_keys(cfg, ("version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos"), "the file")
+    check_keys(cfg, ("version", "name", "ibm", "files", "images", "tm1", "tm1Web", "paw", "cognos", "tm1Engine"),
+               "the file")
     if cfg.get("version") != 1:
         raise ConfigError("version: must be 1")
     name = cfg.get("name") or os.path.basename(HOST_DIR.rstrip("/\\")) or "pa"
@@ -143,12 +165,14 @@ def normalize(cfg):
     m = {"name": name, "ibm": host_path(cfg["ibm"], "ibm") if cfg.get("ibm") else None,
          "files": host_path(cfg.get("files") or "pa-files", "files")}
     images = cfg.get("images") or {}
-    check_keys(images, ("tm1Server", "tm1Web", "cognosServer", "keycloak"), "images")
+    check_keys(images, ("tm1Server", "tm1Web", "cognosServer", "keycloak", "tm1Engine", "mongo"), "images")
     m["images"] = {
         "tm1Server": images.get("tm1Server") or f"ghcr.io/ajmyers/tm1-server:{IMAGE_TAG}",
         "tm1Web": images.get("tm1Web") or f"ghcr.io/ajmyers/tm1-web:{IMAGE_TAG}",
         "cognosServer": images.get("cognosServer") or f"ghcr.io/ajmyers/cognos-server:{IMAGE_TAG}",
         "keycloak": images.get("keycloak") or "quay.io/keycloak/keycloak:26.4",
+        "tm1Engine": images.get("tm1Engine") or f"ghcr.io/ajmyers/tm1-engine:{IMAGE_TAG}",
+        "mongo": images.get("mongo") or "mongo:8.0",
     }
 
     tm1 = section(cfg, "tm1")
@@ -247,9 +271,45 @@ def normalize(cfg):
         paw = {"port": port(paw.get("port"), "paw", 8800), "zip": paw.get("zip")}
     m["paw"] = paw
 
-    if not (servers or cognos):
-        raise ConfigError("nothing to run: add tm1.servers and/or cognos")
-    ports = [s["port"] for s in servers.values()] + ([admin["port"]] if admin else []) + \
+    engine = section(cfg, "tm1Engine")
+    if engine is not None:
+        check_keys(engine, ("port", "databases", "users", "datastore"), "tm1Engine")
+        raw = engine.get("databases")
+        if raw is None:
+            raw = {ENGINE_INSTANCE: None}
+        if not isinstance(raw, dict) or not raw:
+            raise ConfigError("tm1Engine.databases: name at least one database, e.g. tm1Engine: {databases: {planning: {}}}")
+        databases = {}
+        for dname, d in raw.items():
+            where = f"tm1Engine.databases.{dname}"
+            # No check for names that differ only in case, as tm1.servers has: Sales and sales
+            # are two databases to TM1 v12
+            if not isinstance(dname, str) or not ENGINE_NAME.match(dname):
+                raise ConfigError(f"{where}: database names are letters, digits, _ and -, starting with a letter or digit")
+            if len(dname) < 3:
+                raise ConfigError(f"{where}: TM1 needs database names of at least 3 characters")
+            d = d or {}
+            check_keys(d, ("instance",), where)
+            instance = d.get("instance") or ENGINE_INSTANCE
+            if not isinstance(instance, str) or not ENGINE_NAME.match(instance):
+                raise ConfigError(f"{where}.instance: instance names are letters, digits, _ and -, starting with a letter or digit")
+            databases[dname] = {"instance": instance}
+        engine_users = [parse_user(u, f"tm1Engine.users[{i}]", password_optional=True)
+                        for i, u in enumerate(engine.get("users") or [])]
+        engine_names = [u["name"].lower() for u in engine_users]
+        if len(set(engine_names)) != len(engine_names):
+            raise ConfigError("tm1Engine.users: a user is listed twice")
+        datastore = engine.get("datastore")
+        datastore = {} if datastore in (None, True) else datastore
+        check_keys(datastore, ("port",), "tm1Engine.datastore")
+        engine = {"port": port(engine.get("port"), "tm1Engine", 4444), "databases": databases, "users": engine_users,
+                  "datastorePort": port(datastore["port"], "tm1Engine.datastore", 27017) if "port" in datastore else None}
+    m["tm1Engine"] = engine
+
+    if not (servers or cognos or engine):
+        raise ConfigError("nothing to run: add tm1.servers, tm1Engine and/or cognos")
+    ports = ([engine["port"]] + ([engine["datastorePort"]] if engine["datastorePort"] else []) if engine else []) + \
+        [s["port"] for s in servers.values()] + ([admin["port"]] if admin else []) + \
         ([web["port"]] if web else []) + ([cognos["port"]] if cognos else []) + \
         ([cognos["oidc"]["keycloakPort"]] if cognos and cognos["oidc"] else []) + ([paw["port"]] if paw else [])
     dupes = sorted({p for p in ports if ports.count(p) > 1})
@@ -349,6 +409,38 @@ def generate(m):
             "depends_on": {service_name(n): {"condition": "service_healthy"} for n in m["tm1"]},
         }
         volumes["tm1-web-cache"] = {}
+    engine = m["tm1Engine"]
+    if engine:
+        files = host_join(m["files"], "tm1-engine")
+        mongo = {
+            "image": m["images"]["mongo"], "command": ["--wiredTigerCacheSizeGB", "0.5"],
+            "environment": {"MONGO_INITDB_ROOT_USERNAME": DATASTORE_USER,
+                            "MONGO_INITDB_ROOT_PASSWORD": DATASTORE_PASSWORD},
+            "healthcheck": {"test": ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"],
+                            "interval": "5s", "timeout": "5s", "retries": 20},
+            # The deployment and MongoDB's data belong together: a database's changes since its
+            # last save, and TM1's list of its databases, are in MongoDB
+            "volumes": [f"{host_join(files, 'datastore')}:/data/db"],
+        }
+        if engine["datastorePort"]:
+            mongo["ports"] = [f"{engine['datastorePort']}:27017"]
+        services["tm1-engine-mongo"] = mongo
+        env = {"TM1_DATASTORE_URL": f"mongodb://{DATASTORE_USER}:{DATASTORE_PASSWORD}@tm1-engine-mongo:27017",
+               "TM1_DATABASES": ",".join(f"{d['instance']}/{name}" for name, d in engine["databases"].items()),
+               "TM1_ENGINE_BUNDLE_URL": "${TM1_ENGINE_BUNDLE_URL:-}",
+               "TM1_ENGINE_BUNDLE_SHA256": "${TM1_ENGINE_BUNDLE_SHA256:-}"}
+        if engine["users"]:
+            # The image takes user:group:group; TM1 v12 keeps no passwords
+            env["TM1_USERS"] = ",".join(":".join([u["name"], *u["groups"]]) for u in engine["users"])
+        services["tm1-engine"] = {
+            "image": m["images"]["tm1Engine"], "platform": "linux/amd64",
+            # Each database is stopped through TM1 first, which commits it
+            "stop_grace_period": "2m", "environment": env, "ports": [f"{engine['port']}:4444"],
+            "volumes": ["tm1-engine-cache:/tm1/cache"] + ibm +
+            [f"{host_join(files, d)}:/tm1/{d}" for d in ("deployment", "credentials")],
+            "depends_on": {"tm1-engine-mongo": {"condition": "service_healthy"}},
+        }
+        volumes["tm1-engine-cache"] = {}
     return {"name": m["name"], "services": services, "volumes": volumes}
 
 
@@ -366,7 +458,8 @@ def write_compose(m):
         with open(env_file, "w", encoding="utf-8") as f:
             f.write("# Secrets for pa-setup, kept out of pa-environment.yaml. Uncomment what you need.\n"
                     "# Download links (e.g. pre-signed S3 URLs) instead of the files in ibm:\n"
-                    "# TM1_BUNDLE_URL=https://...\n# TM1_WEB_BUNDLE_URL=https://...\n# COGNOS_ZIP_URL=https://...\n")
+                    "# TM1_BUNDLE_URL=https://...\n# TM1_WEB_BUNDLE_URL=https://...\n# COGNOS_ZIP_URL=https://...\n"
+                    "# TM1_ENGINE_BUNDLE_URL=https://...\n")
 
 
 # ---- running ---------------------------------------------------------------------
@@ -418,9 +511,17 @@ def run_paw(m, command):
                    check=True)
 
 
+# Measured with TM1 12.6.7: see the README
+ENGINE_MEMORY_GB = 0.9
+ENGINE_DATABASE_MEMORY_GB = 0.15
+
+
 def memory_needed(m):
     """Rough memory for the chosen parts, in GB, from what they used in testing."""
     gb = 0.5 * len(m["tm1"]) + (0.3 if m["admin"] else 0) + (1.0 if m["tm1Web"] else 0)
+    if m["tm1Engine"]:
+        # The engine's services and MongoDB, then each database's own process
+        gb += ENGINE_MEMORY_GB + ENGINE_DATABASE_MEMORY_GB * len(m["tm1Engine"]["databases"])
     if m["cognos"]:
         gb += 8 + (0.7 if m["cognos"]["oidc"] else 0)
     if m["paw"]:
@@ -471,9 +572,54 @@ def urls(m):
             rows.append(("Keycloak", f"http://localhost:{c['oidc']['keycloakPort']}/", "console: admin / admin"))
     if m["paw"]:
         rows.append(("PAW", f"http://localhost:{m['paw']['port']}/", "as for TM1"))
+    engine = m["tm1Engine"]
+    if engine:
+        base = f"http://localhost:{engine['port']}/"
+        credentials = host_join(m["files"], "tm1-engine", "credentials")
+        rows.append(("TM1 engine", base + "manage/v1/", "root credentials in " + host_join(credentials, "root.json")))
+        for dname, d in engine["databases"].items():
+            rows.append((f"  {dname}", f"{base}{d['instance']}/api/v1/Databases('{dname}')/", ""))
+        names = ["admin"] + [u["name"] for u in engine["users"] if u["name"].lower() != "admin"]
+        for instance in dict.fromkeys(d["instance"] for d in engine["databases"].values()):
+            # Where the secret is, never the secret: 'credentials' prints those
+            rows.append((f"  login to {instance}", "application tm1, credentials in " +
+                         host_join(credentials, instance, "tm1.json"), "as " + " or ".join(names)))
+        first = next(iter(engine["databases"]))
+        rows.append(("  try it", f"setup.sh session {first}", "a cookie for curl -b"))
     width = max(len(r[0]) for r in rows)
     for what, url, login in rows:
         log(f"  {what.ljust(width)}  {url}" + (f"   ({login})" if login else ""))
+
+
+def engine_command(m, *args):
+    """Runs the tm1-engine image's own command in the running engine."""
+    if not m["tm1Engine"]:
+        raise ConfigError("this needs a TM1 v12 engine: add tm1Engine to the file")
+    return compose(m, "exec", "-T", "tm1-engine", "tm1-engine", *args, check=False).returncode
+
+
+def qualified(m, name):
+    """INSTANCE/NAME for a database: as given, or in the instance the file puts it in."""
+    if "/" in name:
+        return name
+    known = (m["tm1Engine"] or {}).get("databases", {}).get(name)
+    return f"{known['instance'] if known else ENGINE_INSTANCE}/{name}"
+
+
+def engine_main(m, command, args):
+    if command == "credentials":
+        if args not in ([], ["--json"]):
+            raise ConfigError("usage: credentials [--json]")
+        return engine_command(m, "credentials", *args)
+    if command == "session":
+        if len(args) > 2:
+            raise ConfigError("usage: session [DATABASE [USER]]")
+        # A session is an instance's, and serves every database there
+        instance = qualified(m, args[0]).split("/")[0] if args else ENGINE_INSTANCE
+        return engine_command(m, "session", instance, *args[1:])
+    if len(args) != 2 or args[0] not in ("create", "drop"):
+        raise ConfigError("usage: database create NAME, or database drop NAME (INSTANCE/NAME for another instance)")
+    return engine_command(m, "database", args[0], qualified(m, args[1]))
 
 
 SAMPLE = """# pa-environment.yaml: what pa-setup runs. Then run: setup.sh up
@@ -493,14 +639,17 @@ tm1:
 #   oidc: { keycloakPort: 8180 }
 #   cam: { namespace: ldap, admins: [admin] }
 # paw: { port: 8800, acceptLicense: true }
+# tm1Engine: true          # TM1 v12: needs tm1-v*-standalone-linux.tgz in ibm
 """
 
 
 def main():
     parser = argparse.ArgumentParser(prog="setup", description=__doc__.split("\n\n")[0])
     parser.add_argument("command", nargs="?", default="up",
-                        choices=["init", "up", "generate", "urls", "status", "logs", "down"])
-    parser.add_argument("services", nargs="*")
+                        choices=["init", "up", "generate", "urls", "status", "logs", "down",
+                                 "credentials", "session", "database"])
+    # argparse.REMAINDER: 'credentials --json' is the command's own option
+    parser.add_argument("services", nargs=argparse.REMAINDER)
     parser.add_argument("-f", "--file", default="pa-environment.yaml")
     a = parser.parse_args()
     path = os.path.join(WORK, a.file)
@@ -533,6 +682,8 @@ def main():
             compose(m, "ps")
         elif a.command == "logs":
             compose(m, "logs", "--tail", "100", *a.services)
+        elif a.command in ("credentials", "session", "database"):
+            return engine_main(m, a.command, a.services)
         elif a.command == "down":
             if m["paw"]:
                 run_paw(m, "down")

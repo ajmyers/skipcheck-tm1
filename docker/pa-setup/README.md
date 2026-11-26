@@ -42,6 +42,9 @@ the first release.
 | `logs [service...]` | Recent logs, e.g. `logs planning cognos` |
 | `down` | Stops and removes the containers. Data (TM1 databases, installs, the Cognos content store) is kept. |
 | `generate` | Only writes `compose.yaml` |
+| `credentials` | With a TM1 v12 engine: every address of the engine, and where each credential is. `--json` for a program (it includes the secrets). |
+| `session [database [user]]` | With an engine: logs in and prints the session cookie, for `curl -b`. Default: `admin`. |
+| `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance. |
 
 `-f other.yaml` uses another file in the same folder. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
@@ -74,13 +77,14 @@ cognos:
 | `version` | (required) | `1` |
 | `name` | the folder's name | The compose project name |
 | `ibm` | | The folder holding your IBM downloads. Relative to this file, or starting with `~`. |
-| `files` | `./pa-files` | Where each TM1 server keeps `config`, `data` and `logs`, in a folder per server |
-| `images` | the published images, `:edge` until the first release (`PA_IMAGE_TAG` picks a release) | `tm1Server`, `tm1Web`, `cognosServer`, `keycloak`: other images, e.g. local builds or **private images with IBM software built in** |
+| `files` | `./pa-files` | Where each TM1 server keeps `config`, `data` and `logs`, in a folder per server, and the engine everything of its own, in `tm1-engine` |
+| `images` | the published images, `:edge` until the first release (`PA_IMAGE_TAG` picks a release) | `tm1Server`, `tm1Web`, `cognosServer`, `keycloak`, `tm1Engine`, `mongo`: other images, e.g. local builds or **private images with IBM software built in** |
 | `tm1.servers.<name>` | | A TM1 server. `port` (REST API; default 8010, 8011, ...), `seed` (`empty`, `sdata`, `24retail`), `cfg` (any `tm1s.cfg` parameter) |
 | `tm1.adminServer`, `tm1.adminPort` | automatic, 5895 | A shared Admin Server: on with more than one server, where every server registers |
 | `tm1Web` | off | `true`, or `port` (9510) and `heap` (`1g`). Lists every server. |
 | `paw` | off | `acceptLicense: true` (required: IBM's PAW license), `port` (8800), `zip` (default: the newest in `ibm`) |
 | `cognos` | off | `port` (9300), `users` (`user:password[:group,group]`), `oidc` (`true` or `keycloakPort`, 8180), `cam`, `memory` (dispatcher heap MB, 6144) |
+| `tm1Engine` | off | A **TM1 v12 engine** (Planning Analytics 3.x) and its MongoDB: `true`, or `port` (4444), `databases`, `users`, `datastore`. [Below](#tm1-v12). |
 | `cognos.cam` | LDAP, the first user | With Cognos, every TM1 server runs in CAM security: `namespace` (`ldap` or `oidc`) and `admins`, the test users who are TM1 administrators. Every user's groups become TM1 groups. |
 
 The file is checked strictly: an unknown setting, a port used twice, or a part that
@@ -90,7 +94,48 @@ Schema can check it as you type with [`pa-environment.schema.json`](pa-environme
 
 **Secrets go in `.env`**, which `up` creates next to the file: download links (e.g.
 pre-signed S3 URLs) instead of files in `ibm` (`TM1_BUNDLE_URL`, `TM1_WEB_BUNDLE_URL`,
-`COGNOS_ZIP_URL`). Test users' passwords are in the YAML: they're throwaway, for tests.
+`COGNOS_ZIP_URL`, `TM1_ENGINE_BUNDLE_URL`). Test users' passwords are in the YAML: they're throwaway, for tests.
+
+## TM1 v12
+
+`tm1Engine` runs a TM1 v12 engine, from IBM's `tm1-v<version>-standalone-linux.tgz` in `ibm`.
+It sits beside `tm1`, so one environment can run both versions. The smallest file:
+
+```yaml
+version: 1
+ibm: ~/Downloads/ibm
+tm1Engine: true            # one database, tm1; log in as admin
+```
+
+[`examples/tm1-engine.yaml`](examples/tm1-engine.yaml) has every setting.
+
+| Setting | Default | |
+|---|---|---|
+| `tm1Engine.port` | 4444 | TM1's gateway on your computer: the REST API, logins and the management API |
+| `tm1Engine.databases.<name>` | one, `tm1` | A database. Names need at least 3 characters, and `Sales` and `sales` are two. `instance` puts it in another instance than `tm1`: an instance has its own credentials, sessions and URL prefix. |
+| `tm1Engine.users` | | Users for every database: `user`, `user::group,group`, or a mapping with `name` and `groups`. `admin` is always there. |
+| `tm1Engine.datastore.port` | not published | Publishes the engine's MongoDB on your computer |
+
+- **One engine holds every database.** Unlike TM1 11, a database isn't a container: `database
+  create` adds one to the running engine in about 13 seconds.
+- **TM1 v12 keeps no passwords.** A program logs a user in by name, with the client ID and secret
+  of the instance's application. `up` prints where those are, and `session` does it for you:
+
+  ```sh
+  curl -b "$(./setup.sh session planning analyst)" "http://localhost:4444/tm1/api/v1/Databases('planning')/Cubes"
+  ```
+
+  A user's password in the file is accepted and not used: it's there for the logins that will
+  need one (OAuth 2.0 and pass-through, which aren't in pa-setup yet).
+- **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
+  databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
+  together: a database's changes since its last save are in MongoDB.
+- **Memory:** about 1 GB for the engine and MongoDB with two databases (0.7 GB just started, 1.1 GB
+  after a day's use, with TM1 12.6.7).
+- **TM1 Web, PAW and Cognos security are TM1 11's** here: they need `tm1.servers`.
+
+The engine is the project's [`tm1-engine`](../tm1-engine/README.md) image, which says more about
+instances, logins and what's stored where.
 
 ## What you get
 
