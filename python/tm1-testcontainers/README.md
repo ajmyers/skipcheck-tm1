@@ -121,6 +121,37 @@ with Tm1EngineContainer(Tm1EngineSource.Bundle("/path/to/ibm-downloads")).with_d
     scratch = engine.create_database("scratch")  # and engine.drop_database(scratch)
 ```
 
+### OAuth 2.0 logins
+
+TM1 v12 also takes a token from an identity provider. `with_oauth2(keycloak)` has the engine take
+tokens from a `KeycloakContainer`, which imports a realm (`tm1`) with the users you gave a password
+with `with_login`: TM1 v12 keeps none itself.
+
+```python
+from contextlib import closing
+
+keycloak = KeycloakContainer()  # not started: the engine starts it first
+engine = Tm1EngineContainer(source).with_user("analyst", "Analysts").with_login("analyst", "analystpw").with_oauth2(keycloak)
+with closing(keycloak), engine:
+    db = engine.database("tm1")
+    headers = db.oauth2_login("analyst").authorize_with_token({})  # Authorization: Bearer <token>
+    httpx2.get(db.rest_url + "Cubes?$select=Name", headers=headers)
+```
+
+- **`db.oauth2_login(user)`** is a `Tm1Login` through OAuth 2.0 (`is_oauth2`): `token()` gets an access
+  token from Keycloak with the user's `password` (at `token_url`, as the client `tm1`), and
+  `authorize_with_token(headers)` sends a new one as `Authorization: Bearer`. TM1 takes it on any
+  request and answers with a session cookie; `cookie()` and `authorize(headers)` keep that session.
+  `session(...)` refuses: TM1 doesn't take the provider's token at its session endpoint.
+- **A user with a password must be a user of the engine** (`with_user`), or `admin`. Logins
+  through the application (`db.login(user)`) keep working beside it.
+- **Give the engine a Keycloak that isn't started yet.** The realm is made when Keycloak starts,
+  so users and logins added after `with_oauth2` are in it; `with KeycloakContainer() as keycloak`
+  would start it too soon, without the realm. The Keycloak joins the engine's network (or the
+  engine the Keycloak's, if it has one), and is yours to stop, after the engine.
+- In a `PlanningAnalyticsEnvironment`, `tm1_engine_oauth2()` does the same with the environment's
+  Keycloak, added if `keycloak()` wasn't called; in `pa-environment.yaml` it's `tm1Engine.oauth2`.
+
 `Tm1EngineSource.discover()` reads these, in this order:
 
 | Setting | Source |
@@ -184,7 +215,9 @@ checked as `pa-setup` checks it, with the same defaults and messages.
 - **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`,
   `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `keycloak()`, `cam` as `cam_security`,
   `memory`), `paw` (`acceptLicense`, `zip`) and `tm1Engine` (`databases` with their `instance`, and
-  `users` with their groups; a user's password is checked and not used, as TM1 v12 keeps none).
+  `users` with their groups; a user's password is checked and not used, as TM1 v12 keeps none,
+  unless `oauth2` is on, when it's the user's at Keycloak, `with_login`; `oauth2` as
+  `tm1_engine_oauth2()`).
   `cognos.oidc: true` turns OIDC on, as a mapping does.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads;
   then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's
@@ -248,6 +281,9 @@ env.start()  # seconds, once a run with this configuration has started it
 | `withDatabase(name)`, `withDatabase(instance, name)`; the same for `database` and `createDatabase` | `with_database(name)`, `with_database(instance, name)`, in Java's order |
 | `login.authorize(HttpRequest.Builder)` | `login.authorize(headers)`: a dict of headers, or an `httpx2.Request` |
 | `equals`, `hashCode`, `toString` | `==`, `hash()`, `repr()` |
+| `withOAuth2`, `isOAuth2()`, `oauth2Login`, `tm1EngineOAuth2()` | `with_oauth2`, `is_oauth2`, `oauth2_login`, `tm1_engine_oauth2()`: OAuth is one word |
+| `login.authorizeWithToken(HttpRequest.Builder)` | `login.authorize_with_token(headers)`: a dict of headers, or an `httpx2.Request` |
+| `try (var keycloak = new KeycloakContainer(); var engine = ...withOAuth2(keycloak))` | `with closing(keycloak), engine:`. A Python `with` on a container starts it, and the engine has to start its Keycloak |
 | `withReuse(true)` | `with_reuse(True)`, honoured when `testcontainers.reuse.enable=true` (testcontainers-python has no reuse of its own) |
 
 Containers are set up without Docker, as Java's are, so wiring is tested anywhere; they connect

@@ -38,6 +38,11 @@ def test_engine() -> None:
     _record("engine")
 
 
+@pytest.mark.requires_tm1_engine(share_database=True)
+def test_engine_with_o_auth2() -> None:
+    _record("engine-oauth2")
+
+
 def _record(scenario: str) -> None:
     home = ROOT / "testcontainers-conformance" / "scenarios"
     env = PlanningAnalyticsEnvironment.from_config(home / f"{scenario}.yaml").build()
@@ -50,6 +55,10 @@ def _record(scenario: str) -> None:
             containers["adminServer"] = admin
         if scenario == "servers-and-web":
             containers["tm1Web"] = env.tm1_web()
+        if scenario == "engine-oauth2":
+            containers["tm1Engine"] = env.tm1_engine()
+            containers["tm1EngineDatastore"] = env.tm1_engine().datastore
+            containers["keycloak"] = env.keycloak()
         if scenario == "engine":
             containers["tm1Engine"] = env.tm1_engine()
             containers["tm1EngineDatastore"] = env.tm1_engine().datastore

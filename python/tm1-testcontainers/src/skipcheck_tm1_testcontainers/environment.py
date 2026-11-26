@@ -90,7 +90,7 @@ class PlanningAnalyticsEnvironment:
             network = Network.new_network()
         self._network = network
         self._owns_network = given is None
-        self._keycloak = KeycloakContainer(b._keycloak_image).with_network(network) if b._keycloak is not None else None
+        self._keycloak = KeycloakContainer(b._keycloak_image).with_network(network) if b._keycloak is not None or b._tm1_engine_oauth2 else None
         cognos: CognosContainer | None = None
         if b._cognos is not None:
             cognos_source = b._get(
@@ -98,7 +98,9 @@ class PlanningAnalyticsEnvironment:
             )
             cognos_image = b._cognos_image if _runs(b._cognos_image, isinstance(cognos_source, CognosSource.PrivateImage)) else None
             cognos = CognosContainer(cognos_source, cognos_image).with_network(network)
-            if self._keycloak is not None:
+            # Only when Keycloak was asked for: one that's there for the engine's OAuth 2.0 logins
+            # alone doesn't give Cognos an OIDC namespace nobody wanted
+            if self._keycloak is not None and b._keycloak is not None:
                 cognos.with_keycloak(self._keycloak)
             # First: the TM1 servers' CAM security is wired from the test users
             b._cognos(cognos)
@@ -159,6 +161,11 @@ class PlanningAnalyticsEnvironment:
             # Its datastore joins the same network with it, and the network stays the environment's to remove
             # Its name on the network is the one it has in the compose project pa-setup writes
             engine = Tm1EngineContainer(engine_source, engine_image).with_network(network).with_network_aliases(ENGINE_ALIAS)
+            if b._tm1_engine_oauth2:
+                assert self._keycloak is not None
+                # The environment's one Keycloak: its address on the network is its issuer for
+                # Cognos and for the engine alike
+                engine.with_oauth2(self._keycloak)
             # What the file said first; then, below, what the caller says
             _apply(b._file_tm1_engine, engine)
         self._tm1_engine = engine
@@ -377,6 +384,7 @@ class PlanningAnalyticsEnvironment:
             self._tm1_engine_image: str | None = None
             # The file's own settings for the engine, kept when the caller adds theirs
             self._file_tm1_engine: Callable[[Tm1EngineContainer], Any] | None = None
+            self._tm1_engine_oauth2 = False
 
         def tm1(self, name: str, customizer: Callable[[Tm1ServerContainer], Any] = _nothing) -> Self:
             """A TM1 server, its network alias and server name ``name``."""
@@ -454,6 +462,14 @@ class PlanningAnalyticsEnvironment:
             self._cognos_source = _required(source)
             return self
 
+        def tm1_engine_oauth2(self) -> Self:
+            """Has the TM1 v12 engine take OAuth 2.0 logins, with tokens from the environment's
+            Keycloak, which is added if :meth:`keycloak` wasn't called. Give users a password with
+            :meth:`Tm1EngineContainer.with_login`, in :meth:`tm1_engine`, and log in with
+            :meth:`Tm1Database.oauth2_login`."""
+            self._tm1_engine_oauth2 = True
+            return self
+
         def tm1_engine_source(self, source: Tm1EngineSource) -> Self:
             """Where the engine gets TM1 v12 from, instead of what :meth:`Tm1EngineSource.discover`
             finds."""
@@ -504,8 +520,12 @@ class PlanningAnalyticsEnvironment:
                     "An environment with a TM1 v12 engine can't be reused: the engine and its datastore belong together, "
                     "and a kept one keeps every database tests left"
                 )
-            if self._keycloak is not None and self._cognos is None:
-                raise RuntimeError("Keycloak gives Cognos its OIDC namespace: add cognos(...) too")
+            if self._keycloak is not None and self._cognos is None and not self._tm1_engine_oauth2:
+                raise RuntimeError(
+                    "Keycloak gives Cognos its OIDC namespace, or a TM1 v12 engine its OAuth 2.0 logins: add cognos(...) or tm1_engine_oauth2() too"
+                )
+            if self._tm1_engine_oauth2 and self._tm1_engine is None:
+                raise RuntimeError("OAuth 2.0 logins are a TM1 v12 engine's: add tm1_engine() too")
             if self._cam_namespace is Namespace.OIDC and self._keycloak is None:
                 raise RuntimeError("CAM security through OIDC needs keycloak()")
             return PlanningAnalyticsEnvironment(self, reuse_enabled)

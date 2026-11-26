@@ -9,6 +9,7 @@ import base64
 import enum
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import ClassVar, Self
 
@@ -203,8 +204,9 @@ class CognosContainer(GenericContainer):
 
 
 class KeycloakContainer(GenericContainer):
-    """Keycloak, for Cognos's OIDC namespace (:meth:`CognosContainer.with_keycloak`). The image
-    loads the ``cognos`` realm itself."""
+    """Keycloak, for Cognos's OIDC namespace (:meth:`CognosContainer.with_keycloak`), whose
+    ``cognos`` realm the image loads itself, and for a TM1 v12 engine's OAuth 2.0 logins
+    (:meth:`Tm1EngineContainer.with_oauth2`), whose ``tm1`` realm it imports when it starts."""
 
     DEFAULT_IMAGE: ClassVar[str] = "quay.io/keycloak/keycloak:26.4"
     IMAGE: ClassVar[str] = "KEYCLOAK_IMAGE"
@@ -225,6 +227,38 @@ class KeycloakContainer(GenericContainer):
         # One issuer for Cognos and the tests, whichever address they use
         self.with_env("KC_HOSTNAME", self.network_url)
         self.waiting_for(wait_for_http("/realms/master", self.HTTP_PORT, 200, timeout=3 * 60.0))
+        # Realms to import at start, by name: a TM1 v12 engine's, for OAuth 2.0 logins
+        self._realms: dict[str, Callable[[], str]] = {}
+
+    def _with_realm(self, name: str, json: Callable[[], str]) -> Self:
+        """A realm for this Keycloak to import when it starts, as JSON. The JSON is asked for when
+        Keycloak starts, so whoever gives it can still be changed until then."""
+        self._realms[name] = json
+        return self
+
+    def configure(self) -> None:
+        """Called before the container is created: has Keycloak import the realms it was given."""
+        if not self._realms:
+            return
+        self.with_command(["start-dev", "--import-realm"])
+        for name, realm in self._realms.items():
+            destination = f"/opt/keycloak/data/import/{name}-realm.json"
+            # Once, however often this is called: the realm as it is now replaces an earlier copy
+            self._transferable_specs[:] = [spec for spec in self._transferable_specs if spec[1] != destination]
+            self.with_copy_into_container(realm().encode(), destination)
+
+    def _access_token(self, realm: str, client: str, user: str, password: str) -> str:
+        """An access token for a user of a realm, by the password grant, as a program holding the
+        user's password gets one."""
+        response = httpx2.post(
+            f"{self.url}/realms/{realm}/protocol/openid-connect/token",
+            data={"grant_type": "password", "client_id": client, "username": user, "password": password},
+            timeout=30,
+        )
+        match = re.search(r'"access_token"\s*:\s*"([^"]+)"', response.text)
+        if response.status_code != 200 or match is None:
+            raise RuntimeError(f"Keycloak refused {user} (HTTP {response.status_code}): {response.text}")
+        return match.group(1)
 
     @property
     def network_url(self) -> str:

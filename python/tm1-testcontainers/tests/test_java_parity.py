@@ -55,6 +55,8 @@ _ENUM_CONSTANT = re.compile(r"^(?P<name>[A-Z][A-Z0-9_]*)\s*(?:\(|,|;|$)")
 
 
 def snake(name: str) -> str:
+    # OAuth is one word: withOAuth2 is with_oauth2, not with_o_auth2
+    name = name.replace("OAuth", "Oauth")
     s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
     s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s)
     return s.lower()
@@ -153,6 +155,21 @@ def has(cls: Any, name: str) -> bool:
         # Every class has object's: Java's equals and hashCode are the class's own
         return any(name in vars(base) for base in cls.__mro__ if base is not object)
     return hasattr(cls, name) or name in getattr(cls, "__dataclass_fields__", {})
+
+
+def test_oauth_is_one_word_in_a_name_and_no_other_name_changes() -> None:
+    assert python_name("withOAuth2", 1) == "with_oauth2"
+    assert python_name("isOAuth2", 0) == "is_oauth2"
+    assert python_name("tm1EngineOAuth2", 0) == "tm1_engine_oauth2"
+    assert python_name("oauth2Login", 1) == "oauth2_login"
+
+    def mechanical(name: str) -> str:
+        s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+        return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s).lower()
+
+    members = {name for java in JAVA_TYPES.values() for name in [*java.methods, *java.components]}
+    assert len(members) > 100
+    assert {name for name in members if snake(name) != mechanical(name)} == {name for name in members if "OAuth" in name}
 
 
 def test_the_java_sources_are_read() -> None:

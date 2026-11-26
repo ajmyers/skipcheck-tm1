@@ -12,7 +12,7 @@ import secrets
 import threading
 import time
 from collections.abc import MutableMapping
-from typing import Any, ClassVar, Self, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypeVar
 
 import httpx2
 
@@ -21,6 +21,9 @@ from skipcheck_tm1 import Tm1Version
 from ._container import GenericContainer, Network, wait_for_http
 from .sources import Tm1EngineSource
 from .tm1 import default_image
+
+if TYPE_CHECKING:
+    from .cognos import KeycloakContainer
 
 __all__ = ["Tm1Database", "Tm1EngineContainer", "Tm1Login"]
 
@@ -115,6 +118,11 @@ class Tm1EngineContainer(GenericContainer):
     """The volume package installs are cached in, shared by every engine container on this Docker
     host. Only the first container to see a package installs it. Remove the volume to clear it."""
 
+    OAUTH2_REALM: ClassVar[str] = "tm1"
+    """The Keycloak realm an engine with :meth:`with_oauth2` takes tokens from."""
+    OAUTH2_CLIENT: ClassVar[str] = "tm1"
+    """The client of that realm a test asks for tokens as, and the audience its tokens carry."""
+
     _shared: ClassVar[Tm1EngineContainer | None] = None
     _shared_lock: ClassVar[threading.Lock] = threading.Lock()
 
@@ -126,6 +134,9 @@ class Tm1EngineContainer(GenericContainer):
         # instance/database, in the order they were added
         self._databases: list[str] = []
         self._users: dict[str, list[str]] = {}
+        # The users who can log in through OAuth 2.0, and what with
+        self._passwords: dict[str, str] = {}
+        self._keycloak: KeycloakContainer | None = None
         self._credentials: dict[str, Any] | None = None
         self._credentials_lock = threading.Lock()
         self._version: Tm1Version | None = None
@@ -153,7 +164,15 @@ class Tm1EngineContainer(GenericContainer):
 
     def with_network(self, network: Any) -> Self:
         """Puts the engine, and its datastore with it, on a network. They have one of their own
-        unless this is called; a network that's given is never removed by the engine."""
+        unless this is called; a network that's given is never removed by the engine. A RuntimeError
+        if the engine takes tokens from a Keycloak (:meth:`with_oauth2`) that's on another."""
+        joined = getattr(self, "_keycloak", None)
+        if joined is not None and joined.network is not network:
+            # The Keycloak is the caller's, and may serve others: it isn't moved from here
+            raise RuntimeError(
+                "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: "
+                "set the network before with_oauth2, or give the Keycloak the same"
+            )
         super().with_network(network)
         # At once, not when the engine starts: whatever starts the engine may start what it
         # depends on first, as an environment does, and the datastore must be here by then
@@ -204,6 +223,53 @@ class Tm1EngineContainer(GenericContainer):
             raise ValueError(f"The user {name} is already added")
         self._users[name] = list(groups)
         return self
+
+    def with_oauth2(self, keycloak: KeycloakContainer) -> Self:
+        """Takes OAuth 2.0 logins: tokens from a Keycloak, which gets a realm (``tm1``) with the
+        users given a password by :meth:`with_login`. A test then logs in with
+        :meth:`Tm1Database.oauth2_login`. Logins through the engine's application
+        (:meth:`Tm1Database.login`) keep working beside it.
+
+        The Keycloak joins the engine's network, unless it has one already, which the engine then
+        joins. It's yours to stop: the engine only starts it first, so give it one that isn't
+        started yet, and stop it after the engine."""
+        if keycloak is None:
+            raise ValueError("keycloak must not be None")
+        self._keycloak = keycloak
+        if keycloak.network is not None:
+            self.with_network(keycloak.network)
+        else:
+            keycloak.with_network(self.network if self.network is not None else self._own_network)
+        self.depends_on(keycloak)
+        # Asked for when Keycloak starts, so users added after this call are in it
+        keycloak._with_realm(self.OAUTH2_REALM, self._realm)
+        # Keycloak's address on the network is what its tokens name, however they're fetched, and
+        # TM1 has to reach the issuer a token names
+        self.with_env("TM1_OAUTH2_ISSUER_URL", f"{keycloak.network_url}/realms/{self.OAUTH2_REALM}")
+        self.with_env("TM1_OAUTH2_AUDIENCE", self.OAUTH2_CLIENT)
+        self.with_env("TM1_OAUTH2_ID_CLAIMS", "preferred_username")
+        return self
+
+    def with_login(self, user: str, password: str) -> Self:
+        """Gives a user a password to log in with through OAuth 2.0 (:meth:`with_oauth2`). TM1 v12
+        keeps no passwords itself: it's the Keycloak's. The user is one added with
+        :meth:`with_user`, or ``admin``."""
+        if not isinstance(user, str) or _USER.fullmatch(user) is None:
+            raise ValueError(f"A user's name is letters, digits, '.', '_' and '-': {user}")
+        if not isinstance(password, str) or not password:
+            raise ValueError(f"The password of {user} must not be empty")
+        # A name is one whatever its case, to Keycloak and to TM1: a second password for it
+        # replaces the first
+        for known in [name for name in self._passwords if name.lower() == user.lower()]:
+            del self._passwords[known]
+        self._passwords[user] = password
+        return self
+
+    @property
+    def keycloak(self) -> KeycloakContainer | None:
+        """The Keycloak the engine takes OAuth 2.0 tokens from, or None without
+        :meth:`with_oauth2`."""
+        return self._keycloak
 
     @property
     def source(self) -> Tm1EngineSource:
@@ -303,6 +369,53 @@ class Tm1EngineContainer(GenericContainer):
                     return Tm1Login(f"{self.url}{instance}/auth/v1/", instance, str(application.get("clientId", "")), str(application["clientSecret"]), user)
         raise RuntimeError(f"The instance {instance} has no application to log in through")
 
+    def _oauth2_login(self, database: Tm1Database, user: str) -> Tm1Login:
+        """A login through OAuth 2.0, as a user given a password with with_login."""
+        keycloak = self._keycloak
+        if keycloak is None:
+            raise RuntimeError("This engine takes no OAuth 2.0 logins: give it a Keycloak with with_oauth2")
+        # A name is one whatever its case, to Keycloak and to TM1
+        for name, password in self._passwords.items():
+            if name.lower() == str(user).lower():
+                return Tm1Login._oauth2(keycloak, database, name, password)
+        raise ValueError(f"{user} has no password to log in with: give one with with_login. Those who have: [{', '.join(self._passwords)}]")
+
+    def _realm(self) -> str:
+        """The realm the Keycloak imports: a client whose tokens carry the audience TM1 expects,
+        and the users who have a password."""
+        known = {name.lower() for name in self._users}
+        for user in self._passwords:
+            if user.lower() != "admin" and user.lower() not in known:
+                raise RuntimeError(f"{user} has a password (with_login) but isn't a user of the engine: add them with with_user")
+        audience = {
+            "name": "tm1-audience",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "config": {"included.custom.audience": self.OAUTH2_CLIENT, "access.token.claim": "true", "id.token.claim": "false"},
+        }
+        client = {
+            "clientId": self.OAUTH2_CLIENT,
+            "publicClient": True,
+            "directAccessGrantsEnabled": True,
+            "standardFlowEnabled": False,
+            "protocolMappers": [audience],
+        }
+        # Keycloak wants a profile that's complete before it gives a user a token. The address
+        # isn't made from the name: Keycloak refuses some that a name may be
+        users = [
+            {
+                "username": name,
+                "enabled": True,
+                "emailVerified": True,
+                "email": f"user{number}@example.com",
+                "firstName": name,
+                "lastName": "Test",
+                "credentials": [{"type": "password", "value": password, "temporary": False}],
+            }
+            for number, (name, password) in enumerate(self._passwords.items(), start=1)
+        ]
+        return json.dumps({"realm": self.OAUTH2_REALM, "enabled": True, "clients": [client], "users": users}, indent=2, ensure_ascii=False)
+
     def _configured(self) -> list[str]:
         """What's passed to the image as TM1_DATABASES: what was added, or the default."""
         return list(self._databases) or [f"{self.DEFAULT_INSTANCE}/{self.DEFAULT_DATABASE}"]
@@ -348,8 +461,11 @@ class Tm1EngineContainer(GenericContainer):
             finally:
                 self._credentials = None
                 self._version = None
-                # Only its own: a network it was given is whoever gave it's to remove
-                if self.network is self._own_network:
+                # Only its own: a network it was given is whoever gave it's to remove. And not from
+                # under a Keycloak that's still on it, which is the caller's to stop: Docker would
+                # refuse, and the network then goes with the test session, as Keycloak may
+                keycloak = self._keycloak
+                if self.network is self._own_network and (keycloak is None or keycloak._container is None):
                     self._own_network.close()
 
     def _await_setup(self) -> None:
@@ -497,6 +613,14 @@ class Tm1Database:
         (403)."""
         return self._engine._login(self._instance, user)
 
+    def oauth2_login(self, user: str) -> Tm1Login:
+        """A login through OAuth 2.0: as a user the engine's Keycloak knows the password of
+        (:meth:`Tm1EngineContainer.with_login`). The login gets a token from Keycloak with that
+        password and sends it to TM1, as a program acting for the user would. A RuntimeError if the
+        engine has no :meth:`Tm1EngineContainer.with_oauth2`, and a ValueError if the user has no
+        password."""
+        return self._engine._oauth2_login(self, user)
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Tm1Database) and self._engine is other._engine and self._instance == other._instance and self._name == other._name
 
@@ -517,7 +641,11 @@ class Tm1Login:
 
     Get one from :meth:`Tm1Database.login`, then either let it log in for you (:meth:`authorize` or
     :meth:`cookie`), or hand :attr:`client_id`, :attr:`client_secret` and :attr:`user` to a client
-    that logs in itself."""
+    that logs in itself.
+
+    A login from :meth:`Tm1Database.oauth2_login` is through OAuth 2.0 instead
+    (:attr:`is_oauth2`): its tokens come from the engine's Keycloak, for the user's
+    :attr:`password` there, and TM1 takes one on any request (:meth:`authorize_with_token`)."""
 
     def __init__(self, auth_url: str, instance: str, client_id: str, client_secret: str, user: str) -> None:
         if user is None:
@@ -529,6 +657,43 @@ class Tm1Login:
         self._user = user
         self._cookie: str | None = None
         self._lock = threading.Lock()
+        # An OAuth 2.0 login: where its tokens come from, the user's password there, and a
+        # database's address to turn a token into a session at
+        self._keycloak: KeycloakContainer | None = None
+        self._password = ""
+        self._database: Tm1Database | None = None
+
+    @classmethod
+    def _oauth2(cls, keycloak: KeycloakContainer, database: Tm1Database, user: str, password: str) -> Tm1Login:
+        """A login through OAuth 2.0, with tokens from the engine's Keycloak."""
+        # Addresses are asked of the database when they're needed: a login can be made before the
+        # engine has started
+        login = cls("", database.instance, Tm1EngineContainer.OAUTH2_CLIENT, "", user)
+        login._keycloak = keycloak
+        login._password = password
+        login._database = database
+        return login
+
+    @property
+    def is_oauth2(self) -> bool:
+        """Whether this is a login through OAuth 2.0 (:meth:`Tm1Database.oauth2_login`), rather than
+        through the instance's application."""
+        return self._keycloak is not None
+
+    @property
+    def password(self) -> str:
+        """The user's password at the identity provider, for an OAuth 2.0 login; empty otherwise,
+        as TM1 v12 keeps none."""
+        return self._password
+
+    @property
+    def token_url(self) -> str:
+        """Where a token is asked for: the identity provider's token endpoint for an OAuth 2.0
+        login, as seen from the host, and TM1's own otherwise."""
+        keycloak = self._keycloak
+        if keycloak is None:
+            return self._auth_url + "token"
+        return f"{keycloak.url}/realms/{Tm1EngineContainer.OAUTH2_REALM}/protocol/openid-connect/token"
 
     @property
     def instance(self) -> str:
@@ -554,13 +719,22 @@ class Tm1Login:
     def auth_url(self) -> str:
         """Where a session or a token is asked for, as seen from the host, ending in ``/``, e.g.
         ``http://localhost:54321/tm1/auth/v1/``."""
-        return self._auth_url
+        database = self._database
+        return self._auth_url if database is None else f"{database.engine.url}{self._instance}/auth/v1/"
 
     def cookie(self) -> str:
         """The session cookie, ``TM1SessionId=...``, for a ``Cookie`` header. Logs in the first time,
-        with the application's credentials as Basic authentication, and keeps the session. A
-        RuntimeError if TM1 refuses the login."""
+        with the application's credentials as Basic authentication, or for an OAuth 2.0 login with
+        a token from the provider, and keeps the session. A RuntimeError if TM1 refuses the login."""
         with self._lock:
+            if self._cookie is None and self._database is not None:
+                # TM1 gives a session to the first request that carries the provider's token
+                anywhere = self._database.rest_url + "ActiveUser?$select=Name"
+                try:
+                    response = httpx2.get(anywhere, headers={"Authorization": "Bearer " + self.token()}, timeout=_REQUEST_TIMEOUT)
+                except httpx2.HTTPError as e:
+                    raise RuntimeError(f"Couldn't reach TM1 at {self.auth_url}") from e
+                self._cookie = self._session_cookie(response)
             if self._cookie is None:
                 basic = base64.b64encode(f"{self._client_id}:{self._client_secret}".encode()).decode("ascii")
                 self._cookie = self.session("Basic " + basic)
@@ -570,7 +744,13 @@ class Tm1Login:
         """A bearer token for the application, a JWT, from TM1's token endpoint (the OAuth 2.0
         client-credentials grant). It names no user: send it as ``Authorization: Bearer`` with the
         user's name to get a session, as :meth:`session` does. A RuntimeError if TM1 refuses the
-        application's credentials."""
+        application's credentials.
+
+        For an OAuth 2.0 login, an access token for the user from the provider, by the password
+        grant: a new one each time."""
+        keycloak = self._keycloak
+        if keycloak is not None:
+            return keycloak._access_token(Tm1EngineContainer.OAUTH2_REALM, self._client_id, self._user, self._password)
         body = {"grant_type": "client_credentials", "client_id": self._client_id, "client_secret": self._client_secret}
         response = self._post("token", body, {})
         token = None
@@ -587,10 +767,17 @@ class Tm1Login:
     def session(self, authorization: str) -> str:
         """Logs the user in with an ``Authorization`` header of your own, such as
         ``"Bearer " + login.token()``, and returns the new session's cookie, ``TM1SessionId=...``. Each
-        call makes a session; :meth:`cookie` keeps one. A RuntimeError if TM1 refuses the login."""
+        call makes a session; :meth:`cookie` keeps one. A RuntimeError if TM1 refuses the login, or
+        for an OAuth 2.0 login, which has no session endpoint to ask."""
+        if self._keycloak is not None:
+            raise RuntimeError(
+                "An OAuth 2.0 login has no session to ask for: TM1 takes its token on any request (authorize_with_token), and cookie() keeps the session that gives"
+            )
         if authorization is None:
             raise ValueError("authorization must not be None")
-        response = self._post("session", {"User": self._user}, {"Authorization": authorization})
+        return self._session_cookie(self._post("session", {"User": self._user}, {"Authorization": authorization}))
+
+    def _session_cookie(self, response: httpx2.Response) -> str:
         cookies = (value.split(";", 1)[0].strip() for value in response.headers.get_list("set-cookie"))
         found = next((cookie for cookie in cookies if cookie.startswith("TM1SessionId=")), None)
         if response.status_code // 100 != 2 or found is None:
@@ -605,6 +792,18 @@ class Tm1Login:
         headers["Cookie"] = self.cookie()
         return request
 
+    def authorize_with_token(self, request: _Request) -> _Request:
+        """Adds this login's token to a request as ``Authorization: Bearer``, as a program with a
+        token of its own would send it: to its headers, as a dict, or to an ``httpx2.Request``. For
+        an OAuth 2.0 login, a new token from the provider each time; TM1 answers with a session
+        cookie. A RuntimeError for a login through the application, whose token TM1 takes only at
+        its session endpoint (:meth:`session`)."""
+        if self._keycloak is None:
+            raise RuntimeError('TM1 takes its own token only where a session is asked for: use session("Bearer " + token()), or authorize for the cookie')
+        headers: MutableMapping[str, str] = getattr(request, "headers", request)  # type: ignore[assignment]
+        headers["Authorization"] = "Bearer " + self.token()
+        return request
+
     def __repr__(self) -> str:
         # Never the secret
         return f"Tm1Login[{self._user} in {self._instance}]"
@@ -612,10 +811,10 @@ class Tm1Login:
     def _post(self, path: str, body: dict[str, str], headers: dict[str, str]) -> httpx2.Response:
         try:
             return httpx2.post(
-                self._auth_url + path,
+                self.auth_url + path,
                 content=json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode(),
                 headers={**headers, "Content-Type": "application/json"},
                 timeout=_REQUEST_TIMEOUT,
             )
         except httpx2.HTTPError as e:
-            raise RuntimeError(f"Couldn't reach TM1 at {self._auth_url}") from e
+            raise RuntimeError(f"Couldn't reach TM1 at {self.auth_url}") from e
