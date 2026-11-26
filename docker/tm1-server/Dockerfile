@@ -56,7 +56,7 @@ COPY docker/entrypoint.sh /usr/local/bin/tm1-entrypoint
 COPY docker/install-tm1.sh /usr/local/bin/tm1-install
 COPY docker/unpack-tm1.py docker/unpack-tm1-issetup.py docker/cam-setup.py /usr/local/lib/tm1-server/
 COPY docker/healthcheck.sh /usr/local/bin/tm1-healthcheck
-COPY docker/tm1s-log.properties docker/tm1s.cfg.default docker/banner.txt /usr/local/lib/tm1-server/
+COPY docker/tm1s-log.properties docker/tm1s.cfg.default docker/banner.txt docker/daemon.sh /usr/local/lib/tm1-server/
 RUN chmod 755 /usr/local/bin/tm1-*
 
 # Deliberately no VOLUME: a VOLUME instruction makes Docker create an anonymous
