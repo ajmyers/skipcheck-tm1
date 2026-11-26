@@ -28,8 +28,10 @@ import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
  * <li><b>Same schema version:</b> the live metadata must equal the snapshot byte for
  * byte. A difference means the snapshot is stale.
  * <li><b>Another version:</b> writes what it adds and removes to
- * {@code build/reports/tm1-metadata-drift.txt} and passes. This is how running the tests
- * against another TM1 version shows its API differences.
+ * {@code build/reports/tm1-metadata-drift.txt}. This is how running the tests against
+ * another TM1 version shows its API differences. If a snapshot of that version is
+ * committed too (an older supported version), the live metadata must equal it byte for
+ * byte; otherwise the test passes.
  * </ul>
  */
 @RequiresTm1
@@ -51,6 +53,7 @@ class MetadataDriftTest {
 			return;
 		}
 
+		String schema = liveDoc.schemaVersion().orElse("unknown");
 		NavigableSet<String> snapshot = Signatures.of(MetadataSnapshot.load());
 		NavigableSet<String> server = Signatures.of(liveDoc);
 		NavigableSet<String> added = new TreeSet<>(server);
@@ -76,6 +79,12 @@ class MetadataDriftTest {
 		Files.createDirectories(file.getParent());
 		Files.writeString(file, report, StandardCharsets.UTF_8);
 		System.out.println(report);
+
+		MetadataSnapshot.text(schema)
+			.ifPresent(own -> assertThat(live)
+				.as("live $metadata (schema %s) against its own committed snapshot; regenerate it with TM1_UPDATE_METADATA_SNAPSHOT=true",
+						schema)
+				.isEqualTo(own));
 	}
 
 }
