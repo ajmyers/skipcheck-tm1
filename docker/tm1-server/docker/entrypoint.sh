@@ -81,17 +81,9 @@ DEFAULTS=/usr/local/lib/tm1-server
 log() { echo "[tm1-entrypoint] $*"; }
 die() { echo "[tm1-entrypoint] ERROR: $*" >&2; exit 2; }
 
-# tm1s.exe and tm1admsrv.exe both daemonize: the launcher exits 0 and the real
-# process keeps running. Wait for the daemon and print its PID.
-daemon_pid() {  # daemon_pid <pgrep -f pattern>
-  local pid
-  for _ in $(seq 1 30); do
-    pid=$(pgrep -f "$1" | head -1 || true)
-    if [ -n "$pid" ]; then echo "$pid"; return 0; fi
-    sleep 1
-  done
-  return 1
-}
+# daemon_pid <command line as run>: the daemonized server's PID (daemon.sh says why it's found so)
+# shellcheck source=daemon.sh
+. "$DEFAULTS/daemon.sh"
 
 # ---- find or install TM1 ----------------------------------------------------
 have_bundle() {
@@ -148,7 +140,7 @@ if [ "$ROLE" = admin ]; then
   cd "$BIN"   # config.tm1admsrv.json and ./ssl are resolved relative to bin64
   log "Starting TM1 Admin Server (REST on 5895 http / 5898 https)"
   ./tm1admsrv.exe
-  ADMIN_PID=$(daemon_pid '^\./tm1admsrv\.exe$') || { log "TM1 Admin Server did not start"; exit 1; }
+  ADMIN_PID=$(daemon_pid ./tm1admsrv.exe) || { log "TM1 Admin Server did not start"; exit 1; }
   log "TM1 Admin Server running as PID $ADMIN_PID"
   stop_admin() {
     log "Stopping TM1 Admin Server"
@@ -327,7 +319,7 @@ if [ "$EMBED_ADMIN" = "T" ]; then
   log "Starting TM1 Admin Server"
   # Writes tm1admsrv.log into bin64/ when the install is writable (skipped if mounted :ro).
   ./tm1admsrv.exe
-  ADMIN_PID=$(daemon_pid '^\./tm1admsrv\.exe$') || log "WARNING: embedded Admin Server did not start"
+  ADMIN_PID=$(daemon_pid ./tm1admsrv.exe) || log "WARNING: embedded Admin Server did not start"
 fi
 
 # ---- CAM administrators and groups -------------------------------------------
@@ -347,7 +339,7 @@ if [ -n "${TM1_CAM_ADMINS:-}${TM1_CAM_GROUPS:-}" ]; then
     sed -i -E 's/^[[:space:]]*(IntegratedSecurityMode|HTTPPortNumber|PortNumber|ClientMessagePortNumber)[[:space:]]*=.*$/#&/I' "$boot/tm1s.cfg"
     printf 'IntegratedSecurityMode=1\nHTTPPortNumber=18010\nPortNumber=12355\nClientMessagePortNumber=12356\n' >> "$boot/tm1s.cfg"
     ./tm1s.exe -w -z"$boot"
-    BOOT_PID=$(daemon_pid "^\./tm1s\.exe -w -z$boot\$" || true)
+    BOOT_PID=$(daemon_pid "./tm1s.exe -w -z$boot" || true)
     [ -n "$BOOT_PID" ] || { log "TM1 didn't start for the CAM setup"; tail -30 "$LOGS/tm1server.log" || true; exit 1; }
     scheme=https; case "${USE_SSL:-F}" in F|f|FALSE|false|False) scheme=http ;; esac
     rc=0; python3 "$DEFAULTS/cam-setup.py" "$scheme://localhost:18010" || rc=$?
@@ -367,7 +359,7 @@ TAIL_PID=$!
 log "Starting TM1 Server '$SERVER_NAME' (REST on ${HTTP_PORT:-none}, SSL=${USE_SSL:-F})"
 # tm1s.exe daemonizes: the launcher exits 0 and the real server keeps running.
 ./tm1s.exe -w -z"$RUN_CONF"
-TM1_PID=$(daemon_pid "^\./tm1s\.exe -w -z$RUN_CONF\$" || true)
+TM1_PID=$(daemon_pid "./tm1s.exe -w -z$RUN_CONF" || true)
 if [ -z "$TM1_PID" ]; then
   log "TM1 Server did not start - last lines of tm1server.log:"
   tail -50 "$LOGS/tm1server.log" || true
