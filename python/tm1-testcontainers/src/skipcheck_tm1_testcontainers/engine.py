@@ -324,14 +324,20 @@ class Tm1EngineContainer(GenericContainer):
                 "This TM1 server is already running, without the name the engine reaches it by: "
                 "give with_pass_through one that isn't started, and the engine starts it"
             )
+        if server._pass_through_for is not None:
+            # They'd share a network, where each engine's datastore answers to one name
+            raise RuntimeError(
+                "This TM1 server already checks logins for another engine: an engine and the server it passes logins to share a network, which holds one engine"
+            )
         if server.network is not None:
             self.with_network(server.network)
         else:
-            # The engine's own, or a new one if it was taken off it
+            # One of its own again, if it was taken off it
             self._join_network()
             network = self.network
             assert network is not None
             server.with_network(network)
+        server._pass_through_for = self
         if alias is None:
             server.with_network_aliases(self.PASS_THROUGH_ALIAS)
         self._pass_through = server
@@ -583,6 +589,8 @@ class Tm1EngineContainer(GenericContainer):
         # Before anything starts: the datastore, which this depends on, is started ahead of
         # configure()
         self._join_network()
+        # And before the TM1 server, and the Cognos behind it, take minutes to start
+        self._users_for_the_image()
         try:
             return super().start()
         except BaseException:
@@ -600,7 +608,26 @@ class Tm1EngineContainer(GenericContainer):
         """Called before the container is created: passes the databases and the users to the image."""
         self._join_network()
         self.with_env("TM1_DATABASES", ",".join(self._configured()))
-        # name -> groups, as the image is given them
+        wanted = self._users_for_the_image()
+        server = self._pass_through
+        namespace = server.cam_namespace if server is not None and server._in_cam_security() else None
+        if namespace is not None:
+            self.with_env("TM1_CAM_NAMESPACE", namespace.id)
+            self.with_env("TM1_CAM_NAMESPACE_TYPE", namespace.type)
+        else:
+            # Read on each start: a server taken out of CAM security since the last one answers
+            # plain names again
+            self.env.pop("TM1_CAM_NAMESPACE", None)
+            self.env.pop("TM1_CAM_NAMESPACE_TYPE", None)
+        if wanted:
+            self.with_env("TM1_USERS", ",".join(":".join([name, *groups]) for name, groups in wanted.items()))
+        else:
+            self.env.pop("TM1_USERS", None)
+
+    def _users_for_the_image(self) -> dict[str, list[str]]:
+        """The users as the image is given them, name to groups, refusing what couldn't work: a
+        server asked over plain HTTP that has TLS on, and a user Cognos doesn't have behind a
+        server in CAM security."""
         wanted = {name: list(groups) for name, groups in self._users.items()}
         server = self._pass_through
         if server is not None and server._uses_ssl():
@@ -609,10 +636,7 @@ class Tm1EngineContainer(GenericContainer):
             # Read now, not in with_pass_through: with_cam_security may have come after it. The
             # server answers a login with the user's CAMID, so the image makes the users under theirs
             cognos = server.cognos
-            namespace = server.cam_namespace
-            assert cognos is not None and namespace is not None
-            self.with_env("TM1_CAM_NAMESPACE", namespace.id)
-            self.with_env("TM1_CAM_NAMESPACE_TYPE", namespace.type)
+            assert cognos is not None
             # As Cognos spells it: the name goes into the CAMID
             wanted = {_cognos_user(cognos, name): list(groups) for name, groups in self._users.items()}
             # TM1 v12 learns no groups from Cognos: the server's administrators are made
@@ -621,8 +645,7 @@ class Tm1EngineContainer(GenericContainer):
                 groups = wanted.setdefault(_cognos_user(cognos, admin), [])
                 if all(group.lower() != "admin" for group in groups):
                     groups.append("ADMIN")
-        if wanted:
-            self.with_env("TM1_USERS", ",".join(":".join([name, *groups]) for name, groups in wanted.items()))
+        return wanted
 
     def container_is_started(self) -> None:
         """Called once the gateway answers: waits for the image to set TM1 up, and reads its version."""
@@ -1081,7 +1104,8 @@ class Tm1Login:
         cookies = (value.split(";", 1)[0].strip() for value in response.headers.get_list("set-cookie"))
         found = next((cookie for cookie in cookies if cookie.startswith("TM1SessionId=")), None)
         if response.status_code // 100 != 2 or found is None:
-            raise RuntimeError(f"TM1 refused the login of '{self._user}' to instance '{self._instance}' (HTTP {response.status_code}): {response.text}")
+            who = f"'{self._user}'" if self._user else "a pass-through header"
+            raise RuntimeError(f"TM1 refused the login of {who} to instance '{self._instance}' (HTTP {response.status_code}): {response.text}")
         return found
 
     def authorize(self, request: _Request) -> _Request:

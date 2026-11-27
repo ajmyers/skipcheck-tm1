@@ -131,6 +131,8 @@ class Tm1ServerContainer(GenericContainer):
         self._cam_admins: list[str] = []
         self._cam_namespace: Namespace | None = None
         self._admin_server: Tm1AdminServerContainer | None = None
+        # The engine that passes logins to this server: one, as they share a network
+        self._pass_through_for: Any = None
         self.with_exposed_ports(self.REST_PORT)
         self.with_env("TM1_SEED", Tm1Seed.EMPTY.value)
         # TM1 Server only exists for x86-64. On Apple Silicon this runs under Rosetta.
@@ -272,7 +274,7 @@ class Tm1ServerContainer(GenericContainer):
     def authorization(self) -> str:
         """The ``Authorization`` header to log in with: ``Basic``, or ``CAMNamespace`` in CAM
         security."""
-        if self._cognos is not None and self._cam_namespace is not None:
+        if self._in_cam_security() and self._cam_namespace is not None:
             from .cognos import CognosContainer
 
             return CognosContainer.cam_authorization_for(self._username, self._password, self._cam_namespace.id)
@@ -318,7 +320,10 @@ class Tm1ServerContainer(GenericContainer):
         admin = cognos.get_user(self._cam_admins[0])
         for name in self._cam_admins:
             cognos.get_user(name)
-        self.with_credentials(admin.name, admin.password)
+        if self._in_cam_security():
+            # A tm1s.cfg parameter may take the server out of CAM security again: it then keeps
+            # the login it has, its seed's
+            self.with_credentials(admin.name, admin.password)
         self.with_env("TM1_CAM_URI", cognos.network_url)
         if self._cam_namespace is Namespace.OIDC and cognos.keycloak is None:
             raise RuntimeError("CAM security through OIDC needs the Cognos to have with_keycloak")

@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -207,6 +209,11 @@ def test_passes_logins_to_a_tm1_server_on_its_network() -> None:
     with pytest.raises(RuntimeError, match="already passes logins to another TM1 server"):
         engine.with_pass_through(Tm1ServerContainer(TM1))
 
+    # A server checks logins for one engine: the two share a network, which holds one engine's
+    # datastore
+    with pytest.raises(RuntimeError, match="already checks logins for another engine"):
+        Tm1EngineContainer(SOURCE).with_pass_through(server)
+
     # Moved off the server's network, TM1 couldn't reach it
     with pytest.raises(RuntimeError, match="set the network before with_pass_through"):
         engine.with_network(Network.new_network())
@@ -218,6 +225,14 @@ def test_passes_logins_to_a_tm1_server_on_its_network() -> None:
     joining = Tm1EngineContainer(SOURCE).with_pass_through(placed)
     assert joining.network is network
     assert joining.datastore.network is network
+
+    # An engine taken off its network gets one of its own again, and the server joins it
+    off = Tm1EngineContainer(SOURCE).with_network(None)
+    joined = Tm1ServerContainer(TM1)
+    off.with_pass_through(joined)
+    assert off.network is not None
+    assert off.network is joined.network
+    assert off.network is off.datastore.network
 
 
 def test_takes_tokens_or_passes_logins_on_not_both() -> None:
@@ -272,6 +287,12 @@ def test_names_its_users_by_their_camids_behind_a_server_in_cam_security() -> No
     own.configure()
     assert "TM1_CAM_NAMESPACE" not in own.env_map
     assert own.env_map["TM1_USERS"] == "planner:Planners"
+    # Read on each start: a server taken out of CAM security since the last one answers plain
+    # names again, and the image isn't told a namespace any more
+    server.with_env("TM1_CFG_IntegratedSecurityMode", "1")
+    engine.configure()
+    assert "TM1_CAM_NAMESPACE" not in engine.env_map and "TM1_CAM_NAMESPACE_TYPE" not in engine.env_map
+    assert engine.env_map["TM1_USERS"] == "Analyst:Analysts"
     # Without Cognos nothing changes for the users
     plain = Tm1EngineContainer(SOURCE).with_user("planner").with_pass_through(Tm1ServerContainer(TM1))
     plain.configure()
@@ -285,6 +306,14 @@ def test_refuses_a_server_it_cant_ask_over_plain_http() -> None:
         engine = Tm1EngineContainer(SOURCE).with_pass_through(Tm1ServerContainer(TM1).with_env("TM1_CFG_usessl", on))
         with pytest.raises(RuntimeError, match="with UseSSL on"):
             engine.configure()
+        # Said before anything starts: the server would otherwise be waited for, in vain, ahead
+        # of the engine's own configuration
+        with pytest.raises(RuntimeError, match="with UseSSL on"):
+            engine.start()
+    # And so is a user Cognos doesn't have, before Cognos takes minutes to start
+    stranger = Tm1EngineContainer(SOURCE).with_user("planner").with_pass_through(Tm1ServerContainer(TM1).with_cam_security(cognos_with_users(), "admin"))
+    with pytest.raises(RuntimeError, match="planner isn't one of Cognos's test users"):
+        stranger.start()
     off = Tm1EngineContainer(SOURCE).with_pass_through(Tm1ServerContainer(TM1).with_env("TM1_CFG_UseSSL", " f "))
     off.configure()
 
@@ -338,6 +367,14 @@ def test_gives_a_pass_through_login_the_header_the_server_takes() -> None:
     assert passport.password == ""
     assert repr(passport) == "Tm1Login[a pass-through header in tm1]"
 
+    # A server that tm1s.cfg takes out of CAM security keeps its seed's login, as Basic, once it's
+    # configured too: the Cognos administrator's isn't one it would take
+    own_users = Tm1ServerContainer(TM1).with_seed(Tm1Seed.SDATA).with_cam_security(cognos_with_users(), "admin").with_env("TM1_CFG_IntegratedSecurityMode", "1")
+    behind = Tm1EngineContainer(SOURCE).with_pass_through(own_users).database("tm1")
+    own_users.configure()
+    assert own_users.authorization == "Basic YWRtaW46YXBwbGU="
+    assert behind.pass_through_login().authorization == "Basic YWRtaW46YXBwbGU="
+
     # A server in CAM security: CAMNamespace, for any of Cognos's users, whose passwords Cognos
     # has. Its own login is its first administrator's
     cam = Tm1EngineContainer(SOURCE).with_pass_through(Tm1ServerContainer(TM1).with_cam_security(cognos_with_users(), "viewer", "admin")).database("tm1")
@@ -359,23 +396,49 @@ def test_gives_a_pass_through_login_the_header_the_server_takes() -> None:
 
 
 def test_a_pass_through_login_gets_its_session_with_its_header(monkeypatch: pytest.MonkeyPatch) -> None:
-    import httpx2
+    # A stand-in for TM1: it gives a session for one header, and refuses the rest
+    asked: list[str] = []
 
-    sent: list[tuple[str, dict[str, str]]] = []
+    class Tm1(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            header = self.headers.get("Authorization")
+            asked.append(f"{self.path} {header}")
+            known = header == "Basic YWRtaW46YXBwbGU="
+            body = b'{"Name":"Admin"}' if known else b'{"error":{"message":"Authentication required"}}'
+            self.send_response(200 if known else 401)
+            if known:
+                self.send_header("Set-Cookie", "TM1SessionId=abc; Path=/; HttpOnly")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
-    def answer(url: str, **request: object) -> httpx2.Response:
-        sent.append((url, dict(request["headers"])))  # type: ignore[call-overload]
-        return httpx2.Response(200, headers={"Set-Cookie": "TM1SessionId=abc; Path=/; HttpOnly"})
+        def log_message(self, format: str, *args: object) -> None:
+            pass
 
-    monkeypatch.setattr(httpx2, "get", answer)
-    monkeypatch.setattr(Tm1EngineContainer, "url", "http://localhost:1/")
-    database = Tm1EngineContainer(SOURCE).with_pass_through(Tm1ServerContainer(TM1).with_seed(Tm1Seed.SDATA)).database("tm1")
-    login = database.pass_through_login()
-    # The header on a request of the database's, not a token and not the session endpoint
-    assert login.authorize({}) == {"Cookie": "TM1SessionId=abc"}
-    assert sent == [("http://localhost:1/tm1/api/v1/Databases('tm1')/ActiveUser?$select=Name", {"Authorization": login.authorization})]
-    # And the session is kept
-    assert login.cookie() == "TM1SessionId=abc" and len(sent) == 1
+    tm1 = ThreadingHTTPServer(("127.0.0.1", 0), Tm1)
+    threading.Thread(target=tm1.serve_forever, daemon=True).start()
+    try:
+        url = f"http://127.0.0.1:{tm1.server_address[1]}/"
+        monkeypatch.setattr(Tm1EngineContainer, "url", url)
+        engine = Tm1EngineContainer(SOURCE).with_pass_through(Tm1ServerContainer(TM1).with_seed(Tm1Seed.SDATA))
+        database = engine.database("tm1")
+        login = database.pass_through_login()
+        # The header on a request to the database, which TM1 answers with a session; kept, so
+        # asked for once
+        assert login.cookie() == "TM1SessionId=abc"
+        assert login.cookie() == "TM1SessionId=abc"
+        assert asked == ["/tm1/api/v1/Databases('tm1')/ActiveUser?$select=Name Basic YWRtaW46YXBwbGU="]
+        assert login.authorize({}) == {"Cookie": "TM1SessionId=abc"}
+        assert login.auth_url == url + "tm1/auth/v1/"
+        assert login.token_url == url + "tm1/auth/v1/token"
+        # A refusal says who was refused: by name, or a header that names nobody
+        with pytest.raises(RuntimeError, match=r"the login of 'admin'.*HTTP 401"):
+            database.pass_through_login("admin", "wrong").cookie()
+        with pytest.raises(RuntimeError, match=r"the login of a pass-through header.*HTTP 401"):
+            database.pass_through_login_with("CAMPassport expired").cookie()
+    finally:
+        tm1.shutdown()
+        tm1.server_close()
 
 
 def test_leaves_its_network_under_a_tm1_server_that_is_still_running() -> None:
