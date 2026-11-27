@@ -434,12 +434,20 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			throw new IllegalStateException("This TM1 server is already running, without the name the engine "
 					+ "reaches it by: give withPassThrough one that isn't started, and the engine starts it");
 		}
+		if (server.passThroughFor != null) {
+			// They'd share a network, where each engine's datastore answers to one name
+			throw new IllegalStateException("This TM1 server already checks logins for another engine: an "
+					+ "engine and the server it passes logins to share a network, which holds one engine");
+		}
 		if (server.getNetwork() != null) {
 			withNetwork(server.getNetwork());
 		}
 		else {
+			// One of its own again, if it was taken off it
+			joinNetwork();
 			server.withNetwork(getNetwork());
 		}
+		server.passThroughFor = this;
 		if (alias == null) {
 			server.withNetworkAliases(PASS_THROUGH_ALIAS);
 		}
@@ -807,6 +815,8 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		// Before anything starts: Testcontainers starts the datastore, which this depends
 		// on, ahead of configure()
 		joinNetwork();
+		// And before the TM1 server, and the Cognos behind it, take minutes to start
+		usersForTheImage();
 		try {
 			super.start();
 		}
@@ -849,7 +859,36 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	protected void configure() {
 		joinNetwork();
 		withEnv("TM1_DATABASES", String.join(",", configured()));
-		// name -> groups, as the image is given them
+		Map<String, List<String>> wanted = usersForTheImage();
+		Tm1ServerContainer server = passThrough;
+		if (server != null && server.inCamSecurity()) {
+			CognosContainer.Namespace namespace = Objects.requireNonNull(server.getCamNamespace(), "namespace");
+			withEnv("TM1_CAM_NAMESPACE", namespace.id());
+			withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
+		}
+		else {
+			// Read on each start: a server taken out of CAM security since the last one
+			// answers plain names again
+			getEnvMap().remove("TM1_CAM_NAMESPACE");
+			getEnvMap().remove("TM1_CAM_NAMESPACE_TYPE");
+		}
+		if (wanted.isEmpty()) {
+			getEnvMap().remove("TM1_USERS");
+		}
+		else {
+			List<String> listed = new ArrayList<>();
+			wanted
+				.forEach((name, groups) -> listed.add(groups.isEmpty() ? name : name + ":" + String.join(":", groups)));
+			withEnv("TM1_USERS", String.join(",", listed));
+		}
+	}
+
+	/**
+	 * The users as the image is given them, name to groups, refusing what couldn't work:
+	 * a server asked over plain HTTP that has TLS on, and a user Cognos doesn't have
+	 * behind a server in CAM security.
+	 */
+	private Map<String, List<String>> usersForTheImage() {
 		Map<String, List<String>> wanted = new LinkedHashMap<>(users);
 		Tm1ServerContainer server = passThrough;
 		if (server != null && server.usesSsl()) {
@@ -861,9 +900,6 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			// The server answers a login with the user's CAMID, so the image makes the
 			// users under theirs
 			CognosContainer cognos = Objects.requireNonNull(server.getCognos(), "cognos");
-			CognosContainer.Namespace namespace = Objects.requireNonNull(server.getCamNamespace(), "namespace");
-			withEnv("TM1_CAM_NAMESPACE", namespace.id());
-			withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
 			wanted = new LinkedHashMap<>();
 			for (Map.Entry<String, List<String>> user : users.entrySet()) {
 				// As Cognos spells it: the name goes into the CAMID
@@ -878,12 +914,7 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 				}
 			}
 		}
-		if (!wanted.isEmpty()) {
-			List<String> listed = new ArrayList<>();
-			wanted
-				.forEach((name, groups) -> listed.add(groups.isEmpty() ? name : name + ":" + String.join(":", groups)));
-			withEnv("TM1_USERS", String.join(",", listed));
-		}
+		return wanted;
 	}
 
 	/** A Cognos test user's name as Cognos has it, whatever its case here. */

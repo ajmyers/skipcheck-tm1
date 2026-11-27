@@ -7,10 +7,14 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpRequest;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 
+import com.sun.net.httpserver.HttpServer;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Wiring only: nothing here starts a container. */
@@ -238,6 +243,11 @@ class Tm1EngineWiringTest {
 		assertThatIllegalStateException().isThrownBy(() -> engine.withPassThrough(new Tm1ServerContainer(TM1)))
 			.withMessageContaining("already passes logins to another TM1 server");
 
+		// A server checks logins for one engine: the two share a network, which holds one
+		// engine's datastore
+		assertThatIllegalStateException().isThrownBy(() -> new Tm1EngineContainer(SOURCE).withPassThrough(server))
+			.withMessageContaining("already checks logins for another engine");
+
 		// Moved off the server's network, TM1 couldn't reach it
 		assertThatIllegalStateException().isThrownBy(() -> engine.withNetwork(Network.newNetwork()))
 			.withMessageContaining("set the network before withPassThrough");
@@ -249,6 +259,16 @@ class Tm1EngineWiringTest {
 		var placed = new Tm1ServerContainer(TM1).withNetwork(network);
 		var joining = new Tm1EngineContainer(SOURCE).withPassThrough(placed);
 		assertThat(joining.getNetwork()).isSameAs(network).isSameAs(joining.getDatastore().getNetwork());
+
+		// An engine taken off its network gets one of its own again, and the server joins
+		// it
+		var off = new Tm1EngineContainer(SOURCE);
+		off.setNetwork(null);
+		var joined = new Tm1ServerContainer(TM1);
+		off.withPassThrough(joined);
+		assertThat(off.getNetwork()).isNotNull()
+			.isSameAs(joined.getNetwork())
+			.isSameAs(off.getDatastore().getNetwork());
 	}
 
 	@Test
@@ -304,6 +324,13 @@ class Tm1EngineWiringTest {
 		own.configure();
 		assertThat(own.getEnvMap()).doesNotContainKey("TM1_CAM_NAMESPACE")
 			.containsEntry("TM1_USERS", "planner:Planners");
+		// Read on each start: a server taken out of CAM security since the last one
+		// answers
+		// plain names again, and the image isn't told a namespace any more
+		server.withEnv("TM1_CFG_IntegratedSecurityMode", "1");
+		engine.configure();
+		assertThat(engine.getEnvMap()).doesNotContainKeys("TM1_CAM_NAMESPACE", "TM1_CAM_NAMESPACE_TYPE")
+			.containsEntry("TM1_USERS", "Analyst:Analysts");
 		// Without Cognos nothing changes for the users
 		var plain = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1));
 		plain.configure();
@@ -317,7 +344,16 @@ class Tm1EngineWiringTest {
 			var engine = new Tm1EngineContainer(SOURCE)
 				.withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_usessl", on));
 			assertThatIllegalStateException().isThrownBy(engine::configure).withMessageContaining("with UseSSL on");
+			// Said before anything starts: the server would otherwise be waited for, in
+			// vain,
+			// ahead of the engine's own configuration
+			assertThatIllegalStateException().isThrownBy(engine::start).withMessageContaining("with UseSSL on");
 		}
+		// And so is a user Cognos doesn't have, before Cognos takes minutes to start
+		var stranger = new Tm1EngineContainer(SOURCE).withUser("planner")
+			.withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin"));
+		assertThatIllegalStateException().isThrownBy(stranger::start)
+			.withMessageContaining("planner isn't one of Cognos's test users");
 		var off = new Tm1EngineContainer(SOURCE)
 			.withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_UseSSL", " f "));
 		off.configure();
@@ -371,6 +407,17 @@ class Tm1EngineWiringTest {
 		assertThat(passport.getPassword()).isEmpty();
 		assertThat(passport).hasToString("Tm1Login[a pass-through header in tm1]");
 
+		// A server that tm1s.cfg takes out of CAM security keeps its seed's login, as
+		// Basic,
+		// once it's configured too: the Cognos administrator's isn't one it would take
+		var ownUsers = new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA)
+			.withCamSecurity(cognos(), "admin")
+			.withEnv("TM1_CFG_IntegratedSecurityMode", "1");
+		var behind = new Tm1EngineContainer(SOURCE).withPassThrough(ownUsers).database("tm1");
+		ownUsers.configure();
+		assertThat(ownUsers.getAuthorization()).isEqualTo("Basic YWRtaW46YXBwbGU=");
+		assertThat(behind.passThroughLogin().getAuthorization()).isEqualTo("Basic YWRtaW46YXBwbGU=");
+
 		// A server in CAM security: CAMNamespace, for any of Cognos's users, whose
 		// passwords Cognos has. Its own login is its first administrator's
 		var cam = new Tm1EngineContainer(SOURCE)
@@ -394,6 +441,60 @@ class Tm1EngineWiringTest {
 		assertThatIllegalStateException()
 			.isThrownBy(() -> oauth2.database("tm1").oauth2Login("admin").getAuthorization())
 			.withMessageContaining("Only a pass-through login is a header of its own");
+	}
+
+	@Test
+	void aPassThroughLoginGetsItsSessionWithItsHeader() throws IOException {
+		// A stand-in for TM1: it gives a session for one header, and refuses the rest
+		List<String> asked = new ArrayList<>();
+		HttpServer tm1 = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+		tm1.createContext("/", exchange -> {
+			String header = exchange.getRequestHeaders().getFirst("Authorization");
+			asked.add(exchange.getRequestURI() + " " + header);
+			boolean known = "Basic YWRtaW46YXBwbGU=".equals(header);
+			if (known) {
+				exchange.getResponseHeaders().add("Set-Cookie", "TM1SessionId=abc; Path=/; HttpOnly");
+			}
+			byte[] body = (known ? "{\"Name\":\"Admin\"}" : "{\"error\":{\"message\":\"Authentication required\"}}")
+				.getBytes(StandardCharsets.UTF_8);
+			exchange.sendResponseHeaders(known ? 200 : 401, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
+		tm1.start();
+		try {
+			String url = "http://" + tm1.getAddress().getAddress().getHostAddress() + ":" + tm1.getAddress().getPort()
+					+ "/";
+			var engine = new Tm1EngineContainer(SOURCE) {
+				@Override
+				public String getUrl() {
+					return url;
+				}
+			}.withPassThrough(new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA));
+			Tm1Database database = engine.database("tm1");
+			Tm1Login login = database.passThroughLogin();
+			// The header on a request to the database, which TM1 answers with a session;
+			// kept, so asked for once
+			assertThat(login.cookie()).isEqualTo("TM1SessionId=abc");
+			assertThat(login.cookie()).isEqualTo("TM1SessionId=abc");
+			assertThat(asked)
+				.containsExactly("/tm1/api/v1/Databases('tm1')/ActiveUser?$select=Name Basic YWRtaW46YXBwbGU=");
+			assertThat(login.authorize(HttpRequest.newBuilder(URI.create(url))).build().headers().allValues("Cookie"))
+				.containsExactly("TM1SessionId=abc");
+			assertThat(login.getAuthUrl()).isEqualTo(url + "tm1/auth/v1/");
+			assertThat(login.getTokenUrl()).isEqualTo(url + "tm1/auth/v1/token");
+			// A refusal says who was refused: by name, or a header that names nobody
+			assertThatIllegalStateException().isThrownBy(() -> database.passThroughLogin("admin", "wrong").cookie())
+				.withMessageContaining("the login of 'admin'")
+				.withMessageContaining("HTTP 401");
+			assertThatIllegalStateException()
+				.isThrownBy(() -> database.passThroughLoginWith("CAMPassport expired").cookie())
+				.withMessageContaining("the login of a pass-through header")
+				.withMessageContaining("HTTP 401");
+		}
+		finally {
+			tm1.stop(0);
+		}
 	}
 
 	@Test

@@ -49,11 +49,16 @@ class Tm1EnginePassThroughTest {
 
 	@AfterAll
 	static void stop() {
-		if (engine != null) {
-			engine.stop();
+		try {
+			if (engine != null) {
+				engine.stop();
+			}
 		}
-		if (server != null) {
-			server.stop();
+		finally {
+			// Whatever stopping the engine did
+			if (server != null) {
+				server.stop();
+			}
 		}
 	}
 

@@ -379,6 +379,9 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		return null;
 	}
 
+	// The engine that passes logins to this server: one, as they share a network
+	@Nullable Tm1EngineContainer passThroughFor;
+
 	/** The Cognos test users made TM1 administrators by {@link #withCamSecurity}. */
 	List<String> getCamAdmins() {
 		return camAdmins;
@@ -391,7 +394,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 * @return the header value
 	 */
 	public String getAuthorization() {
-		if (cognos != null) {
+		if (inCamSecurity()) {
 			return CognosContainer.camAuthorization(username, password, camNamespace.id());
 		}
 		return "Basic "
@@ -463,7 +466,11 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		for (String name : camAdmins) {
 			cognos.getUser(name);
 		}
-		withCredentials(admin.name(), admin.password());
+		if (inCamSecurity()) {
+			// A tm1s.cfg parameter may take the server out of CAM security again: it then
+			// keeps the login it has, its seed's
+			withCredentials(admin.name(), admin.password());
+		}
 		withEnv("TM1_CAM_URI", cognos.getNetworkUrl());
 		if (camNamespace == CognosContainer.Namespace.OIDC && cognos.getKeycloak() == null) {
 			throw new IllegalStateException("CAM security through OIDC needs the Cognos to have withKeycloak");

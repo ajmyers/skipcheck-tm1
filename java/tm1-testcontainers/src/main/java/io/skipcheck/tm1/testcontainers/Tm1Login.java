@@ -307,7 +307,8 @@ public final class Tm1Login {
 			.findFirst()
 			.orElse(null);
 		if (response.statusCode() / 100 != 2 || found == null) {
-			throw new IllegalStateException("TM1 refused the login of '" + user + "' to instance '" + instance
+			throw new IllegalStateException("TM1 refused the login of "
+					+ (user.isEmpty() ? "a pass-through header" : "'" + user + "'") + " to instance '" + instance
 					+ "' (HTTP " + response.statusCode() + "): " + response.body());
 		}
 		return found;
