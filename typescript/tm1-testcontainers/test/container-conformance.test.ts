@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect } from "vitest";
 import { type GenericContainer, PlanningAnalyticsEnvironment } from "../src/index.js";
-import { requiresCognos, requiresTm1, requiresTm1Engine, requiresTm1Web } from "../src/vitest.js";
+import { RequiresTm1, RequiresTm1Engine, requiresCognos, requiresTm1, requiresTm1Engine, requiresTm1Web } from "../src/vitest.js";
 import { Repo } from "./support/files.js";
 
 /** Java's ContainerConformanceTest: starts each scenario of testcontainers-conformance/scenarios, a
@@ -34,6 +34,20 @@ describe("The containers Docker is asked for", () => {
   requiresTm1Engine("engine with OAuth2", { timeout: 30 * 60_000 }, async () => {
     await record("engine-oauth2");
   });
+
+  // As Java's @RequiresTm1 with @RequiresTm1Engine
+  requiresTm1Engine("engine with pass-through", { timeout: 30 * 60_000 }, async ({ skip }) => {
+    const why = await RequiresTm1.skipReason();
+    if (why !== undefined) skip(why);
+    await record("engine-passthrough");
+  });
+
+  // As Java's @RequiresCognos with @RequiresTm1Engine
+  requiresCognos("engine with pass-through to CAM security", { timeout: 45 * 60_000 }, async ({ skip }) => {
+    const why = await RequiresTm1Engine.skipReason();
+    if (why !== undefined) skip(why);
+    await record("engine-passthrough-cam");
+  });
 });
 
 async function record(scenario: string): Promise<void> {
@@ -50,6 +64,11 @@ async function record(scenario: string): Promise<void> {
     containers.set("tm1Engine", env.tm1Engine());
     containers.set("tm1EngineDatastore", env.tm1Engine().getDatastore());
     containers.set("keycloak", env.keycloak());
+  }
+  if (scenario === "engine-passthrough" || scenario === "engine-passthrough-cam") {
+    containers.set("tm1Engine", env.tm1Engine());
+    containers.set("tm1EngineDatastore", env.tm1Engine().getDatastore());
+    if (scenario === "engine-passthrough-cam") containers.set("cognos", env.cognos());
   }
   if (scenario === "engine") {
     containers.set("tm1Engine", env.tm1Engine());

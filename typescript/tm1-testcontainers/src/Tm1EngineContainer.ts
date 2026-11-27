@@ -2,6 +2,7 @@
 
 import { setTimeout as sleep } from "node:timers/promises";
 import { Tm1Version } from "@skipcheck/tm1-client";
+import { CognosContainer } from "./CognosContainer.js";
 import { GenericContainer } from "./GenericContainer.js";
 import { KeycloakContainer } from "./KeycloakContainer.js";
 import { Messages } from "./messages.js";
@@ -21,6 +22,11 @@ const CREATE_TIMEOUT = 330;
 const REQUEST_TIMEOUT = 30_000;
 const OTHER_NETWORK =
   "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
+
+const SERVER_OTHER_NETWORK =
+  "The engine passes logins to a TM1 server on another network, which TM1 couldn't reach from this one: set the network before withPassThrough, or give the server the same";
+const ONE_WAY =
+  "TM1 takes tokens or passes logins on, not both: with both set it takes tokens and refuses a name and password. Use withOAuth2 or withPassThrough";
 
 // The image's own rule: at least three characters, and nothing the commands or a URL would need
 // quoting for
@@ -131,6 +137,10 @@ export class Tm1EngineContainer extends GenericContainer {
   /** The client of that realm a test asks for tokens as, and the audience its tokens carry. */
   static readonly OAUTH2_CLIENT = "tm1";
 
+  /** The name a TM1 server has on the engine's network when logins are passed to it
+   * ({@link withPassThrough}). */
+  static readonly PASS_THROUGH_ALIAS = "tm1-passthrough";
+
   readonly #source: Tm1EngineSource;
   readonly #datastore: GenericContainer;
   // instance/database, in the order they were added
@@ -139,6 +149,9 @@ export class Tm1EngineContainer extends GenericContainer {
   // The users who can log in through OAuth 2.0, and what with
   readonly #passwords = new Map<string, string>();
   #keycloak: KeycloakContainer | undefined;
+  // The TM1 server logins are passed to, and its name on the network
+  #passThrough: Tm1ServerContainer | undefined;
+  #passThroughAlias: string = Tm1EngineContainer.PASS_THROUGH_ALIAS;
   #credentials: Credentials | undefined;
   #version: Tm1Version | undefined;
 
@@ -198,6 +211,10 @@ export class Tm1EngineContainer extends GenericContainer {
       // The Keycloak is the caller's, and may serve others: it isn't moved from here
       throw new IllegalStateException(OTHER_NETWORK);
     }
+    if (this.#passThrough !== undefined && this.#passThrough.getNetwork() !== network) {
+      // The server is the caller's, and may be in an environment: it isn't moved
+      throw new IllegalStateException(SERVER_OTHER_NETWORK);
+    }
     super.withNetwork(network);
     // At once, not when the engine starts: whatever starts the engine may start what it depends
     // on first, and the datastore must be here by then
@@ -238,11 +255,12 @@ export class Tm1EngineContainer extends GenericContainer {
    * joins. It's yours to stop: the engine only starts it first. Give it one that isn't started,
    * and that no other engine uses: the same one again changes nothing, and another is refused.
    * @throws IllegalStateException for a Keycloak that's running, or another engine's, or a second
-   * one for this engine
+   * one for this engine, or with {@link withPassThrough}
    * @param keycloak the Keycloak to take tokens from */
   withOAuth2(keycloak: KeycloakContainer): this {
     if (!(keycloak instanceof KeycloakContainer)) throw new TypeError("keycloak must be a KeycloakContainer");
     if (this.#keycloak === keycloak) return this;
+    if (this.#passThrough !== undefined) throw new IllegalStateException(ONE_WAY);
     if (this.#keycloak !== undefined) {
       throw new IllegalStateException(
         "The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one",
@@ -271,6 +289,57 @@ export class Tm1EngineContainer extends GenericContainer {
     this.withEnv("TM1_OAUTH2_AUDIENCE", Tm1EngineContainer.OAUTH2_CLIENT);
     this.withEnv("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
     return this;
+  }
+
+  /** Passes logins on to a TM1 11 server ("pass-through"): TM1 v12 asks it who a login is, so
+   * that server's users log in here with what they have there. A test logs in with
+   * {@link Tm1Database.passThroughLogin}. Logins through the engine's application
+   * ({@link Tm1Database.login}) keep working beside it.
+   *
+   * - A user has to be in the database too: add each with {@link withUser}. `admin` always is.
+   * - **A server in Cognos (CAM) security** ({@link Tm1ServerContainer.withCamSecurity}) answers a
+   *   login with the user's CAMID. The engine's users are then Cognos's test users, each made
+   *   under its CAMID, and the server's administrators are administrators here too. TM1 v12 learns
+   *   no groups from Cognos: a user has the groups {@link withUser} gives.
+   * - Not together with {@link withOAuth2}: with both, TM1 takes tokens and refuses the rest.
+   *
+   * The server joins the engine's network, unless it has one already, which the engine and its
+   * datastore then join. Starting the engine starts the server first. Give it one that isn't
+   * started: it gets the name the engine reaches it by, {@link PASS_THROUGH_ALIAS}, so one network
+   * holds one such server.
+   * @throws IllegalStateException for a server that's running, a second server for this engine, or
+   * with {@link withOAuth2}
+   * @param server the TM1 server that checks logins */
+  withPassThrough(server: Tm1ServerContainer): this;
+  /** As {@link withPassThrough}, to a server that has a name on the network already: an
+   * environment's.
+   * @internal */
+  withPassThrough(server: Tm1ServerContainer, alias: string | undefined): this;
+  withPassThrough(server: Tm1ServerContainer, alias?: string): this {
+    if (!(server instanceof Tm1ServerContainer)) throw new TypeError("server must be a Tm1ServerContainer");
+    if (this.#passThrough === server) return this;
+    if (this.#passThrough !== undefined) throw new IllegalStateException("The engine already passes logins to another TM1 server");
+    if (this.#keycloak !== undefined) throw new IllegalStateException(ONE_WAY);
+    if (server.isRunning()) {
+      // A name on the network is given when a container is created
+      throw new IllegalStateException(
+        "This TM1 server is already running, without the name the engine reaches it by: give withPassThrough one that isn't started, and the engine starts it",
+      );
+    }
+    if (server.getNetwork() !== undefined) this.withNetwork(server.getNetwork());
+    else server.withNetwork(this.getNetwork());
+    if (alias === undefined) server.withNetworkAliases(Tm1EngineContainer.PASS_THROUGH_ALIAS);
+    this.#passThrough = server;
+    this.#passThroughAlias = alias ?? Tm1EngineContainer.PASS_THROUGH_ALIAS;
+    this.dependsOn(server);
+    // The image's defaults are a TM1 11 server's: the address is all it takes
+    this.withEnv("TM1_PASSTHROUGH_URL", "http://" + this.#passThroughAlias + ":" + Tm1ServerContainer.REST_PORT + "/api/v1/");
+    return this;
+  }
+
+  /** The TM1 server logins are passed to, or `undefined` without {@link withPassThrough}. */
+  getPassThrough(): Tm1ServerContainer | undefined {
+    return this.#passThrough;
   }
 
   /** Gives a user a password to log in with through OAuth 2.0 ({@link withOAuth2}). TM1 v12 keeps
@@ -397,6 +466,16 @@ export class Tm1EngineContainer extends GenericContainer {
    * shows a secret once, so an application made elsewhere is listed without.
    * @internal */
   login(instance: string, user: string): Tm1Login {
+    if (this.passesToCam() && String(user).toLowerCase() !== "admin" && !String(user).startsWith("CAMID(")) {
+      // TM1 would make a session for the name and refuse it everywhere (403)
+      throw new IllegalArgumentException(
+        user +
+          " isn't a user of this engine by that name: it passes logins to a TM1 server in CAM security, so its users are Cognos's, each under its CAMID. " +
+          'Log in with passThroughLogin("' +
+          user +
+          '"), or name the CAMID',
+      );
+    }
     for (const found of this.#read().instances ?? []) {
       if (found.name !== instance) continue;
       for (const application of found.applications ?? []) {
@@ -406,6 +485,67 @@ export class Tm1EngineContainer extends GenericContainer {
       }
     }
     throw new IllegalStateException("The instance " + instance + " has no application to log in through");
+  }
+
+  /** A pass-through login: the header the TM1 server takes, for a user it knows.
+   * @internal
+   * @param user the user's name there, or `undefined` for the server's own login
+   * @param password the password, or `undefined` for the one the containers know */
+  passThroughLogin(database: Tm1Database, user: string | undefined, password: string | undefined): Tm1Login {
+    const server = this.#passThroughServer();
+    const cognos = server.getCognos();
+    // The server's own login: in CAM security its first administrator, which the server itself
+    // only takes for its own once it's configured
+    let name = user ?? (server.inCamSecurity() ? server.getCamAdmins()[0]! : server.getUsername());
+    let known = password;
+    if (known === undefined && server.inCamSecurity()) {
+      // Cognos has every test user's password
+      const asked = name;
+      const found = cognos!.getUsers().find((candidate) => candidate.name.toLowerCase() === asked.toLowerCase());
+      if (found === undefined) {
+        throw new IllegalArgumentException(
+          asked +
+            " isn't one of Cognos's test users, whose passwords the containers know: add it with CognosContainer.withUser, or give a password with passThroughLogin(user, password)",
+        );
+      }
+      name = found.name;
+      known = found.password;
+    } else if (known === undefined) {
+      if (name.toLowerCase() !== server.getUsername().toLowerCase()) {
+        throw new IllegalArgumentException(
+          "Only the TM1 server's own login (" +
+            server.getUsername() +
+            ") has a password the containers know: give this user's with passThroughLogin(user, password)",
+        );
+      }
+      // As the server spells it
+      name = server.getUsername();
+      known = server.getPassword();
+    }
+    const authorization = server.inCamSecurity()
+      ? CognosContainer.camAuthorization(name, known, server.getCamNamespace()!.id())
+      : "Basic " + Buffer.from(name + ":" + known, "utf8").toString("base64");
+    return Tm1Login.passThrough(name, { database, password: known, authorization });
+  }
+
+  /** A pass-through login with a header of the caller's own, such as a CAM passport.
+   * @internal */
+  passThroughLoginWith(database: Tm1Database, authorization: string): Tm1Login {
+    this.#passThroughServer();
+    if (typeof authorization !== "string") throw new TypeError("authorization must be a string");
+    return Tm1Login.passThrough("", { database, password: "", authorization });
+  }
+
+  #passThroughServer(): Tm1ServerContainer {
+    const server = this.#passThrough;
+    if (server === undefined) throw new IllegalStateException("This engine passes no logins on: give it a TM1 server with withPassThrough");
+    return server;
+  }
+
+  /** Whether logins are passed to a server in CAM security, whose users are Cognos's.
+   * @internal */
+  passesToCam(): boolean {
+    return this.#passThrough !== undefined && this.#passThrough.inCamSecurity();
   }
 
   /** A login through OAuth 2.0, as a user given a password with withLogin.
@@ -500,8 +640,35 @@ export class Tm1EngineContainer extends GenericContainer {
   override configure(): void {
     this.#joinNetwork();
     this.withEnv("TM1_DATABASES", this.configured().join(","));
-    if (this.#users.size > 0) {
-      this.withEnv("TM1_USERS", [...this.#users].map(([name, groups]) => [name, ...groups].join(":")).join(","));
+    // name -> groups, as the image is given them
+    let wanted = new Map<string, string[]>(this.#users);
+    const server = this.#passThrough;
+    if (server?.usesSsl()) {
+      throw new IllegalStateException(
+        "The engine passes logins to a TM1 server with UseSSL on, and asks it over plain HTTP: take TM1_CFG_UseSSL off that server",
+      );
+    }
+    if (server?.inCamSecurity()) {
+      // Read now, not in withPassThrough: withCamSecurity may have come after it. The server
+      // answers a login with the user's CAMID, so the image makes the users under theirs
+      const cognos = server.getCognos()!;
+      const namespace = server.getCamNamespace()!;
+      this.withEnv("TM1_CAM_NAMESPACE", namespace.id());
+      this.withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
+      wanted = new Map();
+      // As Cognos spells it: the name goes into the CAMID
+      for (const [name, groups] of this.#users) wanted.set(cognosUser(cognos, name), [...groups]);
+      // TM1 v12 learns no groups from Cognos: the server's administrators are made administrators
+      // here, after the users listed
+      for (const admin of server.getCamAdmins()) {
+        const name = cognosUser(cognos, admin);
+        let groups = wanted.get(name);
+        if (groups === undefined) wanted.set(name, (groups = []));
+        if (!groups.some((group) => group.toLowerCase() === "admin")) groups.push("ADMIN");
+      }
+    }
+    if (wanted.size > 0) {
+      this.withEnv("TM1_USERS", [...wanted].map(([name, groups]) => [name, ...groups].join(":")).join(","));
     }
   }
 
@@ -562,6 +729,7 @@ export class Tm1EngineContainer extends GenericContainer {
     this.#datastore.withNetwork(this.getNetwork());
     // Moved since withOAuth2: TM1 couldn't reach its issuer
     if (this.#keycloak !== undefined && this.#keycloak.getNetwork() !== this.getNetwork()) throw new IllegalStateException(OTHER_NETWORK);
+    if (this.#passThrough !== undefined && this.#passThrough.getNetwork() !== this.getNetwork()) throw new IllegalStateException(SERVER_OTHER_NETWORK);
   }
 
   /** Runs the image's tm1-engine command, and returns what it printed. */
@@ -643,6 +811,15 @@ export class Tm1EngineContainer extends GenericContainer {
       ? source.image
       : Tm1ServerContainer.imageFor(Tm1EngineContainer.ENGINE_IMAGE, Tm1EngineContainer.DEFAULT_IMAGE);
   }
+}
+
+/** A Cognos test user's name as Cognos has it, whatever its case here. */
+function cognosUser(cognos: CognosContainer, name: string): string {
+  for (const user of cognos.getUsers()) if (user.name.toLowerCase() === name.toLowerCase()) return user.name;
+  throw new IllegalStateException(
+    name +
+      " isn't one of Cognos's test users. The engine passes logins to a TM1 server in CAM security, which logs in Cognos's users only: add the user with CognosContainer.withUser, or take it off the engine",
+  );
 }
 
 /** `instance/name`, each checked against the image's rule for its name. */

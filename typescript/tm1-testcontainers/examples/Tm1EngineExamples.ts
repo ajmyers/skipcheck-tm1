@@ -2,7 +2,7 @@
 
 // Examples for requiresTm1Engine (Java's @RequiresTm1Engine) and Tm1EngineContainer, quoted in their
 // documentation: type-checked but never run.
-import { KeycloakContainer, Tm1EngineContainer, type Tm1EngineSource } from "@skipcheck/tm1-testcontainers";
+import { KeycloakContainer, Tm1EngineContainer, type Tm1EngineSource, Tm1Seed, Tm1ServerContainer, type Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { requiresTm1Engine } from "@skipcheck/tm1-testcontainers/vitest";
 import { expect } from "vitest";
 
@@ -33,6 +33,20 @@ export async function oauth2(source: Tm1EngineSource): Promise<void> {
   const db = engine.database("tm1");
   // A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
   const request = await db.oauth2Login("analyst").authorizeWithToken();
+  const response = await fetch(db.getRestUrl() + "Cubes?$select=Name", request);
+  // @end
+  expect(response.status).toBe(200);
+}
+
+export async function passThrough(source: Tm1EngineSource, tm1: Tm1Source): Promise<void> {
+  // @start region = pass-through
+  // Starting the engine starts the TM1 11 server first; the server is yours to stop
+  await using server = new Tm1ServerContainer(tm1).withSeed(Tm1Seed.SDATA);
+  await using engine = new Tm1EngineContainer(source).withPassThrough(server);
+  await engine.start();
+  const db = engine.database("tm1");
+  // The sample database's admin / apple, which TM1 v12 asks the server about
+  const request = await db.passThroughLogin().authorize();
   const response = await fetch(db.getRestUrl() + "Cubes?$select=Name", request);
   // @end
   expect(response.status).toBe(200);

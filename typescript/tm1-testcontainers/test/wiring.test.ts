@@ -700,6 +700,76 @@ describe("PlanningAnalyticsEnvironment", () => {
     expect(() => off.tm1Database("tm1").oauth2Login("analyst")).toThrow("give it a Keycloak with withOAuth2");
   });
 
+  it("an engine passes logins to one of the environment's servers", () => {
+    const env = engineBuilder()
+      .tm1("first")
+      .tm1("legacy", (server) => server.withSeed(Tm1Seed.SDATA))
+      .tm1Engine((engine) => engine.withUser("analyst"))
+      .tm1EnginePassThrough("legacy")
+      .build();
+    const engine = env.tm1Engine();
+    // The server named, not the first, by the name it has on the network already
+    expect(engine.getPassThrough()).toBe(env.tm1("legacy"));
+    expect(engine.getEnvMap().get("TM1_PASSTHROUGH_URL")).toBe("http://legacy:8010/api/v1/");
+    expect(env.tm1("legacy").getNetworkAliases()).toContain("legacy");
+    expect(env.tm1("legacy").getNetworkAliases()).not.toContain(Tm1EngineContainer.PASS_THROUGH_ALIAS);
+    expect(engine.getDependencies()).toContain(env.tm1("legacy"));
+    expect(engine.getDependencies()).not.toContain(env.tm1("first"));
+    expect(env.tm1Database("tm1").passThroughLogin().getPassword()).toBe("apple");
+
+    // With CAM security the engine's users are Cognos's, and the servers' administrators its own
+    const cam = engineBuilder()
+      .tm1("legacy")
+      .cognos((cognos) => cognos.withUser("admin", "adminpw").withUser("analyst", "analystpw"))
+      .tm1Engine((e) => e.withUser("analyst", "Analysts"))
+      .tm1EnginePassThrough("legacy")
+      .build();
+    cam.tm1Engine().configure();
+    expect(cam.tm1Engine().getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("LDAP");
+    expect(cam.tm1Engine().getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts,admin:ADMIN");
+    expect(cam.tm1Database("tm1").passThroughLogin("analyst").getAuthorization()).toBe(cam.cognos().camAuthorization("analyst"));
+
+    const unknown = (): unknown => engineBuilder().tm1("legacy").tm1Engine().tm1EnginePassThrough("other").build();
+    expect(unknown).toThrow(IllegalStateException);
+    expect(unknown).toThrow("other, which isn't a TM1 server of the environment: add it with tm1(name). Those there: [legacy]");
+    const both = (): unknown => engineBuilder().tm1("legacy").tm1Engine().tm1EngineOAuth2().tm1EnginePassThrough("legacy").build();
+    expect(both).toThrow(IllegalStateException);
+    expect(both).toThrow("TM1 takes tokens or passes logins on, not both");
+    const alone = (): unknown => builder().tm1("legacy").tm1EnginePassThrough("legacy").build();
+    expect(alone).toThrow(IllegalStateException);
+    expect(alone).toThrow("Pass-through logins are a TM1 v12 engine's: add tm1Engine() too");
+  });
+
+  it("from config passes logins to the server named", () => {
+    const env = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough.yaml")).build();
+    const engine = env.tm1Engine();
+    expect(engine.getPassThrough()).toBe(env.tm1("legacy"));
+    engine.configure();
+    expect(engine.getEnvMap().get("TM1_PASSTHROUGH_URL")).toBe("http://legacy:8010/api/v1/");
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts");
+    expect(engine.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
+
+    // passthrough: false is off
+    const off = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-off.yaml")).build();
+    expect(off.tm1Engine().getPassThrough()).toBeUndefined();
+    expect(off.tm1Engine().getEnvMap().has("TM1_PASSTHROUGH_URL")).toBe(false);
+
+    // With cognos the engine's users are Cognos's, as Cognos spells them, and the TM1 servers'
+    // administrators are the engine's too
+    const cam = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-cam.yaml")).build();
+    cam.tm1Engine().configure();
+    expect(cam.tm1Engine().getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("LDAP");
+    expect(cam.tm1Engine().getEnvMap().get("TM1_CAM_NAMESPACE_TYPE")).toBe("ldap");
+    expect(cam.tm1Engine().getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts,admin:Ops:ADMIN,viewer:ADMIN");
+
+    // A server whose cfg takes it out of CAM security has users of its own
+    const own = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-own-users.yaml")).build();
+    own.tm1Engine().configure();
+    expect(own.tm1Engine().getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
+    expect(own.tm1Engine().getEnvMap().get("TM1_USERS")).toBe("planner:Planners");
+    expect(own.tm1Database("tm1").passThroughLogin().getAuthorization()).toMatch(/^Basic /);
+  });
+
   it("an environment with an engine can't be reused", () => {
     // Whatever the developer's switch says: the same code must do the same everywhere
     for (const enabled of [true, false]) {
@@ -1046,6 +1116,179 @@ describe("Tm1Engine wiring", () => {
     const stray = new Tm1EngineContainer(SOURCE).withLogin("nobody", "pw");
     expect(() => stray.realm()).toThrow(IllegalStateException);
     expect(() => stray.realm()).toThrow("nobody has a password (withLogin) but isn't a user of the engine: add them with withUser");
+  });
+
+  const TM1 = new Tm1Source.PrivateImage("tm1-server:test");
+  const cognos = (): CognosContainer =>
+    new CognosContainer(new CognosSource.PrivateImage("cognos-server:test"))
+      .withUser("admin", "adminpw", "Admins")
+      .withUser("analyst", "analystpw", "Analysts")
+      .withUser("viewer", "viewerpw", "Viewers");
+
+  it("passes logins to a TM1 server on its network", () => {
+    const server = new Tm1ServerContainer(TM1);
+    const engine = new Tm1EngineContainer(SOURCE).withPassThrough(server);
+    // The server's REST API by the name it gets on the network; the image's defaults are a TM1 11
+    // server's, so the address is all it takes
+    expect(engine.getEnvMap().get("TM1_PASSTHROUGH_URL")).toBe("http://tm1-passthrough:8010/api/v1/");
+    expect([...engine.getEnvMap().keys()].filter((name) => name.startsWith("TM1_PASSTHROUGH_"))).toHaveLength(1);
+    expect(Tm1EngineContainer.PASS_THROUGH_ALIAS).toBe("tm1-passthrough");
+    expect(server.getNetworkAliases()).toContain(Tm1EngineContainer.PASS_THROUGH_ALIAS);
+    expect(server.getNetwork()).toBeInstanceOf(Network);
+    expect(server.getNetwork()).toBe(engine.getNetwork());
+    expect(server.getNetwork()).toBe(engine.getDatastore().getNetwork());
+    expect(engine.getDependencies()).toContain(server);
+    expect(engine.getDependencies()).toContain(engine.getDatastore());
+    expect(engine.getPassThrough()).toBe(server);
+    expect(new Tm1EngineContainer(SOURCE).getPassThrough()).toBeUndefined();
+    // The same server again is nothing new; another is refused
+    expect(engine.withPassThrough(server)).toBe(engine);
+    expect(() => engine.withPassThrough(new Tm1ServerContainer(TM1))).toThrow(IllegalStateException);
+    expect(() => engine.withPassThrough(new Tm1ServerContainer(TM1))).toThrow("already passes logins to another TM1 server");
+
+    // Moved off the server's network, TM1 couldn't reach it
+    expect(() => engine.withNetwork(Network.newNetwork())).toThrow(IllegalStateException);
+    expect(() => engine.withNetwork(Network.newNetwork())).toThrow("set the network before withPassThrough");
+    expect(engine.withNetwork(server.getNetwork())).toBe(engine);
+
+    // A server that has a network already (Cognos's, say) is joined there, the datastore too
+    const network = Network.newNetwork();
+    const placed = new Tm1ServerContainer(TM1).withNetwork(network);
+    const joining = new Tm1EngineContainer(SOURCE).withPassThrough(placed);
+    expect(joining.getNetwork()).toBe(network);
+    expect(joining.getDatastore().getNetwork()).toBe(network);
+  });
+
+  it("takes tokens or passes logins on, not both", () => {
+    // With both set TM1 takes tokens and refuses a name and password: half would be dead
+    const tokens = new Tm1EngineContainer(SOURCE).withOAuth2(new KeycloakContainer());
+    expect(() => tokens.withPassThrough(new Tm1ServerContainer(TM1))).toThrow(IllegalStateException);
+    expect(() => tokens.withPassThrough(new Tm1ServerContainer(TM1))).toThrow("TM1 takes tokens or passes logins on, not both");
+    const passing = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1));
+    expect(() => passing.withOAuth2(new KeycloakContainer())).toThrow(IllegalStateException);
+    expect(() => passing.withOAuth2(new KeycloakContainer())).toThrow("TM1 takes tokens or passes logins on, not both");
+  });
+
+  it("names its users by their CAMIDs behind a server in CAM security", () => {
+    const users = cognos();
+    const server = new Tm1ServerContainer(TM1);
+    const engine = new Tm1EngineContainer(SOURCE).withUser("Analyst", "Analysts").withPassThrough(server);
+    // After withPassThrough: what the server is in is read when the engine starts
+    server.withCamSecurity(users, "viewer", "admin");
+    engine.configure();
+    // The server answers a login with the user's CAMID, so the image is told the namespace and
+    // makes the users under theirs. Listed users first, as Cognos spells them; then the server's
+    // administrators, who are administrators here too
+    expect(engine.getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("LDAP");
+    expect(engine.getEnvMap().get("TM1_CAM_NAMESPACE_TYPE")).toBe("ldap");
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("analyst:Analysts,viewer:ADMIN,admin:ADMIN");
+    expect(engine.getNetwork()).toBe(users.getNetwork());
+
+    // An administrator who is listed keeps its groups, and gets ADMIN once
+    const listed = new Tm1EngineContainer(SOURCE)
+      .withUser("admin", "Ops", "admin")
+      .withUser("viewer", "Readers")
+      .withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), CognosContainer.Namespace.OIDC, "viewer", "admin"));
+    listed.configure();
+    expect(listed.getEnvMap().get("TM1_CAM_NAMESPACE")).toBe("OIDC");
+    expect(listed.getEnvMap().get("TM1_CAM_NAMESPACE_TYPE")).toBe("oidc");
+    expect(listed.getEnvMap().get("TM1_USERS")).toBe("admin:Ops:admin,viewer:Readers:ADMIN");
+
+    // Only Cognos's users log in to a server in CAM security
+    const stranger = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin"));
+    expect(() => stranger.configure()).toThrow(IllegalStateException);
+    expect(() => stranger.configure()).toThrow("planner isn't one of Cognos's test users");
+
+    // A server whose tm1s.cfg takes it out of CAM security has users of its own: the image applies
+    // those parameters last, whatever the case of their names
+    const own = new Tm1EngineContainer(SOURCE)
+      .withUser("planner", "Planners")
+      .withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin").withEnv("TM1_CFG_integratedsecuritymode", "1"));
+    own.configure();
+    expect(own.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
+    expect(own.getEnvMap().get("TM1_USERS")).toBe("planner:Planners");
+    // Without Cognos nothing changes for the users
+    const plain = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1));
+    plain.configure();
+    expect(plain.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
+    expect(plain.getEnvMap().get("TM1_USERS")).toBe("planner");
+  });
+
+  it("refuses a server it can't ask over plain HTTP", () => {
+    // The engine asks over plain HTTP, and trusts no certificate of the server's
+    for (const on of ["T", "true"]) {
+      const engine = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_usessl", on));
+      expect(() => engine.configure()).toThrow(IllegalStateException);
+      expect(() => engine.configure()).toThrow("with UseSSL on");
+    }
+    const off = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_UseSSL", " f "));
+    off.configure();
+    // A server that's running can't be given its name on the network any more
+    const running = new (class extends Tm1ServerContainer {
+      override isRunning(): boolean {
+        return true;
+      }
+    })(TM1);
+    expect(() => new Tm1EngineContainer(SOURCE).withPassThrough(running)).toThrow(IllegalStateException);
+    expect(() => new Tm1EngineContainer(SOURCE).withPassThrough(running)).toThrow("give withPassThrough one that isn't started");
+  });
+
+  it("gives a pass-through login the header the server takes", async () => {
+    const none = new Tm1EngineContainer(SOURCE).database("tm1");
+    expect(() => none.passThroughLogin()).toThrow(IllegalStateException);
+    expect(() => none.passThroughLogin()).toThrow("give it a TM1 server with withPassThrough");
+    expect(() => none.passThroughLoginWith("Basic eA==")).toThrow(IllegalStateException);
+
+    // A server with users of its own: Basic, with its own login's password
+    const server = new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA);
+    const database = new Tm1EngineContainer(SOURCE).withPassThrough(server).database("tm1");
+    const own = database.passThroughLogin();
+    expect(own.isPassThrough()).toBe(true);
+    expect(own.isOAuth2()).toBe(false);
+    expect(own.getUser()).toBe("admin");
+    expect(own.getPassword()).toBe("apple");
+    expect(own.getAuthorization()).toBe(server.getAuthorization());
+    expect(own.getAuthorization()).toMatch(/^Basic /);
+    expect(own.getInstance()).toBe("tm1");
+    expect(own.getClientId()).toBe("");
+    expect(own.getClientSecret()).toBe("");
+    expect(String(own)).toBe("Tm1Login[admin in tm1]");
+    expect(database.passThroughLogin("ADMIN").getAuthorization()).toBe(own.getAuthorization());
+    // Another user's password is the test's to give
+    expect(() => database.passThroughLogin("planner")).toThrow(IllegalArgumentException);
+    expect(() => database.passThroughLogin("planner")).toThrow("passThroughLogin(user, password)");
+    expect(database.passThroughLogin("planner", "p:w").getAuthorization()).toBe("Basic cGxhbm5lcjpwOnc=");
+    // It has no token and no session endpoint: the header is the login
+    await expect(own.token()).rejects.toThrow(IllegalStateException);
+    await expect(own.token()).rejects.toThrow("has no token");
+    await expect(own.session("Basic eA==")).rejects.toThrow(IllegalStateException);
+    await expect(own.session("Basic eA==")).rejects.toThrow("has no session to ask for");
+    await expect(own.authorizeWithToken()).rejects.toThrow(IllegalStateException);
+    await expect(own.authorizeWithToken()).rejects.toThrow("has no token");
+    // A header of the caller's own, a CAM passport say, names nobody
+    const passport = database.passThroughLoginWith("CAMPassport abc");
+    expect(passport.getAuthorization()).toBe("CAMPassport abc");
+    expect(passport.getUser()).toBe("");
+    expect(passport.getPassword()).toBe("");
+    expect(String(passport)).toBe("Tm1Login[a pass-through header in tm1]");
+
+    // A server in CAM security: CAMNamespace, for any of Cognos's users, whose passwords Cognos
+    // has. Its own login is its first administrator's
+    const cam = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "viewer", "admin")).database("tm1");
+    expect(cam.passThroughLogin().getUser()).toBe("viewer");
+    expect(cam.passThroughLogin().getAuthorization()).toBe(CognosContainer.camAuthorization("viewer", "viewerpw", "LDAP"));
+    expect(cam.passThroughLogin("ANALYST").getUser()).toBe("analyst");
+    expect(cam.passThroughLogin("analyst").getPassword()).toBe("analystpw");
+    expect(cam.passThroughLogin("analyst", "other").getAuthorization()).toBe(CognosContainer.camAuthorization("analyst", "other", "LDAP"));
+    expect(() => cam.passThroughLogin("nobody")).toThrow(IllegalArgumentException);
+    // Its users are Cognos's, under their CAMIDs: a login through the application by a short name
+    // would be refused everywhere, so it says what to do
+    expect(() => cam.login("analyst")).toThrow(IllegalArgumentException);
+    expect(() => cam.login("analyst")).toThrow('Log in with passThroughLogin("analyst")');
+    // A login that isn't pass-through is no header
+    const oauth2 = new Tm1EngineContainer(SOURCE).withLogin("admin", "pw").withOAuth2(new KeycloakContainer());
+    expect(() => oauth2.database("tm1").oauth2Login("admin").getAuthorization()).toThrow(IllegalStateException);
+    expect(() => oauth2.database("tm1").oauth2Login("admin").getAuthorization()).toThrow("Only a pass-through login is a header of its own");
   });
 
   it("its datastore is on its network before anything starts", () => {

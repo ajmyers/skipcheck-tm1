@@ -50,6 +50,8 @@ interface Engine {
   users: EngineUser[];
   /** Whether it takes OAuth 2.0 logins. */
   oauth2: boolean;
+  /** The TM1 server it passes logins to, by its name; `undefined` when it passes none on. */
+  passThrough: string | undefined;
 }
 
 interface EngineUser {
@@ -232,8 +234,9 @@ class PaEnvironmentFile {
     let enginePort: number | undefined;
     let datastorePort: number | undefined;
     let engineKeycloakPort: number | undefined;
+    let enginePassThrough: string | undefined;
     if (engineSection !== undefined) {
-      this.keys(engineSection, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine");
+      this.keys(engineSection, ["port", "databases", "users", "datastore", "oauth2", "passthrough"], "tm1Engine");
       const databases = new Map<string, string>();
       const raw = engineSection.get("databases");
       if (raw == null) {
@@ -262,7 +265,9 @@ class PaEnvironmentFile {
       // or false to keep the passwords with OAuth 2.0 off
       const passwordUsed = engineSection.get("oauth2") != null;
       // Every user is checked before any is found twice, as in pa_setup
-      const engineUsers = (listed as unknown[]).map((u, n) => this.engineUser(u, "tm1Engine.users[" + n + "]", passwordUsed));
+      // With pass-through a password is the TM1 server's to know, not this file's
+      const passwordElsewhere = engineSection.get("passthrough") != null && engineSection.get("passthrough") !== false;
+      const engineUsers = (listed as unknown[]).map((u, n) => this.engineUser(u, "tm1Engine.users[" + n + "]", passwordUsed, passwordElsewhere));
       if (new Set(engineUsers.map((u) => u.name.toLowerCase())).size !== engineUsers.length) throw this.error("tm1Engine.users: a user is listed twice");
       const datastore = engineSection.get("datastore");
       const ds = datastore == null || typeof datastore === "boolean" ? new Map<unknown, unknown>() : this.keys(datastore, ["port"], "tm1Engine.datastore");
@@ -275,6 +280,50 @@ class PaEnvironmentFile {
         }
         engineKeycloakPort = this.port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181);
       }
+      const passthrough = engineSection.get("passthrough");
+      // Off when absent or false; on, it names the TM1 server that checks logins
+      if (passthrough != null && passthrough !== false) {
+        if (passthrough === true) {
+          throw this.error("tm1Engine.passthrough: name the TM1 server that checks names and passwords, e.g. passthrough: {server: legacy}");
+        }
+        const p = this.keys(passthrough, ["server"], "tm1Engine.passthrough");
+        const wanted = p.get("server");
+        const named = typeof wanted === "string" ? servers.get(wanted) : undefined;
+        if (typeof wanted !== "string" || named === undefined) {
+          throw this.error(
+            "tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there" +
+              (servers.size === 0 ? "" : " (" + [...servers.keys()].join(", ") + ")"),
+          );
+        }
+        if (engineKeycloakPort !== undefined) {
+          throw this.error("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and refuse a name and password");
+        }
+        // Whatever its case: the server's image matches a tm1s.cfg parameter's name in any
+        const useSsl = cfgParameter(named.cfg, "UseSSL", "F").trim().toLowerCase();
+        if (useSsl !== "f" && useSsl !== "false") {
+          throw this.error(
+            "tm1Engine.passthrough.server: " + wanted + " has cfg.UseSSL on, and the engine asks it over plain HTTP: take UseSSL out of that server's cfg",
+          );
+        }
+        // With cognos a TM1 server is in CAM security, unless its cfg says another mode: the image
+        // applies cfg last
+        const mode = cfgParameter(named.cfg, "IntegratedSecurityMode", "5").trim();
+        if (cam !== undefined && (mode === "4" || mode === "5")) {
+          // Only Cognos's users log in to a TM1 server in CAM security
+          const known = cam.users.map((u) => u.name.toLowerCase());
+          const strangers = engineUsers.filter((u) => !known.includes(u.name.toLowerCase())).map((u) => u.name);
+          if (strangers.length > 0) {
+            throw this.error(
+              "tm1Engine.users: " +
+                strangers.join(", ") +
+                " isn't in cognos.users. With cognos, " +
+                wanted +
+                " is in CAM security, and passthrough logs in Cognos's users only: add the name to cognos.users, or take it out of tm1Engine.users",
+            );
+          }
+        }
+        enginePassThrough = wanted;
+      }
       enginePort = this.port(engineSection.get("port"), "tm1Engine", 4444);
       // Published only when a port is given
       datastorePort = ds.get("port") == null ? undefined : this.port(ds.get("port"), "tm1Engine.datastore", 27017);
@@ -286,7 +335,7 @@ class PaEnvironmentFile {
           throw this.error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
         }
       }
-      engine = { databases, users: engineUsers, oauth2: engineKeycloakPort !== undefined };
+      engine = { databases, users: engineUsers, oauth2: engineKeycloakPort !== undefined, passThrough: enginePassThrough };
     }
 
     if (servers.size === 0 && cam === undefined && engine === undefined) throw this.error("nothing to run: add tm1.servers, tm1Engine and/or cognos");
@@ -339,6 +388,7 @@ class PaEnvironmentFile {
     });
     if (engine !== undefined) b.tm1Engine();
     if (engine?.oauth2) b.tm1EngineOAuth2();
+    if (engine?.passThrough !== undefined) b.tm1EnginePassThrough(engine.passThrough);
     return b;
   }
 
@@ -411,7 +461,7 @@ class PaEnvironmentFile {
 
   /** pa_setup.parse_user with password_optional: an engine's user, whose password may be left out
    * or empty, since TM1 v12 keeps none. */
-  engineUser(entry: unknown, where: string, passwordUsed: boolean): EngineUser {
+  engineUser(entry: unknown, where: string, passwordUsed: boolean, passwordElsewhere: boolean): EngineUser {
     let name: unknown;
     let password: unknown;
     const groups: unknown[] = [];
@@ -419,10 +469,10 @@ class PaEnvironmentFile {
       const parts = entry.split(":");
       if (parts.length === 2 && parts[1] !== "" && !passwordUsed) {
         // The image's own form has groups there; here the second part is a password
-        throw this.error(
-          `${where}: '${entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write ${parts[0]}::${parts[1]}. ` +
-            "(A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)",
-        );
+        const hint = passwordElsewhere
+          ? "With passthrough the password is the one the user has on the TM1 server, and isn't written here: write " + parts[0] + "."
+          : "A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.";
+        throw this.error(`${where}: '${entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write ${parts[0]}::${parts[1]}. (${hint})`);
       }
       if (parts.length > 3) throw this.error(`${where}: expected user, user::group,group or user:password:group,group, not '${entry}'`);
       name = parts[0]!;
@@ -488,6 +538,12 @@ function configure(
   }
   if (paw) b.paw((p) => p.acceptLicense());
   return b.withFileSources(sources);
+}
+
+/** A tm1s.cfg parameter of a server's cfg, whatever the case of its name. */
+function cfgParameter(cfg: Map<string, string>, parameter: string, otherwise: string): string {
+  for (const [name, value] of cfg) if (name.toLowerCase() === parameter.toLowerCase()) return value;
+  return otherwise;
 }
 
 function image(images: Map<unknown, unknown>, key: string): string | undefined {

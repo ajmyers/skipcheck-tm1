@@ -189,6 +189,31 @@ export class Tm1ServerContainer extends GenericContainer {
     return this.#cognos === undefined ? undefined : this.#camNamespace;
   }
 
+  /** Whether the server ends up in CAM security: set with {@link withCamSecurity}, unless a
+   * `tm1s.cfg` parameter given as `TM1_CFG_IntegratedSecurityMode` says another mode than 4 or 5.
+   * The image applies those last, and takes a parameter's name in any case.
+   * @internal */
+  inCamSecurity(): boolean {
+    if (this.#cognos === undefined) return false;
+    const mode = this.#cfg("IntegratedSecurityMode");
+    return mode === undefined || mode.trim() === "4" || mode.trim() === "5";
+  }
+
+  /** Whether a `tm1s.cfg` parameter given as `TM1_CFG_UseSSL` turns TLS on.
+   * @internal */
+  usesSsl(): boolean {
+    const ssl = this.#cfg("UseSSL");
+    return ssl !== undefined && ssl.trim().toLowerCase() !== "f" && ssl.trim().toLowerCase() !== "false";
+  }
+
+  /** A tm1s.cfg parameter given in the environment, whatever the case of its name. */
+  #cfg(parameter: string): string | undefined {
+    for (const [name, value] of this.getEnvMap()) {
+      if (name.toLowerCase() === ("TM1_CFG_" + parameter).toLowerCase()) return value;
+    }
+    return undefined;
+  }
+
   /** The Cognos test users made TM1 administrators by {@link withCamSecurity}.
    * @internal */
   getCamAdmins(): readonly string[] {

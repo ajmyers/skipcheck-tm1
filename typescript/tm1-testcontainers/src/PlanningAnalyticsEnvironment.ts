@@ -225,6 +225,12 @@ export class PlanningAnalyticsEnvironment implements Startable {
         if (this.#keycloak === undefined) throw new IllegalStateException("OAuth 2.0 logins need the environment's Keycloak");
         this.#tm1Engine.withOAuth2(this.#keycloak);
       }
+      if (parts.tm1EnginePassThrough !== undefined) {
+        // By the name the server has on the network already
+        const server = servers.get(parts.tm1EnginePassThrough);
+        if (server === undefined) throw new IllegalStateException("Pass-through logins need one of the environment's TM1 servers");
+        this.#tm1Engine.withPassThrough(server, parts.tm1EnginePassThrough);
+      }
       // What the file said first; then, below, what the caller says
       apply(parts.fileTm1Engine, this.#tm1Engine);
     }
@@ -268,7 +274,9 @@ export class PlanningAnalyticsEnvironment implements Startable {
    *   {@link Tm1EngineContainer.withUser}. `oauth2` is
    *   {@link PlanningAnalyticsEnvironment.Builder.tm1EngineOAuth2}, and a user's password is then
    *   their {@link Tm1EngineContainer.withLogin} at Keycloak; without it the password is checked
-   *   and not used, as TM1 v12 keeps none. It runs beside `tm1`, or alone;
+   *   and not used, as TM1 v12 keeps none. `passthrough` is
+   *   {@link PlanningAnalyticsEnvironment.Builder.tm1EnginePassThrough} to the server it names; with
+   *   `cognos` the users are then Cognos's. It runs beside `tm1`, or alone;
    * - `ibm`: each part's source, the folder as {@link Tm1Source.Bundle}, {@link Tm1WebSource.Bundle},
    *   {@link Tm1EngineSource.Bundle} and {@link CognosSource.Zip}. A relative path is from the file's folder; `~` is the user's
    *   home;
@@ -496,6 +504,8 @@ export interface BuilderParts {
   tm1EngineImage?: string;
   /** Whether the engine takes OAuth 2.0 logins, with tokens from the environment's Keycloak. */
   tm1EngineOAuth2?: boolean;
+  /** The TM1 server the engine passes logins to, by its name, if it passes them on. */
+  tm1EnginePassThrough?: string;
   /** The file's own settings for the engine, kept when the caller adds theirs. */
   fileTm1Engine?: Customizer<Tm1EngineContainer>;
 }
@@ -615,6 +625,17 @@ export namespace PlanningAnalyticsEnvironment {
       return this;
     }
 
+    /** Has the TM1 v12 engine pass logins on to one of the environment's TM1 servers
+     * ({@link Tm1EngineContainer.withPassThrough}): that server's users log in to TM1 v12 with what
+     * they have there. With {@link camSecurity} they are Cognos's users. Log in with
+     * {@link Tm1Database.passThroughLogin}. Not together with {@link tm1EngineOAuth2}.
+     * @param server the name of a server added with {@link tm1} */
+    tm1EnginePassThrough(server: string): this {
+      if (typeof server !== "string") throw new TypeError("server must be a string");
+      this.#parts.tm1EnginePassThrough = server;
+      return this;
+    }
+
     /** Where the engine gets TM1 v12 from, rather than {@link Tm1EngineSource.discover}. */
     tm1EngineSource(source: Tm1EngineSource): this {
       if (!(source instanceof Tm1EngineSource)) throw new TypeError("source must be a Tm1EngineSource");
@@ -693,6 +714,15 @@ export namespace PlanningAnalyticsEnvironment {
         );
       }
       if (p.tm1EngineOAuth2 && p.tm1Engine === undefined) throw new IllegalStateException("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
+      if (p.tm1EnginePassThrough !== undefined) {
+        if (p.tm1Engine === undefined) throw new IllegalStateException("Pass-through logins are a TM1 v12 engine's: add tm1Engine() too");
+        if (!p.tm1.has(p.tm1EnginePassThrough)) {
+          throw new IllegalStateException(
+            `The engine passes logins to ${p.tm1EnginePassThrough}, which isn't a TM1 server of the environment: add it with tm1(name). Those there: [${[...p.tm1.keys()].join(", ")}]`,
+          );
+        }
+        if (p.tm1EngineOAuth2) throw new IllegalStateException("TM1 takes tokens or passes logins on, not both: use tm1EngineOAuth2 or tm1EnginePassThrough");
+      }
       if (p.camNamespace === CognosContainer.Namespace.OIDC && p.keycloak === undefined)
         throw new IllegalStateException("CAM security through OIDC needs keycloak()");
       return new PlanningAnalyticsEnvironment(p, reuseEnabled);

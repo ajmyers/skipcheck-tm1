@@ -4,7 +4,16 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { inspect } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { IllegalStateException, KeycloakContainer, type Tm1Database, Tm1EngineContainer, Tm1EngineSource, Tm1Login } from "../src/index.js";
+import {
+  IllegalStateException,
+  KeycloakContainer,
+  type Tm1Database,
+  Tm1EngineContainer,
+  Tm1EngineSource,
+  Tm1Login,
+  Tm1ServerContainer,
+  Tm1Source,
+} from "../src/index.js";
 
 interface Asked {
   method: string | undefined;
@@ -244,6 +253,72 @@ describe("Tm1Login", () => {
       expect(analyst.getPassword()).toBe("an$pw&more");
       expect(String(analyst)).toBe("Tm1Login[analyst in tm1]");
       expect(inspect(analyst, { depth: 6 })).not.toContain("an$pw");
+    });
+  });
+
+  /** A pass-through login, as an engine with a TM1 server behind it gives one: the server stands in
+   * for TM1 (a database's REST API), which the header is sent to. */
+  describe("with a pass-through header", () => {
+    const passThroughLogin = (): Tm1Login => {
+      const root = url.replace("tm1/auth/v1/", "");
+      const engine = new (class extends Tm1EngineContainer {
+        override getUrl(): string {
+          return root;
+        }
+      })(new Tm1EngineSource.PrivateImage("tm1-engine:test")).withPassThrough(
+        new Tm1ServerContainer(new Tm1Source.PrivateImage("tm1-server:test")).withCredentials("analyst", "an$pw&more"),
+      );
+      return engine.database("tm1").passThroughLogin();
+    };
+    const basic = "Basic " + Buffer.from("analyst:an$pw&more").toString("base64");
+
+    it("keeps the session TM1 gives the header's first request", async () => {
+      asked.length = 0;
+      answer = { status: 200, headers: { "Set-Cookie": "TM1SessionId=pass123; Path=/tm1; HttpOnly" }, body: '{"Name":"analyst"}' };
+      const analyst = passThroughLogin();
+      expect(analyst.getAuthorization()).toBe(basic);
+      expect(analyst.getAuthUrl()).toBe(url);
+      expect(analyst.getTokenUrl()).toBe(url + "token");
+      expect(await analyst.cookie()).toBe("TM1SessionId=pass123");
+      expect(await analyst.cookie()).toBe("TM1SessionId=pass123");
+      expect(new Headers((await analyst.authorize()).headers).get("Cookie")).toBe("TM1SessionId=pass123");
+      // One request with the header, at the database's REST API: not at TM1's session endpoint
+      expect(asked.map((a) => [a.method, a.path, a.authorization])).toEqual([["GET", "/tm1/api/v1/Databases('tm1')/ActiveUser?$select=Name", basic]]);
+    });
+
+    it("says what TM1 answered when the server behind it refuses, and asks again", async () => {
+      answer = { status: 401, headers: {}, body: "no such user" };
+      const analyst = passThroughLogin();
+      await expect(analyst.cookie()).rejects.toThrow(IllegalStateException);
+      await expect(analyst.cookie()).rejects.toThrow("TM1 refused the login of 'analyst' to instance 'tm1' (HTTP 401): no such user");
+      // A refused login isn't kept
+      answer = { status: 200, headers: { "Set-Cookie": "TM1SessionId=pass123" }, body: "{}" };
+      expect(await analyst.cookie()).toBe("TM1SessionId=pass123");
+    });
+
+    it("has no token and no session endpoint, and asks nothing to say so", async () => {
+      asked.length = 0;
+      const analyst = passThroughLogin();
+      await expect(analyst.token()).rejects.toThrow(
+        "A pass-through login has no token: it's the header TM1 passes on (getAuthorization), or the session that gives (authorize, cookie)",
+      );
+      await expect(analyst.authorizeWithToken()).rejects.toThrow("A pass-through login has no token");
+      await expect(analyst.session(basic)).rejects.toThrow(
+        "A pass-through login has no session to ask for: TM1 takes its header on any request (getAuthorization), and cookie() keeps the session that gives",
+      );
+      expect(asked).toEqual([]);
+      // The other kinds are no header of their own
+      expect(login().isPassThrough()).toBe(false);
+      expect(() => login().getAuthorization()).toThrow(
+        "Only a pass-through login is a header of its own: this one logs in through the application (getClientId, getClientSecret and getUser)",
+      );
+    });
+
+    it("never prints the header or the password", () => {
+      const analyst = passThroughLogin();
+      expect(String(analyst)).toBe("Tm1Login[analyst in tm1]");
+      expect(inspect(analyst, { depth: 6 })).not.toContain("an$pw");
+      expect(inspect(analyst, { depth: 6 })).not.toContain(basic);
     });
   });
 });
