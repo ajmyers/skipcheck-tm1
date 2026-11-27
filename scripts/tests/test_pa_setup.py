@@ -21,12 +21,19 @@ SETUP = REPO / "docker" / "pa-setup"
 @pytest.fixture
 def docker(tmp_path: Path) -> Path:
     """A folder to put first on the path, whose docker writes its arguments, one a line, to
-    docker.log beside it. "docker info" fails if a file named down is there."""
+    docker.log beside it. "docker info" fails if a file named down is there, and says the
+    containers are Windows's if one named windows is. A pull is written to pulls.log."""
     folder = tmp_path / "bin"
     folder.mkdir()
     fake = folder / "docker"
     fake.write_text(
-        '#!/bin/sh\nhere=$(dirname "$0")\nif [ "$1" = info ]; then [ ! -f "$here/down" ]; exit $?; fi\nprintf \'%s\\n\' "$@" > "$here/docker.log"\n',
+        '#!/bin/sh\nhere=$(dirname "$0")\n'
+        'if [ "$1" = info ]; then\n'
+        '  [ ! -f "$here/down" ] || exit 1\n'
+        '  if [ "${2:-}" = --format ]; then if [ -f "$here/windows" ]; then echo windows; else echo linux; fi; fi\n'
+        "  exit 0\nfi\n"
+        'if [ "$1" = pull ]; then echo "$*" >> "$here/pulls.log"; exit 0; fi\n'
+        'printf \'%s\\n\' "$@" > "$here/docker.log"\n',
         encoding="utf-8",
     )
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
@@ -134,6 +141,57 @@ def test_says_so_when_docker_isnt_running(
     result = run([*setup, "up"], tmp_path, environment(docker))
     assert result.returncode == 1 and "Docker isn't running" in result.stderr
     assert not (docker / "docker.log").exists()
+
+
+@pytest.mark.skipif(
+    shutil.which("pwsh") is None and not os.environ.get("CI"),
+    reason="PowerShell isn't installed",
+)
+def test_setup_ps1_says_so_when_docker_runs_windows_containers(
+    docker: Path, tmp_path: Path
+) -> None:
+    (docker / "windows").touch()
+    setup = ["pwsh", "-NoProfile", "-File", str(SETUP / "setup.ps1")]
+    result = run([*setup, "up"], tmp_path, environment(docker))
+    assert (
+        result.returncode == 1
+        and "Docker is running Windows containers" in result.stderr
+    )
+    assert not (docker / "docker.log").exists()
+
+
+@pytest.mark.parametrize("setup", SHELLS)
+def test_fetches_the_setup_tools_image_where_an_environment_starts(
+    setup: list[str], docker: Path, tmp_path: Path
+) -> None:
+    # A copy from an earlier day wouldn't know what the script may ask of it. Not on every
+    # command: up, urls and the rest use what's here
+    pulls = docker / "pulls.log"
+    for arguments_given in (["up"], ["urls"], ["down"]):
+        assert (
+            run([*setup, *arguments_given], tmp_path, environment(docker)).returncode
+            == 0
+        )
+    assert not pulls.exists()
+    for arguments_given in ([], ["--bundle", "x"], ["init"], ["pull"]):
+        assert (
+            run([*setup, *arguments_given], tmp_path, environment(docker)).returncode
+            == 0
+        )
+    assert (
+        pulls.read_text(encoding="utf-8").splitlines()
+        == ["pull -q ghcr.io/ajmyers/pa-setup:edge"] * 4
+    )
+    # And the options are handed on as they are
+    assert (
+        run(
+            [*setup, "--bundle", "a b.tar.gz", "--no-start"],
+            tmp_path,
+            environment(docker),
+        ).returncode
+        == 0
+    )
+    assert arguments(docker)[-3:] == ["--bundle", "a b.tar.gz", "--no-start"]
 
 
 def test_setup_sh_says_so_when_docker_isnt_installed(tmp_path: Path) -> None:

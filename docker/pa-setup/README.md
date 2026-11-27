@@ -10,8 +10,18 @@ it, waits until everything is healthy, and prints every address and login.
 > licensed IBM downloads, and you are responsible for complying with your IBM license
 > terms.
 
+**One TM1 server, from your IBM download:** say where TM1 comes from, and it's set up and
+started in the current folder. With no option, at a terminal, you're asked.
+
 ```sh
 mkdir pa && cd pa
+curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-<version>-linuxi38664h_bundle.tar.gz
+```
+
+**Anything more** (several servers, TM1 Web, PAW, Cognos, a TM1 v12 engine): write the
+file, edit it, and start it.
+
+```sh
 curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- init    # writes pa-environment.yaml
 # edit it: point ibm at your downloads, choose the parts
 curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- up
@@ -20,6 +30,7 @@ curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- up
 Windows (PowerShell):
 
 ```powershell
+& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) --bundle $HOME\Downloads\tm1server-<version>-linuxi38664h_bundle.tar.gz
 & ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) init
 & ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) up
 ```
@@ -35,7 +46,9 @@ the first release.
 
 | Command | What it does |
 |---|---|
-| `init` | Writes a starting `pa-environment.yaml` |
+| (none) | Starts what the file says, as `up`. **With no file**, starts from nothing: one TM1 server from where you say TM1 comes from (below), or from your answers at a terminal. |
+| `init` | Writes a starting `pa-environment.yaml` and starts nothing. With the options below, the file for them; with none, at a terminal, it asks; otherwise a file with every part to uncomment. |
+| `pull` | Fetches the current images of everything the file runs. `up` uses whatever image of a tag is already on the machine, and the default tag, `edge`, is rebuilt on every change. |
 | `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed (PAW isn't: run `down` before taking `paw` out). |
 | `urls` | Prints every service's address and login |
 | `status` | Lists the containers and their health |
@@ -46,6 +59,36 @@ the first release.
 | `session [database [user]]` | With an engine: logs in and prints the session cookie, for `curl -b`. Default: the file's first database, as `admin`. |
 | `token [user]` | With `tm1Engine.oauth2`: prints an access token for a user, for `curl -H "Authorization: Bearer ..."`. Default: the first user with a password. |
 | `database create <name>`, `database drop <name>` | With an engine: creates a database (about 13 s, with the file's users) or deletes one. `instance/name` for another instance than `tm1`. A database the file names isn't dropped: `up` would make it again, so take it out of the file first. |
+
+### Starting from nothing
+
+Where TM1 comes from, for a new `pa-environment.yaml` with one TM1 server. Pick one:
+
+| Option | |
+|---|---|
+| `--bundle FILE` | Your IBM download: `tm1server-<version>-linuxi38664h_bundle.tar.gz`, the Linux one, even on Mac or Windows (Planning Analytics 2.1.2 to 2.1.7: `tm1_linuxi38664h_<version>_ml.tar.gz`). Its folder becomes `ibm`, and this file is the one installed, whatever else the folder holds. With TM1 v12's package, `tm1-v<version>-standalone-linux.tgz`, you get a TM1 v12 engine in place of the TM1 server. |
+| `--ibm DIR` | The folder holding your IBM downloads, when there are several: the newest TM1 bundle in it is installed |
+| `--url URL` | A link to the TM1 bundle, e.g. a pre-signed S3, R2, GCS or Azure link. It goes in `.env`. `--sha256 HASH` checks the download. |
+| `--tm1-home DIR` | An installed `tm1_64` folder on this computer (the one containing `bin64`). It goes in `.env` as `TM1_HOME_DIR`. |
+| `--image IMAGE` | The `tm1-server` image, e.g. a private one with TM1 built in |
+
+| And | |
+|---|---|
+| `--samples` | Also run IBM's SData sample server, on port 8011 |
+| `--engine` | Also run a TM1 v12 engine: its package has to be in the `ibm` folder |
+| `--files-dir DIR` | Where each server's config, data and logs go (default: `pa-files` in the current folder) |
+| `-y`, `--yes` | Ask nothing |
+| `--no-start` | Write the files and start nothing |
+| `--timeout SECONDS` | How long `up` waits for everything to be healthy (default: 1800) |
+
+- **The file it writes is an ordinary `pa-environment.yaml`:** edit it and run `up` to add
+  parts. A file that's already there is never written over: the options are then for a
+  new one, and say so.
+- **It sets up the folder it's run in.** `cd` there first.
+- **A file or folder you point at is looked for before anything is written,** from a
+  container with its folder mounted: the setup tool itself sees only the current folder.
+- **Piped from `curl`, questions are asked at the terminal itself.** With no terminal, or
+  with `CI` set, nothing is asked: say where TM1 comes from, or it stops and says so.
 
 `-f other.yaml` uses another file in the same folder; give each file its own `name`, or one's `up` and `down` remove the other's containers. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
@@ -96,6 +139,11 @@ Schema can check it as you type with [`pa-environment.schema.json`](pa-environme
 **Secrets go in `.env`**, which `up` creates next to the file: download links (e.g.
 pre-signed S3 URLs) instead of files in `ibm` (`TM1_BUNDLE_URL`, `TM1_WEB_BUNDLE_URL`,
 `COGNOS_ZIP_URL`, `TM1_ENGINE_BUNDLE_URL`). Test users' passwords are in the YAML: they're throwaway, for tests.
+
+**Two more settings live in `.env`**, as they're this computer's and not the environment's:
+`TM1_HOME_DIR`, an installed `tm1_64` folder that every TM1 server runs in place of a
+bundle (the name `tm1-testcontainers` reads too), and `TM1_BUNDLE`, the one bundle to
+install of several in `ibm`, as `/ibm/<file name>`.
 
 ## TM1 v12
 

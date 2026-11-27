@@ -135,4 +135,32 @@ docker run --rm -v "$dir:/work" "$image" init >/dev/null || fail "init failed"
 docker run --rm -v "$dir:/work" -e PA_HOST_DIR=/host/p "$image" generate >/dev/null || fail "init's file doesn't generate"
 pass "init writes a file that generates"
 
+# 7. Starting from nothing: where TM1 comes from is all it takes, and nothing is started
+start() {  # start <options...>: runs the tool with no file, and prints the folder it wrote in
+  local dir; dir=$(mktemp -d)
+  docker run --rm -v "$dir:/work" -e PA_HOST_DIR=/host/p -e PA_HOST_HOME=/home/me -e CI=true "$image" "$@" >"$dir/out" 2>&1 \
+    || { cat "$dir/out" >&2; return 1; }
+  echo "$dir"
+}
+# shellcheck disable=SC2088  # the tilde is the tool's to read, as the host's home
+dir=$(start --bundle '~/Downloads/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz' --samples --no-start) || fail "--bundle"
+grep -qx 'ibm: "~/Downloads"   # the folder holding your IBM downloads' "$dir/pa-environment.yaml" || fail "--bundle: ibm isn't the file's folder: $(cat "$dir/pa-environment.yaml")"
+grep -qx 'TM1_BUNDLE=/ibm/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz' "$dir/.env" || fail "--bundle: the bundle isn't named in .env"
+grep -qF "/home/me/Downloads:/ibm:ro" "$dir/compose.yaml" || fail "--bundle: the folder isn't mounted"
+grep -qF "sdata:" "$dir/compose.yaml" || fail "--samples: no sample server"
+dir=$(start --tm1-home /opt/ibm/tm1_64 --no-start) || fail "--tm1-home"
+grep -qF "/opt/ibm/tm1_64:/opt/ibm/cognos/tm1_64" "$dir/compose.yaml" || fail "--tm1-home: the folder isn't the install: $(cat "$dir/compose.yaml")"
+! grep -qF "tm1-install" "$dir/compose.yaml" || fail "--tm1-home: there's still a volume to install into"
+dir=$(start --bundle /dl/tm1-v0.0.0-standalone-linux.tgz --no-start) || fail "--bundle with TM1 v12's package"
+grep -qF "tm1-engine:" "$dir/compose.yaml" || fail "TM1 v12's package didn't make an engine"
+dir=$(mktemp -d)
+rc=0; out=$(docker run --rm -v "$dir:/work" -e CI=true "$image" 2>&1) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "Say where TM1 comes from" <<<"$out" || fail "no file, nothing said: got $rc: $out"
+rc=0; out=$(docker run --rm -v "$dir:/work" -e CI=true "$image" --bundle /dl/tm1server-0.0.0-1-win64_bundle.zip 2>&1) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "isn't the Linux TM1 Server download" <<<"$out" || fail "the Windows download: got $rc: $out"
+rc=0; out=$(docker run --rm -v "$dir:/work" -e CI=true "$image" --dir tm1 2>&1) || rc=$?
+[ "$rc" -eq 2 ] && grep -qF "mkdir -p tm1 && cd tm1" <<<"$out" || fail "--dir: got $rc: $out"
+docker run --rm "$image" --help | grep -qF -- "--bundle FILE" || fail "--help doesn't say how to start from nothing"
+pass "starts from nothing with where TM1 comes from"
+
 echo "All smoke tests passed."
