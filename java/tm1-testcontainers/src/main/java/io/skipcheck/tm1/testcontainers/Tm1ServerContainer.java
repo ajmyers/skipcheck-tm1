@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.BiConsumer;
@@ -346,6 +347,41 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		return cognos == null ? null : camNamespace;
 	}
 
+	/**
+	 * Whether the server ends up in CAM security: set with {@link #withCamSecurity},
+	 * unless a {@code tm1s.cfg} parameter given as {@code TM1_CFG_IntegratedSecurityMode}
+	 * says another mode than 4 or 5. The image applies those last, and takes a
+	 * parameter's name in any case.
+	 */
+	boolean inCamSecurity() {
+		if (cognos == null) {
+			return false;
+		}
+		String mode = cfg("IntegratedSecurityMode");
+		return mode == null || mode.strip().equals("4") || mode.strip().equals("5");
+	}
+
+	/**
+	 * Whether a {@code tm1s.cfg} parameter given as {@code TM1_CFG_UseSSL} turns TLS on.
+	 */
+	boolean usesSsl() {
+		String ssl = cfg("UseSSL");
+		return ssl != null && !ssl.strip().equalsIgnoreCase("F") && !ssl.strip().equalsIgnoreCase("false");
+	}
+
+	/** A tm1s.cfg parameter given in the environment, whatever the case of its name. */
+	private @Nullable String cfg(String parameter) {
+		for (Map.Entry<String, String> entry : getEnvMap().entrySet()) {
+			if (entry.getKey().equalsIgnoreCase("TM1_CFG_" + parameter)) {
+				return entry.getValue();
+			}
+		}
+		return null;
+	}
+
+	// The engine that passes logins to this server: one, as they share a network
+	@Nullable Tm1EngineContainer passThroughFor;
+
 	/** The Cognos test users made TM1 administrators by {@link #withCamSecurity}. */
 	List<String> getCamAdmins() {
 		return camAdmins;
@@ -358,7 +394,7 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 * @return the header value
 	 */
 	public String getAuthorization() {
-		if (cognos != null) {
+		if (inCamSecurity()) {
 			return CognosContainer.camAuthorization(username, password, camNamespace.id());
 		}
 		return "Basic "
@@ -430,7 +466,11 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 		for (String name : camAdmins) {
 			cognos.getUser(name);
 		}
-		withCredentials(admin.name(), admin.password());
+		if (inCamSecurity()) {
+			// A tm1s.cfg parameter may take the server out of CAM security again: it then
+			// keeps the login it has, its seed's
+			withCredentials(admin.name(), admin.password());
+		}
 		withEnv("TM1_CAM_URI", cognos.getNetworkUrl());
 		if (camNamespace == CognosContainer.Namespace.OIDC && cognos.getKeycloak() == null) {
 			throw new IllegalStateException("CAM security through OIDC needs the Cognos to have withKeycloak");

@@ -165,6 +165,12 @@ export abstract class GenericContainer implements Startable {
     return this;
   }
 
+  /** Takes an environment variable off again; nothing happens if it isn't set. */
+  protected withoutEnv(name: string): this {
+    this.#env.delete(name);
+    return this;
+  }
+
   /** Runs `commandParts` in place of the image's command. */
   withCommand(...commandParts: string[]): this {
     this.#command = [...commandParts];

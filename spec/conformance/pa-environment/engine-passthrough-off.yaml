@@ -1,0 +1,9 @@
+# passthrough: false is off, as leaving it out is
+version: 1
+ibm: ibm
+tm1:
+  servers:
+    legacy: {}
+tm1Engine:
+  users: [analyst]
+  passthrough: false

@@ -35,6 +35,7 @@ public class CubeTests(Tm1ServerFixture tm1) : IClassFixture<Tm1ServerFixture>
 | A `Tm1Database` test parameter with `@RequiresTm1Engine` | `Tm1DatabaseFixture<TheTestClass>` as an `IClassFixture`; with `shareDatabase = true`, `Tm1EngineFixture` |
 | `engine.databases()`, `createDatabase(…)`, `dropDatabase(…)` | `DatabasesAsync()`, `CreateDatabaseAsync(…)`, `DropDatabaseAsync(…)` |
 | `engine.withOAuth2(keycloak)`, `getKeycloak()`, `db.oauth2Login(user)`, `OAUTH2_REALM` | `WithOAuth2(keycloak)`, `Keycloak`, `db.OAuth2Login(user)`, `OAuth2Realm`: OAuth is written as the name is |
+| `engine.withPassThrough(server)`, `getPassThrough()`, `db.passThroughLogin(…)`, `passThroughLoginWith(…)`, `login.getAuthorization()`, `isPassThrough()` | `WithPassThrough(server)`, `PassThrough`, `db.PassThroughLogin(…)`, `PassThroughLoginWith(…)`, `login.Authorization`, `IsPassThrough` |
 | `login.cookie()`, `token()`, `session(…)`, `authorize(HttpRequest.Builder)`, `authorizeWithToken(…)` | `CookieAsync()`, `TokenAsync()`, `SessionAsync(…)`, `AuthorizeAsync(HttpRequestMessage)`, `AuthorizeWithTokenAsync(HttpRequestMessage)` |
 
 ### TM1 v12 (the TM1 engine)
@@ -89,6 +90,26 @@ await db.OAuth2Login("analyst").AuthorizeWithTokenAsync(request);   // Authoriza
 - **Beside the application's logins.** `db.Login(user)` keeps working.
 - **In an environment,** `Tm1EngineOAuth2()` on the builder uses the environment's one Keycloak, added if `Keycloak()` wasn't called. From `pa-environment.yaml`, `tm1Engine.oauth2` (`true`, or `{ keycloakPort }`, the port ignored) turns it on, and each user with a password gets it as a login: `analyst:analystpw:Analysts`. With `oauth2: false` the passwords are checked and not used. A TM1 server can't be named `keycloak` (in any case) beside the environment's Keycloak.
 
+### Pass-through logins to the engine
+
+TM1 v12 can pass a login on to a TM1 11 server, and take that server's word for who it is. `WithPassThrough(server)` has the engine ask a TM1 server beside it, so that server's users log in to TM1 v12 with what they have there:
+
+```csharp
+await using var server = new Tm1ServerContainer(tm1).WithSeed(Tm1Seed.Sdata);   // yours to stop: the engine only starts it first
+await using var engine = new Tm1EngineContainer(source).WithPassThrough(server);
+await engine.StartAsync();
+var db = engine.Database("tm1");
+using var request = new HttpRequestMessage(HttpMethod.Get, db.RestUrl + "Cubes?$select=Name");
+await db.PassThroughLogin().AuthorizeAsync(request);   // admin / apple of the sample database
+```
+
+- **The login,** in four forms. `db.PassThroughLogin()` is the server's own user. `PassThroughLogin(user)` is a user whose password the containers know: the server's own user only, unless the server is in CAM security. `PassThroughLogin(user, password)` is one you created there, or a wrong password to see refused. `PassThroughLoginWith(authorization)` takes a header of your own, which TM1 passes on as it is. `login.Authorization` is the header, for a client that logs in itself: TM1 takes it on any request and answers with a session cookie, which `CookieAsync()` and `AuthorizeAsync(request)` keep. `TokenAsync()`, `SessionAsync(…)` and `AuthorizeWithTokenAsync(…)` refuse: there's no token in it, and no session endpoint for it.
+- **The users.** A user has to be in the TM1 v12 database too: add each with `WithUser`. `admin` always is.
+- **A server in Cognos (CAM) security** (`WithCamSecurity`) answers a login with the user's CAMID. The engine's users are then Cognos's test users, each made under its CAMID and named as Cognos spells it, and the server's administrators are administrators of the engine too. `PassThroughLogin(user)` knows any Cognos test user's password, and `PassThroughLogin()` is the server's first administrator. A user Cognos doesn't have fails the start. `db.Login(user)` by a short name is refused there (`admin` and a CAMID aside), with a message that says to use `PassThroughLogin`.
+- **One server, on the engine's network.** Give `WithPassThrough` a server that isn't started: it joins the engine's network under the name `tm1-passthrough` (`Tm1EngineContainer.PassThroughAlias`), or the engine and its datastore join the network the server has. A second server, a server on another network, and one with `TM1_CFG_UseSSL` on (the engine asks over plain HTTP) are refused.
+- **Not with OAuth 2.0.** With both, TM1 takes tokens and refuses a name and password, so `WithOAuth2` and `WithPassThrough` refuse each other. `db.Login(user)` keeps working beside either.
+- **In an environment,** `Tm1EnginePassThrough(name)` on the builder names one of the environment's TM1 servers, reached by the name it already has. From `pa-environment.yaml`, `tm1Engine.passthrough: { server: name }` turns it on, and a user is then written without a password (`analyst::Analysts`). When that server is in CAM security (the file has `cognos`, and the server's `cfg` sets no other `IntegratedSecurityMode` than 4 or 5), every user must be one of `cognos.users`.
+
 ### How the containers are built
 
 Testcontainers for .NET configures containers through immutable builders. Each container class here keeps its configuration (environment, network, aliases, dependencies) in a form you can read and change before the container starts, as Java's `GenericContainer` does. The builder only runs when the container starts. This is what lets `PlanningAnalyticsEnvironment` wire containers together, and lets the tests check that wiring without Docker.
@@ -114,6 +135,7 @@ var planning = env.Tm1Database("planning");   // env.Tm1Engine().Database(instan
 - `Tm1Engine()`, `Tm1Engine(customizer)` and `Tm1EngineSource(source)` on the builder; `Tm1Engine()` and `Tm1Database(name)` on the environment.
 - The engine and its MongoDB are on the environment's network, the engine under the name `tm1-engine` (as in the compose project `pa-setup` writes) and its MongoDB as `tm1-datastore`, and start with TM1 11's parts, before PAW. The environment's network is the environment's to remove, not the engine's.
 - `Tm1EngineOAuth2()` has the engine take OAuth 2.0 logins from the environment's Keycloak ([above](#oauth-20-logins-to-the-engine)).
+- `Tm1EnginePassThrough(name)` has the engine pass logins on to one of the environment's TM1 servers ([above](#pass-through-logins-to-the-engine)).
 - A TM1 server can't be named `tm1-engine` or `tm1-datastore` (in any case) beside an engine: two containers would answer to the name.
 - On a builder from `FromConfig`, `Tm1Engine(customizer)` adds to the file's databases and users rather than replacing them, and `images.tm1Engine` is the image of an engine added in code too.
 - The Admin Server, TM1 Web, PAW and Cognos security are TM1 11's: they need a TM1 server.
@@ -163,7 +185,7 @@ var url = env.Tm1("planning").RestUrl;
 
 It returns the builder, configured, so you can still change it before `Build()`. The file is checked as `pa-setup` checks it, with the same defaults and messages. A file it refuses throws an `ArgumentException`.
 
-- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`), `paw` (`acceptLicense`, `zip`), and `tm1Engine`, the TM1 v12 engine (`databases`, each in its `instance`, as `WithDatabase(instance, name)`; `users` as `WithUser(name, groups…)`; `oauth2` as `Tm1EngineOAuth2()`, and a user's password is then their `WithLogin(user, password)` at Keycloak; without `oauth2` the password is checked and not used, since TM1 v12 keeps none). `cognos.oidc: true` or an empty mapping turns OIDC on; only leaving it out or `false` is off.
+- **Each part** maps onto the builder: `tm1.servers` (with `seed` and `cfg`), `tm1.adminServer`, `tm1Web` (with `heap`), `cognos` (`users`, `oidc` as `Keycloak()`, `cam` as `CamSecurity`, `memory`), `paw` (`acceptLicense`, `zip`), and `tm1Engine`, the TM1 v12 engine (`databases`, each in its `instance`, as `WithDatabase(instance, name)`; `users` as `WithUser(name, groups…)`; `oauth2` as `Tm1EngineOAuth2()`, and a user's password is then their `WithLogin(user, password)` at Keycloak; without `oauth2` the password is checked and not used, since TM1 v12 keeps none; `passthrough` as `Tm1EnginePassThrough(server)`). `cognos.oidc: true` or an empty mapping turns OIDC on; only leaving it out or `false` is off.
 - **Sources:** a part's source set on the builder wins; then `ibm`, the folder of IBM downloads; then the settings above (pa-setup's `.env` sets the same `*_URL` names); then the part's `images` entry, as a private image with IBM's software built in. With another source, an `images` entry is the image the part runs.
 - **Ignored:** `name`, every port, `files`, and `tm1Engine.datastore` and `images.mongo` (the engine's MongoDB is the container's own here). Testcontainers gives the environment its own network, random host ports and a new database each time. They're still checked as `pa-setup` checks them.
 - **Refused** with a message naming the setting: `cognos` without `tm1.servers`, and `seed: 24retail`, which the environment can't run yet.

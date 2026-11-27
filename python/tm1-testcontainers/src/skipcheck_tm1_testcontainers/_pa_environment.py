@@ -60,6 +60,7 @@ class _Engine:
     databases: dict[str, str]
     users: list[_EngineUser]
     oauth2: bool
+    pass_through: str | None
 
 
 def read(path: Path | str) -> PlanningAnalyticsEnvironment.Builder:
@@ -223,8 +224,9 @@ class _Reader:
         engine_port: int | None = None
         datastore_port: int | None = None
         engine_keycloak_port: int | None = None
+        engine_pass_through: str | None = None
         if engine_section is not None:
-            self._keys(engine_section, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine")
+            self._keys(engine_section, ["port", "databases", "users", "datastore", "oauth2", "passthrough"], "tm1Engine")
             databases: dict[str, str] = {}
             raw = engine_section.get("databases")
             if raw is None:
@@ -254,7 +256,9 @@ class _Reader:
             # With oauth2 in the section a password is meant, so user:password says what it means:
             # on, or false to keep the passwords with OAuth 2.0 off
             password_used = engine_section.get("oauth2") is not None
-            engine_users = [self._engine_user(entry, f"tm1Engine.users[{u}]", password_used) for u, entry in enumerate(listed_users)]
+            # With pass-through a password is the TM1 server's to know, not this file's
+            password_elsewhere = engine_section.get("passthrough") is not None and engine_section.get("passthrough") is not False
+            engine_users = [self._engine_user(entry, f"tm1Engine.users[{u}]", password_used, password_elsewhere) for u, entry in enumerate(listed_users)]
             engine_names = [user.name.lower() for user in engine_users]
             if len(set(engine_names)) != len(engine_names):
                 raise self.error("tm1Engine.users: a user is listed twice")
@@ -268,6 +272,40 @@ class _Reader:
                 if all(not user.password for user in engine_users):
                     raise self.error("tm1Engine.oauth2: needs a user with a password to log in as, e.g. users: [analyst:analystpw:Analysts]")
                 engine_keycloak_port = self._port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181)
+            passthrough = engine_section.get("passthrough")
+            # Off when absent or false; on, it names the TM1 server that checks logins
+            if passthrough is not None and passthrough is not False:
+                if passthrough is True:
+                    raise self.error("tm1Engine.passthrough: name the TM1 server that checks names and passwords, e.g. passthrough: {server: legacy}")
+                p = self._keys(passthrough, ["server"], "tm1Engine.passthrough")
+                wanted_server = p.get("server")
+                if not isinstance(wanted_server, str) or wanted_server not in servers:
+                    raise self.error(
+                        "tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there"
+                        + (f" ({', '.join(servers)})" if servers else "")
+                    )
+                if engine_keycloak_port is not None:
+                    raise self.error("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and refuse a name and password")
+                server_cfg = servers[wanted_server].cfg
+                # Whatever its case: the server's image matches a tm1s.cfg parameter's name in any
+                if _cfg_parameter(server_cfg, "UseSSL", "F").strip().lower() not in ("f", "false"):
+                    raise self.error(
+                        f"tm1Engine.passthrough.server: {wanted_server} has cfg.UseSSL on, and the engine asks it over plain HTTP: "
+                        "take UseSSL out of that server's cfg"
+                    )
+                # With cognos a TM1 server is in CAM security, unless its cfg says another mode:
+                # the image applies cfg last
+                mode = _cfg_parameter(server_cfg, "IntegratedSecurityMode", "5").strip()
+                if cam is not None and mode in ("4", "5"):
+                    # Only Cognos's users log in to a TM1 server in CAM security
+                    known = {user.name.lower() for user in cam.users}
+                    strangers = [user.name for user in engine_users if user.name.lower() not in known]
+                    if strangers:
+                        raise self.error(
+                            f"tm1Engine.users: {', '.join(strangers)} isn't in cognos.users. With cognos, {wanted_server} is in CAM security, "
+                            "and passthrough logs in Cognos's users only: add the name to cognos.users, or take it out of tm1Engine.users"
+                        )
+                engine_pass_through = wanted_server
             engine_port = self._port(engine_section.get("port"), "tm1Engine", 4444)
             # Published only when a port is given
             datastore_port = None if ds.get("port") is None else self._port(ds.get("port"), "tm1Engine.datastore", 27017)
@@ -276,7 +314,7 @@ class _Reader:
                 # replaced by them
                 if name.lower() in ("tm1-engine", "tm1-engine-mongo") or (engine_keycloak_port is not None and name.lower() == "tm1-engine-keycloak"):
                     raise self.error(f"tm1.servers.{name}: that name is the TM1 v12 engine's here; give the server another")
-            engine = _Engine(databases, engine_users, engine_keycloak_port is not None)
+            engine = _Engine(databases, engine_users, engine_keycloak_port is not None, engine_pass_through)
 
         if not servers and cam is None and engine is None:
             raise self.error("nothing to run: add tm1.servers, tm1Engine and/or cognos")
@@ -319,6 +357,8 @@ class _Reader:
             b._file_tm1_engine = customize
             if engine.oauth2:
                 b.tm1_engine_oauth2()
+            if engine.pass_through is not None:
+                b.tm1_engine_pass_through(engine.pass_through)
         # Whatever the file's sections: an engine added in code runs the file's image too
         b._tm1_engine_image = _image(images, "tm1Engine")
         return b
@@ -391,7 +431,7 @@ class _Reader:
                 raise self.error(f"{where}: group '{_text(g)}' must be letters, digits, '.', '_' and '-'")
         return User(name, password, tuple(groups))
 
-    def _engine_user(self, entry: Any, where: str, password_used: bool) -> _EngineUser:
+    def _engine_user(self, entry: Any, where: str, password_used: bool, password_elsewhere: bool) -> _EngineUser:
         """pa_setup.parse_user with password_optional: an engine's user, whose password may be left
         out or empty, since TM1 v12 keeps none."""
         name: Any
@@ -401,10 +441,12 @@ class _Reader:
             parts = entry.split(":")
             if len(parts) == 2 and parts[1] and not password_used:
                 # The image's own form has groups there; here the second part is a password
-                raise self.error(
-                    f"{where}: '{entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write {parts[0]}::{parts[1]}. "
-                    "(A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)"
+                hint = (
+                    f"With passthrough the password is the one the user has on the TM1 server, and isn't written here: write {parts[0]}."
+                    if password_elsewhere
+                    else "A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off."
                 )
+                raise self.error(f"{where}: '{entry}' reads as a password, which TM1 v12 doesn't keep: for a group, write {parts[0]}::{parts[1]}. ({hint})")
             if len(parts) > 3:
                 raise self.error(f"{where}: expected user, user::group,group or user:password:group,group, not '{entry}'")
             name = parts[0]
@@ -438,6 +480,14 @@ class _Reader:
 
     def error(self, message: str) -> ValueError:
         return ValueError(f"{self._file}: {message}")
+
+
+def _cfg_parameter(cfg: dict[str, str], parameter: str, otherwise: str) -> str:
+    """A tm1s.cfg parameter of a server's cfg, whatever the case of its name."""
+    for name, value in cfg.items():
+        if name.lower() == parameter.lower():
+            return value
+    return otherwise
 
 
 def _text(value: Any) -> str:

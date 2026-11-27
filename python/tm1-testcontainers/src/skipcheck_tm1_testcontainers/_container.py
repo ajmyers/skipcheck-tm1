@@ -156,6 +156,9 @@ class GenericContainer(DockerContainer):
         self._labels: dict[str, str] = {LIBRARY_LABEL: "python"}
         self._extra_hosts: dict[str, str] = {}
         self._lock = threading.RLock()
+        # What's left to do once this container is gone, by a key of the asker's, each done once:
+        # an engine's own network that it couldn't remove from under this container
+        self._after_stop: dict[object, Callable[[], None]] = {}
 
     @property  # type: ignore[override]
     def _docker(self) -> DockerClient:
@@ -351,6 +354,12 @@ class GenericContainer(DockerContainer):
                     pass
             self._container = None
             self._cached_container_info = None
+            pending, self._after_stop = self._after_stop, {}
+        for action in pending.values():
+            try:
+                action()
+            except Exception:  # noqa: BLE001 - cleanup for another container: this one is stopped whatever it says
+                self._log.debug("Couldn't clean up after a stopped container of %s", self.image, exc_info=True)
 
     def close(self) -> None:
         self.stop()

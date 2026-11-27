@@ -258,6 +258,11 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 				// Cognos and for the engine alike
 				engine.withOAuth2(Objects.requireNonNull(keycloak, "keycloak"));
 			}
+			if (b.tm1EnginePassThrough != null) {
+				// By the name the server has on the network already
+				engine.withPassThrough(Objects.requireNonNull(servers.get(b.tm1EnginePassThrough), "server"),
+						b.tm1EnginePassThrough);
+			}
 			// What the file said first; then, below, what the caller says
 			apply(b.fileTm1Engine, engine);
 		}
@@ -311,7 +316,9 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 	 * and {@code users} as {@link Tm1EngineContainer#withUser}. {@code oauth2} is
 	 * {@link Builder#tm1EngineOAuth2}, and a user's password is then their
 	 * {@link Tm1EngineContainer#withLogin} at Keycloak; without it the password is
-	 * checked and not used, as TM1 v12 keeps none. It runs beside {@code tm1}, or alone;
+	 * checked and not used, as TM1 v12 keeps none. {@code passthrough} is
+	 * {@link Builder#tm1EnginePassThrough} to the server it names; with {@code cognos}
+	 * the users are then Cognos's. It runs beside {@code tm1}, or alone;
 	 * <li>{@code ibm}: each part's source, the folder as {@link Tm1Source.Bundle},
 	 * {@link Tm1WebSource.Bundle}, {@link CognosSource.Zip} and
 	 * {@link Tm1EngineSource.Bundle}. A relative path is from the file's folder;
@@ -695,6 +702,8 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 
 		private boolean tm1EngineOAuth2;
 
+		private @Nullable String tm1EnginePassThrough;
+
 		// The file's own settings for the engine, kept when the caller adds theirs
 		@Nullable Consumer<Tm1EngineContainer> fileTm1Engine;
 
@@ -908,6 +917,20 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 		}
 
 		/**
+		 * Has the TM1 v12 engine pass logins on to one of the environment's TM1 servers
+		 * ({@link Tm1EngineContainer#withPassThrough}): that server's users log in to TM1
+		 * v12 with what they have there. With {@link #camSecurity} they are Cognos's
+		 * users. Log in with {@link Tm1Database#passThroughLogin()}. Not together with
+		 * {@link #tm1EngineOAuth2}.
+		 * @param server the name of a server added with {@link #tm1(String)}
+		 * @return this builder
+		 */
+		public Builder tm1EnginePassThrough(String server) {
+			this.tm1EnginePassThrough = Objects.requireNonNull(server, "server");
+			return this;
+		}
+
+		/**
 		 * Where the engine gets TM1 v12 from, instead of what
 		 * {@link Tm1EngineSource#discover()} finds.
 		 * @param source the source
@@ -1000,6 +1023,20 @@ public final class PlanningAnalyticsEnvironment implements Startable {
 			}
 			if (tm1EngineOAuth2 && tm1Engine == null) {
 				throw new IllegalStateException("OAuth 2.0 logins are a TM1 v12 engine's: add tm1Engine() too");
+			}
+			if (tm1EnginePassThrough != null) {
+				if (tm1Engine == null) {
+					throw new IllegalStateException("Pass-through logins are a TM1 v12 engine's: add tm1Engine() too");
+				}
+				if (!tm1.containsKey(tm1EnginePassThrough)) {
+					throw new IllegalStateException("The engine passes logins to " + tm1EnginePassThrough
+							+ ", which isn't a TM1 server of the environment: add it with tm1(name). Those there: "
+							+ tm1.keySet());
+				}
+				if (tm1EngineOAuth2) {
+					throw new IllegalStateException("TM1 takes tokens or passes logins on, not both: use "
+							+ "tm1EngineOAuth2 or tm1EnginePassThrough");
+				}
 			}
 			if (camNamespace == Namespace.OIDC && keycloak == null) {
 				throw new IllegalStateException("CAM security through OIDC needs keycloak()");

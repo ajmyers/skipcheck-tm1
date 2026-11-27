@@ -1,0 +1,14 @@
+# A TM1 server whose cfg takes it out of CAM security has users of its own, though the file has
+# cognos: the engine's users needn't be Cognos's
+version: 1
+ibm: ibm
+cognos:
+  users:
+    - admin:adminpw:Admins
+tm1:
+  servers:
+    legacy: { seed: sdata, cfg: { integratedsecuritymode: 1 } }
+tm1Engine:
+  users:
+    - planner::Planners
+  passthrough: { server: legacy }

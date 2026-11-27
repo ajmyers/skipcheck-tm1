@@ -1,0 +1,3 @@
+# error: tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there
+version: 1
+tm1Engine: { passthrough: { server: legacy } }

@@ -1,0 +1,4 @@
+# error: tm1Engine: oauth2 and passthrough can't both be on
+version: 1
+tm1: { servers: { legacy: {} } }
+tm1Engine: { users: ['analyst:analystpw'], oauth2: true, passthrough: { server: legacy } }

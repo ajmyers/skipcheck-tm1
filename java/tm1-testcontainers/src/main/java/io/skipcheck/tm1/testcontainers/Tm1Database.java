@@ -101,6 +101,60 @@ public final class Tm1Database {
 		return engine.oauth2Login(this, user);
 	}
 
+	/**
+	 * A pass-through login as the TM1 11 server's own user
+	 * ({@link Tm1ServerContainer#getUsername()}): the administrator of a server with its
+	 * own users, or the first administrator of one in Cognos (CAM) security. The login
+	 * sends TM1 v12 what that server takes, and TM1 v12 asks it who that is.
+	 * @return the login
+	 * @throws IllegalStateException if the engine has no
+	 * {@link Tm1EngineContainer#withPassThrough}
+	 */
+	public Tm1Login passThroughLogin() {
+		return engine.passThroughLogin(this, null, null);
+	}
+
+	/**
+	 * A pass-through login as a user whose password the containers know: one of Cognos's
+	 * test users when the TM1 11 server is in CAM security, and otherwise that server's
+	 * own user only.
+	 * @param user the user's name on the TM1 11 server, or in Cognos
+	 * @return the login
+	 * @throws IllegalStateException if the engine has no
+	 * {@link Tm1EngineContainer#withPassThrough}
+	 * @throws IllegalArgumentException if the user's password isn't known
+	 */
+	public Tm1Login passThroughLogin(String user) {
+		return engine.passThroughLogin(this, Objects.requireNonNull(user, "user"), null);
+	}
+
+	/**
+	 * A pass-through login with a name and password of your own: a user you created on
+	 * the TM1 11 server, or a wrong password to see refused. They go as {@code Basic}, or
+	 * as {@code CAMNamespace} when the server is in CAM security.
+	 * @param user the user's name on the TM1 11 server, or in Cognos
+	 * @param password the password
+	 * @return the login
+	 * @throws IllegalStateException if the engine has no
+	 * {@link Tm1EngineContainer#withPassThrough}
+	 */
+	public Tm1Login passThroughLogin(String user, String password) {
+		return engine.passThroughLogin(this, Objects.requireNonNull(user, "user"),
+				Objects.requireNonNull(password, "password"));
+	}
+
+	/**
+	 * A pass-through login with an {@code Authorization} header of your own, which TM1
+	 * v12 passes on as it is: {@code "CAMPassport " + passport} from a Cognos logon, say.
+	 * @param authorization the header's value
+	 * @return the login, with no user name or password
+	 * @throws IllegalStateException if the engine has no
+	 * {@link Tm1EngineContainer#withPassThrough}
+	 */
+	public Tm1Login passThroughLoginWith(String authorization) {
+		return engine.passThroughLoginWith(this, authorization);
+	}
+
 	@Override
 	public boolean equals(Object other) {
 		return other instanceof Tm1Database that && engine.equals(that.engine) && instance.equals(that.instance)

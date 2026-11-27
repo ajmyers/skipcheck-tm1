@@ -1,0 +1,10 @@
+# A TM1 v12 engine that passes logins on to a TM1 11 server, and its MongoDB.
+# unordered: tm1/legacy tm1EngineDatastore
+version: 1
+tm1:
+  servers:
+    legacy: { seed: sdata }
+tm1Engine:
+  users:
+    - analyst::Analysts
+  passthrough: { server: legacy }

@@ -43,6 +43,18 @@ def test_engine_with_o_auth2() -> None:
     _record("engine-oauth2")
 
 
+@pytest.mark.requires_tm1
+@pytest.mark.requires_tm1_engine(share_database=True)
+def test_engine_with_pass_through() -> None:
+    _record("engine-passthrough")
+
+
+@pytest.mark.requires_cognos
+@pytest.mark.requires_tm1_engine(share_database=True)
+def test_engine_with_pass_through_to_cam_security() -> None:
+    _record("engine-passthrough-cam")
+
+
 def _record(scenario: str) -> None:
     home = ROOT / "testcontainers-conformance" / "scenarios"
     env = PlanningAnalyticsEnvironment.from_config(home / f"{scenario}.yaml").build()
@@ -62,6 +74,11 @@ def _record(scenario: str) -> None:
         if scenario == "engine":
             containers["tm1Engine"] = env.tm1_engine()
             containers["tm1EngineDatastore"] = env.tm1_engine().datastore
+        if scenario.startswith("engine-passthrough"):
+            containers["tm1Engine"] = env.tm1_engine()
+            containers["tm1EngineDatastore"] = env.tm1_engine().datastore
+        if scenario == "engine-passthrough-cam":
+            containers["cognos"] = env.cognos()
         if scenario == "cam-security":
             containers["cognos"] = env.cognos()
             containers["keycloak"] = env.keycloak()

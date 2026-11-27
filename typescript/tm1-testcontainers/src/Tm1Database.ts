@@ -66,6 +66,41 @@ export class Tm1Database {
     return this.#engine.oauth2Login(this, user);
   }
 
+  /** A pass-through login as the TM1 11 server's own user (its `getUsername()`):
+   * the administrator of a server with its own users, or the first administrator of one in Cognos
+   * (CAM) security. The login sends TM1 v12 what that server takes, and TM1 v12 asks it who that
+   * is.
+   * @throws IllegalStateException if the engine has no {@link Tm1EngineContainer.withPassThrough} */
+  passThroughLogin(): Tm1Login;
+  /** A pass-through login as a user whose password the containers know: one of Cognos's test users
+   * when the TM1 11 server is in CAM security, and otherwise that server's own user only.
+   * @param user the user's name on the TM1 11 server, or in Cognos
+   * @throws IllegalStateException if the engine has no {@link Tm1EngineContainer.withPassThrough}
+   * @throws IllegalArgumentException if the user's password isn't known */
+  passThroughLogin(user: string): Tm1Login;
+  /** A pass-through login with a name and password of your own: a user you created on the TM1 11
+   * server, or a wrong password to see refused. They go as `Basic`, or as `CAMNamespace` when the
+   * server is in CAM security.
+   * @param user the user's name on the TM1 11 server, or in Cognos
+   * @param password the password
+   * @throws IllegalStateException if the engine has no {@link Tm1EngineContainer.withPassThrough} */
+  passThroughLogin(user: string, password: string): Tm1Login;
+  passThroughLogin(user?: string, password?: string): Tm1Login {
+    if (user !== undefined && typeof user !== "string") throw new TypeError("user must be a string");
+    if (password !== undefined && typeof password !== "string") throw new TypeError("password must be a string");
+    if (user === undefined && password !== undefined) throw new TypeError("user must be a string");
+    return this.#engine.passThroughLogin(this, user, password);
+  }
+
+  /** A pass-through login with an `Authorization` header of your own, which TM1 v12 passes on as
+   * it is: `"CAMPassport " + passport` from a Cognos logon, say.
+   * @param authorization the header's value
+   * @returns the login, with no user name or password
+   * @throws IllegalStateException if the engine has no {@link Tm1EngineContainer.withPassThrough} */
+  passThroughLoginWith(authorization: string): Tm1Login {
+    return this.#engine.passThroughLoginWith(this, authorization);
+  }
+
   /** Whether `other` is the same database: this name, in this instance of this engine. */
   equals(other: unknown): boolean {
     return other instanceof Tm1Database && this.#engine === other.#engine && this.#instance === other.#instance && this.#name === other.#name;

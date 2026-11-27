@@ -1,0 +1,4 @@
+# error: tm1Engine.passthrough.server: legacy has cfg.UseSSL on
+version: 1
+tm1: { servers: { legacy: { cfg: { usessl: 'True' } } } }
+tm1Engine: { passthrough: { server: legacy } }

@@ -73,7 +73,17 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <summary>The client of that realm a test asks for tokens as, and the audience its tokens carry.</summary>
     public const string OAuth2Client = "tm1";
 
+    /// <summary>The name a TM1 server has on the engine's network when logins are passed to it
+    /// (<see cref="WithPassThrough(Tm1ServerContainer)"/>).</summary>
+    public const string PassThroughAlias = "tm1-passthrough";
+
     internal const string InstallPath = "/opt/ibm/tm1-engine";
+
+    private const string ServerOtherNetwork =
+        "The engine passes logins to a TM1 server on another network, which TM1 couldn't reach from this one: set the network before WithPassThrough, or give the server the same";
+
+    private const string OneWay =
+        "TM1 takes tokens or passes logins on, not both: with both set it takes tokens and refuses a name and password. Use WithOAuth2 or WithPassThrough";
 
     private const string OtherNetwork =
         "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: set the network before WithOAuth2, or give the Keycloak the same";
@@ -216,14 +226,18 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <para>The Keycloak joins the engine's network, unless it has one already, which the engine then joins. It's yours
     /// to stop: the engine only starts it first. An engine has one Keycloak, and a Keycloak one engine: the same
     /// Keycloak again changes nothing.</para></summary>
-    /// <exception cref="InvalidOperationException">The engine has another Keycloak; or this one is already running, or
-    /// is another engine's.</exception>
+    /// <exception cref="InvalidOperationException">The engine has another Keycloak, or passes logins on
+    /// (<see cref="WithPassThrough(Tm1ServerContainer)"/>); or this Keycloak is already running, or is another engine's.</exception>
     public Tm1EngineContainer WithOAuth2(KeycloakContainer keycloak)
     {
         ArgumentNullException.ThrowIfNull(keycloak);
         if (ReferenceEquals(Keycloak, keycloak))
         {
             return this;
+        }
+        if (PassThrough is not null)
+        {
+            throw new InvalidOperationException(OneWay);
         }
         if (Keycloak is not null)
         {
@@ -261,6 +275,90 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         return this;
     }
 
+    /// <summary>Passes logins on to a TM1 11 server ("pass-through"): TM1 v12 asks it who a login is, so that server's
+    /// users log in here with what they have there. A test logs in with <see cref="Tm1Database.PassThroughLogin()"/>.
+    /// Logins through the engine's application (<see cref="Tm1Database.Login()"/>) keep working beside it.</summary>
+    /// <remarks>
+    /// <list type="bullet">
+    /// <item>A user has to be in the database too: add each with <see cref="WithUser"/>. <c>admin</c> always is.</item>
+    /// <item><b>A server in Cognos (CAM) security</b>
+    /// (<see cref="Tm1ServerContainer.WithCamSecurity(CognosContainer, string[])"/>) answers a login with the user's
+    /// CAMID. The engine's users are then Cognos's test users, each made under its CAMID, and the server's
+    /// administrators are administrators here too. TM1 v12 learns no groups from Cognos: a user has the groups
+    /// <see cref="WithUser"/> gives.</item>
+    /// <item>Not together with <see cref="WithOAuth2"/>: with both, TM1 takes tokens and refuses the rest.</item>
+    /// </list>
+    /// <para>The server joins the engine's network, unless it has one already, which the engine and its datastore then
+    /// join. Starting the engine starts the server first. Give it one that isn't started: it gets the name the engine
+    /// reaches it by, <see cref="PassThroughAlias"/>, so one network holds one such server. The server is yours to
+    /// stop.</para>
+    /// </remarks>
+    /// <param name="server">The TM1 server that checks logins.</param>
+    /// <returns>This container.</returns>
+    /// <exception cref="InvalidOperationException">The engine passes logins to another server already, or takes OAuth 2.0
+    /// tokens; or the server is already running, or checks logins for another engine.</exception>
+    public Tm1EngineContainer WithPassThrough(Tm1ServerContainer server) => WithPassThrough(server, null);
+
+    /// <summary>As <see cref="WithPassThrough(Tm1ServerContainer)"/>, to a server that has a name on the network already:
+    /// an environment's.</summary>
+    internal Tm1EngineContainer WithPassThrough(Tm1ServerContainer server, string? alias)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        // The very server, not one configured like it
+        if (ReferenceEquals(PassThrough, server))
+        {
+            return this;
+        }
+        if (PassThrough is not null)
+        {
+            throw new InvalidOperationException("The engine already passes logins to another TM1 server");
+        }
+        if (Keycloak is not null)
+        {
+            throw new InvalidOperationException(OneWay);
+        }
+        if (server.IsRunning)
+        {
+            // A name on the network is given when a container is created
+            throw new InvalidOperationException(
+                "This TM1 server is already running, without the name the engine reaches it by: give WithPassThrough one that isn't started, and the engine starts it"
+            );
+        }
+        if (server.PassThroughFor is not null)
+        {
+            // They'd share a network, where each engine's datastore answers to one name
+            throw new InvalidOperationException(
+                "This TM1 server already checks logins for another engine: an engine and the server it passes logins to share a network, which holds one engine"
+            );
+        }
+        if (server.Network is not null)
+        {
+            WithNetwork(server.Network);
+        }
+        else
+        {
+            // The engine's own, or a new one if it was taken off it
+            JoinNetwork();
+            server.WithNetwork(Network);
+        }
+        server.PassThroughFor = this;
+        if (alias is null)
+        {
+            server.WithNetworkAliases(PassThroughAlias);
+        }
+        PassThrough = server;
+        DependsOn(server);
+        // The image's defaults are a TM1 11 server's: the address is all it takes
+        WithEnv(
+            "TM1_PASSTHROUGH_URL",
+            "http://" + (alias ?? PassThroughAlias) + ":" + Tm1ServerContainer.RestPort.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/api/v1/"
+        );
+        return this;
+    }
+
+    /// <summary>The TM1 server logins are passed to, or null without <see cref="WithPassThrough(Tm1ServerContainer)"/>.</summary>
+    public Tm1ServerContainer? PassThrough { get; private set; }
+
     /// <summary>Gives a user a password to log in with through OAuth 2.0 (<see cref="WithOAuth2"/>). TM1 v12 keeps no
     /// passwords itself: it's the Keycloak's. The user is one added with <see cref="WithUser"/>, or <c>admin</c>.</summary>
     /// <exception cref="ArgumentException">The name isn't a user's, or the password is empty.</exception>
@@ -290,7 +388,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     public DatastoreContainer Datastore { get; }
 
     /// <summary>The gateway as seen from the host, ending in <c>/</c>, e.g. <c>http://localhost:54321/</c>.</summary>
-    public string Url => $"http://{Host}:{GetMappedPort(Port)}/";
+    public virtual string Url => $"http://{Host}:{GetMappedPort(Port)}/";
 
     /// <summary>The management API, which lists and creates instances, applications and databases,
     /// ending in <c>/</c>, e.g. <c>http://localhost:54321/manage/v1/</c>. It takes the root
@@ -370,10 +468,80 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <summary>A login to an instance, through its first application whose secret the image holds.</summary>
     internal Tm1Login Login(string instance, string user)
     {
+        if (PassesToCam && !user.Equals("admin", StringComparison.OrdinalIgnoreCase) && !user.StartsWith("CAMID(", StringComparison.Ordinal))
+        {
+            // TM1 would make a session for the name and refuse it everywhere (403)
+            throw new ArgumentException(
+                user
+                    + " isn't a user of this engine by that name: it passes logins to a TM1 server in CAM security, so its users are Cognos's, each under its CAMID. Log in with PassThroughLogin(\""
+                    + user
+                    + "\"), or name the CAMID",
+                nameof(user)
+            );
+        }
         var (clientId, clientSecret) = Current().Application(instance)
             ?? throw new InvalidOperationException("The instance " + instance + " has no application to log in through");
         return new Tm1Login(Url + instance + "/auth/v1/", instance, clientId, clientSecret, user);
     }
+
+    /// <summary>A pass-through login: the header the TM1 server takes, for a user it knows.</summary>
+    /// <param name="database">The database the login is for.</param>
+    /// <param name="user">The user's name there, or null for the server's own login.</param>
+    /// <param name="password">The password, or null for the one the containers know.</param>
+    internal Tm1Login PassThroughLogin(Tm1Database database, string? user, string? password)
+    {
+        var server = PassThroughServer();
+        var cam = server.InCamSecurity;
+        // The server's own login: in CAM security its first administrator, which the server itself only takes for
+        // its own once it's configured
+        var name = user ?? (cam ? server.CamAdmins[0] : server.Username);
+        var known = password;
+        if (known is null && cam)
+        {
+            // Cognos has every test user's password
+            var found = server.Cognos!.Users.FirstOrDefault(candidate => candidate.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                ?? throw new ArgumentException(
+                    name
+                        + " isn't one of Cognos's test users, whose passwords the containers know: add it with CognosContainer.WithUser, or give a password with PassThroughLogin(user, password)",
+                    nameof(user)
+                );
+            name = found.Name;
+            known = found.Password;
+        }
+        else if (known is null)
+        {
+            if (!name.Equals(server.Username, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Only the TM1 server's own login ("
+                        + server.Username
+                        + ") has a password the containers know: give this user's with PassThroughLogin(user, password)",
+                    nameof(user)
+                );
+            }
+            // As the server spells it
+            name = server.Username;
+            known = server.Password;
+        }
+        var authorization = cam
+            ? CognosContainer.CamAuthorization(name, known, server.CamNamespace!.Value.Id())
+            : "Basic " + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(name + ":" + known));
+        return new Tm1Login(database, name, known, authorization);
+    }
+
+    /// <summary>A pass-through login with a header of the caller's own, such as a CAM passport.</summary>
+    internal Tm1Login PassThroughLoginWith(Tm1Database database, string authorization)
+    {
+        PassThroughServer();
+        ArgumentNullException.ThrowIfNull(authorization);
+        return new Tm1Login(database, "", "", authorization);
+    }
+
+    private Tm1ServerContainer PassThroughServer() =>
+        PassThrough ?? throw new InvalidOperationException("This engine passes no logins on: give it a TM1 server with WithPassThrough");
+
+    /// <summary>Whether logins are passed to a server in CAM security, whose users are Cognos's.</summary>
+    internal bool PassesToCam => PassThrough is { InCamSecurity: true };
 
     /// <summary>A login through OAuth 2.0, as a user given a password with <see cref="WithLogin"/>.</summary>
     internal Tm1Login OAuth2Login(Tm1Database database, string user)
@@ -463,17 +631,28 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     internal IReadOnlyList<string> Configured() => databases.Count == 0 ? [DefaultInstance + "/" + DefaultDatabase] : databases;
 
     /// <summary>Before anything starts: the datastore, which this depends on, starts ahead of <see cref="Configure"/>.</summary>
-    private protected override void BeforeDependenciesStart() => JoinNetwork();
+    private protected override void BeforeDependenciesStart()
+    {
+        JoinNetwork();
+        // And before the TM1 server, and the Cognos behind it, take minutes to start
+        UsersForTheImage();
+    }
 
     /// <summary>The datastore goes on the engine's network at once, not when the engine starts: whatever starts the
     /// engine may start what it depends on first, and the datastore must be there by then.</summary>
-    /// <exception cref="InvalidOperationException">The engine's Keycloak is on another network.</exception>
+    /// <exception cref="InvalidOperationException">The engine's Keycloak, or the TM1 server it passes logins to, is on
+    /// another network.</exception>
     private protected override void NetworkSet(Network? network)
     {
         if (Keycloak is { } joined && !ReferenceEquals(joined.Network, network))
         {
             // The Keycloak is the caller's, and may serve others: it isn't moved from here
             throw new InvalidOperationException(OtherNetwork);
+        }
+        if (PassThrough is { } asked && !ReferenceEquals(asked.Network, network))
+        {
+            // The server is the caller's, and may be in an environment: it isn't moved
+            throw new InvalidOperationException(ServerOtherNetwork);
         }
         // Null while the base class is still being made
         Datastore?.WithNetwork(network);
@@ -489,11 +668,90 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     {
         JoinNetwork();
         WithEnv("TM1_DATABASES", string.Join(',', Configured()));
-        if (users.Count > 0)
+        var wanted = UsersForTheImage();
+        if (PassThrough is { InCamSecurity: true } inCam)
         {
-            WithEnv("TM1_USERS", string.Join(',', users.Select(u => u.Groups.Length == 0 ? u.Name : u.Name + ":" + string.Join(':', u.Groups))));
+            var @namespace = inCam.CamNamespace!.Value;
+            WithEnv("TM1_CAM_NAMESPACE", @namespace.Id());
+            WithEnv("TM1_CAM_NAMESPACE_TYPE", @namespace.Type());
+        }
+        else
+        {
+            // Read on each start: a server taken out of CAM security since the last one answers plain names again
+            RemoveEnv("TM1_CAM_NAMESPACE");
+            RemoveEnv("TM1_CAM_NAMESPACE_TYPE");
+        }
+        if (wanted.Count == 0)
+        {
+            RemoveEnv("TM1_USERS");
+        }
+        else
+        {
+            WithEnv("TM1_USERS", string.Join(',', wanted.Select(u => u.Groups.Count == 0 ? u.Name : u.Name + ":" + string.Join(':', u.Groups))));
         }
     }
+
+    /// <summary>The users as the image is given them, each with its groups, refusing what couldn't work: a server asked
+    /// over plain HTTP that has TLS on, and a user Cognos doesn't have behind a server in CAM security.</summary>
+    private List<(string Name, List<string> Groups)> UsersForTheImage()
+    {
+        // Made anew each time: this runs before the start, and again whenever the engine is configured
+        var wanted = users.Select(u => (u.Name, Groups: u.Groups.ToList())).ToList();
+        var server = PassThrough;
+        if (server is { UsesSsl: true })
+        {
+            throw new InvalidOperationException(
+                "The engine passes logins to a TM1 server with UseSSL on, and asks it over plain HTTP: take TM1_CFG_UseSSL off that server"
+            );
+        }
+        if (server is { InCamSecurity: true })
+        {
+            // Read now, not in WithPassThrough: WithCamSecurity may have come after it. The server answers a login
+            // with the user's CAMID, so the image makes the users under theirs
+            var cognos = server.Cognos!;
+            wanted = [];
+            foreach (var (name, groups) in users)
+            {
+                // As Cognos spells it: the name goes into the CAMID. Two spellings of one name are one user, in
+                // the first one's place with the last one's groups
+                var spelled = CognosUser(cognos, name);
+                var at = wanted.FindIndex(u => u.Name == spelled);
+                if (at < 0)
+                {
+                    wanted.Add((spelled, [.. groups]));
+                }
+                else
+                {
+                    wanted[at] = (spelled, [.. groups]);
+                }
+            }
+            // TM1 v12 learns no groups from Cognos: the server's administrators are made administrators here, after
+            // the users listed
+            foreach (var admin in server.CamAdmins)
+            {
+                var spelled = CognosUser(cognos, admin);
+                var at = wanted.FindIndex(u => u.Name == spelled);
+                if (at < 0)
+                {
+                    wanted.Add((spelled, []));
+                    at = wanted.Count - 1;
+                }
+                if (!wanted[at].Groups.Any(group => group.Equals("ADMIN", StringComparison.OrdinalIgnoreCase)))
+                {
+                    wanted[at].Groups.Add("ADMIN");
+                }
+            }
+        }
+        return wanted;
+    }
+
+    /// <summary>A Cognos test user's name as Cognos has it, whatever its case here.</summary>
+    private static string CognosUser(CognosContainer cognos, string name) =>
+        cognos.Users.FirstOrDefault(user => user.Name.Equals(name, StringComparison.OrdinalIgnoreCase))?.Name
+        ?? throw new InvalidOperationException(
+            name
+                + " isn't one of Cognos's test users. The engine passes logins to a TM1 server in CAM security, which logs in Cognos's users only: add the user with CognosContainer.WithUser, or take it off the engine"
+        );
 
     /// <inheritdoc/>
     protected override async Task ContainerIsStartedAsync(CancellationToken cancellationToken)
@@ -525,8 +783,8 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         {
             // Testcontainers removes what's left when the run ends
         }
-        // Not with a Keycloak on it: that's the caller's, and may be running there still
-        if (ownNetwork is { } made && Keycloak is null)
+        // Not with a Keycloak or a TM1 server on it: that's the caller's, and may be running there still
+        if (ownNetwork is { } made && Keycloak is null && PassThrough is null)
         {
             // Another for the next start, as a new engine has
             ownNetwork = Network.NewNetwork();
@@ -561,6 +819,10 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
         {
             // Moved since WithOAuth2: TM1 couldn't reach its issuer
             throw new InvalidOperationException(OtherNetwork);
+        }
+        if (PassThrough is { } asked && !ReferenceEquals(asked.Network, Network))
+        {
+            throw new InvalidOperationException(ServerOtherNetwork);
         }
     }
 

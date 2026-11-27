@@ -27,6 +27,10 @@ VALID = [
     FIXTURES / "engine-image-only.yaml",
     FIXTURES / "engine-oauth2.yaml",
     FIXTURES / "engine-oauth2-off.yaml",
+    FIXTURES / "engine-passthrough.yaml",
+    FIXTURES / "engine-passthrough-off.yaml",
+    FIXTURES / "engine-passthrough-cam.yaml",
+    FIXTURES / "engine-passthrough-own-users.yaml",
 ]
 INVALID = sorted((FIXTURES / "invalid").glob("*.yaml"))
 

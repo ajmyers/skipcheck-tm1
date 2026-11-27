@@ -1,0 +1,4 @@
+# error: tm1Engine.passthrough: name the TM1 server that checks names and passwords
+version: 1
+tm1: { servers: { legacy: {} } }
+tm1Engine: { passthrough: true }

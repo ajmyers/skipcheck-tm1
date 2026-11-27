@@ -115,6 +115,31 @@ public class OAuth2ExampleTests
     }
 }
 
+/// <summary>Java's PassThroughExampleTest: pass-through logins, to a TM1 11 server, the way TM1 v12 logs in the users a
+/// TM1 11 server already has. The engine asks the server beside it who a name and password are, so a test logs in to
+/// TM1 v12 with a login of TM1 11's.</summary>
+[Collection(OwnContainers.Name)]
+public class PassThroughExampleTests
+{
+    [RequiresTm1AndEngineFact]
+    public async Task ATm1ServersUserLogsInToTheEngine()
+    {
+        var tm1 = Tm1Source.Discover() ?? throw new InvalidOperationException(RequiresTm1FactAttribute.NoSourceMessage);
+        var source = Tm1EngineSource.Discover() ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.NoSourceMessage);
+        // Disposed last: the server is yours to stop
+        await using var server = new Tm1ServerContainer(tm1).WithSeed(Tm1Seed.Sdata);
+        await using var engine = new Tm1EngineContainer(source).WithPassThrough(server);
+        await engine.StartAsync();
+        var db = engine.Database("tm1");
+
+        // admin / apple of the sample database: TM1 v12 keeps no password of its own
+        var (status, body) = await Tm1EngineRest.GetAsync(db, db.PassThroughLogin(), "ActiveUser?$select=Name,Type");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Type\":\"Admin\"", body, StringComparison.Ordinal);
+    }
+}
+
 /// <summary>Java's S2sUsersExampleTest: users with different rights. An engine of this class's own,
 /// with two users besides <c>admin</c>. TM1 v12 keeps no passwords, so a test logs in as any of them
 /// by name, through the engine's application ("service-to-service"). An engine of your own takes

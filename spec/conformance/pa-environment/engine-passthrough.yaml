@@ -1,0 +1,12 @@
+# Pass-through logins: the TM1 v12 engine asks one of the file's TM1 servers, the second, who a
+# name and password are
+version: 1
+ibm: ibm
+tm1:
+  servers:
+    first: {}
+    legacy: { seed: sdata, cfg: { UseSSL: F } }
+tm1Engine:
+  users:
+    - analyst::Analysts
+  passthrough: { server: legacy }

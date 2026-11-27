@@ -1,0 +1,15 @@
+# A TM1 v12 engine that passes logins on to a TM1 11 server in CAM security: its users are Cognos's.
+# unordered: tm1/legacy tm1EngineDatastore
+# unordered: cognos tm1EngineDatastore
+version: 1
+tm1:
+  servers:
+    legacy: {}
+cognos:
+  users:
+    - admin:adminpw:Admins
+    - analyst:analystpw:Analysts
+tm1Engine:
+  users:
+    - Analyst::Analysts
+  passthrough: { server: legacy }

@@ -56,6 +56,20 @@ class ContainerConformanceTest {
 		record("engine-oauth2");
 	}
 
+	@Test
+	@RequiresTm1
+	@RequiresTm1Engine(shareDatabase = true)
+	void engineWithPassThrough() throws Exception {
+		record("engine-passthrough");
+	}
+
+	@Test
+	@RequiresCognos
+	@RequiresTm1Engine(shareDatabase = true)
+	void engineWithPassThroughToCamSecurity() throws Exception {
+		record("engine-passthrough-cam");
+	}
+
 	private static void record(String scenario) throws IOException, InterruptedException {
 		Path home = Path.of(System.getProperty("tm1.containerConformance.scenarios"));
 		try (var env = PlanningAnalyticsEnvironment.fromConfig(home.resolve(scenario + ".yaml")).build()) {
@@ -75,6 +89,13 @@ class ContainerConformanceTest {
 			if (scenario.equals("engine")) {
 				containers.put("tm1Engine", env.tm1Engine());
 				containers.put("tm1EngineDatastore", env.tm1Engine().getDatastore());
+			}
+			if (scenario.startsWith("engine-passthrough")) {
+				containers.put("tm1Engine", env.tm1Engine());
+				containers.put("tm1EngineDatastore", env.tm1Engine().getDatastore());
+			}
+			if (scenario.equals("engine-passthrough-cam")) {
+				containers.put("cognos", env.cognos());
 			}
 			if (scenario.equals("cam-security")) {
 				containers.put("cognos", env.cognos());

@@ -18,7 +18,11 @@ namespace Skipcheck.Tm1.Testcontainers;
 /// the user existing in it. Get one from <see cref="Tm1Database.Login()"/> or
 /// <see cref="Tm1Database.Login(string)"/>, then either let it log in for you
 /// (<see cref="AuthorizeAsync"/> or <see cref="CookieAsync"/>), or hand <see cref="ClientId"/>,
-/// <see cref="ClientSecret"/> and <see cref="User"/> to a client that logs in itself.</summary>
+/// <see cref="ClientSecret"/> and <see cref="User"/> to a client that logs in itself.
+/// <para>Two other kinds log a user in as themselves: an OAuth 2.0 login (<see cref="Tm1Database.OAuth2Login"/>), with a
+/// token from the engine's Keycloak, and a pass-through login (<see cref="Tm1Database.PassThroughLogin()"/>), with the
+/// <c>Authorization</c> header a TM1 11 server takes (<see cref="Authorization"/>). <see cref="AuthorizeAsync"/> and
+/// <see cref="CookieAsync"/> work for all three.</para></summary>
 public sealed class Tm1Login
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
@@ -40,6 +44,9 @@ public sealed class Tm1Login
     // The session request's property, which is TM1's name for it and not this class's
     private const string UserProperty = "User";
 
+    private const string NoToken =
+        "A pass-through login has no token: it's the header TM1 passes on (Authorization), or the session that gives (AuthorizeAsync, CookieAsync)";
+
     private readonly Lock gate = new();
     private Task<string>? cookie;
     private readonly string authUrl;
@@ -47,6 +54,9 @@ public sealed class Tm1Login
     // An OAuth 2.0 login: where its tokens come from, and a database's address to turn a token into a session at
     private readonly KeycloakContainer? keycloak;
     private readonly Tm1Database? database;
+
+    // A pass-through login: the header the TM1 server behind the engine takes
+    private readonly string? header;
 
     internal Tm1Login(string authUrl, string instance, string clientId, string clientSecret, string user)
     {
@@ -73,30 +83,63 @@ public sealed class Tm1Login
         Password = password;
     }
 
+    /// <summary>A pass-through login, with the header a TM1 server behind the engine takes.</summary>
+    internal Tm1Login(Tm1Database database, string user, string password, string authorization)
+    {
+        authUrl = "";
+        this.database = database;
+        Instance = database.Instance;
+        ClientId = "";
+        ClientSecret = "";
+        User = user;
+        Password = password;
+        header = authorization;
+    }
+
+    /// <summary>Whether this is a pass-through login (<see cref="Tm1Database.PassThroughLogin()"/>): one TM1 v12 checks
+    /// with a TM1 11 server.</summary>
+    public bool IsPassThrough => header is not null;
+
+    /// <summary>The <c>Authorization</c> header of a pass-through login, as a client that logs in itself sends it on any
+    /// request: <c>Basic</c> with the user's name and password on the TM1 11 server, or <c>CAMNamespace</c> when that
+    /// server is in Cognos (CAM) security.</summary>
+    /// <exception cref="InvalidOperationException">A login that isn't pass-through.</exception>
+    public string Authorization =>
+        header
+        ?? throw new InvalidOperationException(
+            "Only a pass-through login is a header of its own: this one logs in "
+                + (keycloak is not null ? "with a token (AuthorizeWithTokenAsync)" : "through the application (ClientId, ClientSecret and User)")
+        );
+
     /// <summary>Whether this is a login through OAuth 2.0 (<see cref="Tm1Database.OAuth2Login"/>), rather than through
     /// the instance's application.</summary>
     public bool IsOAuth2 => keycloak is not null;
 
-    /// <summary>The user's password at the identity provider, for an OAuth 2.0 login; empty otherwise, as TM1 v12
-    /// keeps none.</summary>
+    /// <summary>The user's password: at the identity provider for an OAuth 2.0 login, and on the TM1 11 server (or in
+    /// Cognos) for a pass-through login. Empty otherwise, as TM1 v12 keeps none, and for a pass-through login made from
+    /// a header alone.</summary>
     public string Password { get; }
 
     /// <summary>Where a token is asked for: the identity provider's token endpoint for an OAuth 2.0 login, as seen from
     /// the host, and TM1's own otherwise.</summary>
     /// <exception cref="InvalidOperationException">An OAuth 2.0 login's Keycloak isn't started.</exception>
     public string TokenUrl =>
-        keycloak is null ? authUrl + "token" : keycloak.Url + "/realms/" + Tm1EngineContainer.OAuth2Realm + "/protocol/openid-connect/token";
+        keycloak is null ? AuthUrl + "token" : keycloak.Url + "/realms/" + Tm1EngineContainer.OAuth2Realm + "/protocol/openid-connect/token";
 
     /// <summary>The instance this login is for.</summary>
     public string Instance { get; }
 
-    /// <summary>The TM1 user this logs in as.</summary>
+    /// <summary>The user this logs in as. For a pass-through login it's the name on the TM1 11 server, or in Cognos: with
+    /// a server in CAM security the user's name in TM1 v12 is its CAMID. Empty for a pass-through login made from a
+    /// header alone.</summary>
     public string User { get; }
 
-    /// <summary>The application's client ID; for an OAuth 2.0 login, the client its tokens are asked for as.</summary>
+    /// <summary>The application's client ID; for an OAuth 2.0 login, the client its tokens are asked for as, and empty
+    /// for a pass-through login, which goes through no application.</summary>
     public string ClientId { get; }
 
-    /// <summary>The application's client secret; empty for an OAuth 2.0 login, whose client is a public one.</summary>
+    /// <summary>The application's client secret; empty for an OAuth 2.0 login, whose client is a public one, and for a
+    /// pass-through login.</summary>
     public string ClientSecret { get; }
 
     /// <summary>Where a session or a token is asked for, as seen from the host, ending in <c>/</c>,
@@ -105,7 +148,8 @@ public sealed class Tm1Login
 
     /// <summary>The session cookie, <c>TM1SessionId=...</c>, for a <c>Cookie</c> header. Logs in the
     /// first time, with the application's credentials as Basic authentication, and keeps the session. An OAuth 2.0
-    /// login sends TM1 a token from the provider, and keeps the session TM1 answers with.</summary>
+    /// login sends TM1 a token from the provider, and a pass-through login its header; each keeps the session TM1
+    /// answers with.</summary>
     /// <exception cref="InvalidOperationException">TM1 refuses the login.</exception>
     public async Task<string> CookieAsync(CancellationToken cancellationToken = default)
     {
@@ -113,8 +157,9 @@ public sealed class Tm1Login
         lock (gate)
         {
             // Not the caller's token: the one login serves every caller of this, whoever asked first
-            login = cookie ??= keycloak is not null
-                ? TokenSessionAsync()
+            login = cookie ??=
+                header is not null ? HeaderSessionAsync()
+                : keycloak is not null ? TokenSessionAsync()
                 : SessionAsync("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(ClientId + ":" + ClientSecret)), CancellationToken.None);
         }
         try
@@ -141,9 +186,14 @@ public sealed class Tm1Login
     /// user from the identity provider, with the user's password: one TM1 takes as <c>Authorization: Bearer</c> on any
     /// request.</summary>
     /// <returns>The access token, a JWT.</returns>
-    /// <exception cref="InvalidOperationException">TM1 refuses the application's credentials, or the provider the user's.</exception>
+    /// <exception cref="InvalidOperationException">TM1 refuses the application's credentials, or the provider the user's;
+    /// or this is a pass-through login, which has no token.</exception>
     public async Task<string> TokenAsync(CancellationToken cancellationToken = default)
     {
+        if (header is not null)
+        {
+            throw new InvalidOperationException(NoToken);
+        }
         if (keycloak is not null)
         {
             return await keycloak.AccessTokenAsync(Tm1EngineContainer.OAuth2Realm, ClientId, User, Password, cancellationToken).ConfigureAwait(false);
@@ -172,10 +222,16 @@ public sealed class Tm1Login
     /// session; <see cref="CookieAsync"/> keeps one.</summary>
     /// <returns>The session cookie, <c>TM1SessionId=...</c>.</returns>
     /// <exception cref="InvalidOperationException">TM1 refuses the login; or this is an OAuth 2.0 login, whose token TM1
-    /// takes on any request and not here.</exception>
+    /// takes on any request and not here; or a pass-through login, whose header TM1 takes the same way.</exception>
     public async Task<string> SessionAsync(string authorization, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(authorization);
+        if (header is not null)
+        {
+            throw new InvalidOperationException(
+                "A pass-through login has no session to ask for: TM1 takes its header on any request (Authorization), and CookieAsync() keeps the session that gives"
+            );
+        }
         if (keycloak is not null)
         {
             throw new InvalidOperationException(
@@ -197,6 +253,16 @@ public sealed class Tm1Login
         return await SessionCookieAsync(response, CancellationToken.None).ConfigureAwait(false);
     }
 
+    /// <summary>The session TM1 gives the first request that carries the header: TM1 asks the server behind it who
+    /// this is.</summary>
+    private async Task<string> HeaderSessionAsync()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, database!.RestUrl + "ActiveUser?$select=Name");
+        request.Headers.TryAddWithoutValidation("Authorization", header);
+        using var response = await SendAsync(request, CancellationToken.None).ConfigureAwait(false);
+        return await SessionCookieAsync(response, CancellationToken.None).ConfigureAwait(false);
+    }
+
     private async Task<string> SessionCookieAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var found = response.Headers.TryGetValues("Set-Cookie", out var cookies)
@@ -205,7 +271,9 @@ public sealed class Tm1Login
         if (!response.IsSuccessStatusCode || found is null)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new InvalidOperationException($"TM1 refused the login of '{User}' to instance '{Instance}' (HTTP {(int)response.StatusCode}): {body}");
+            throw new InvalidOperationException(
+                $"TM1 refused the login of {(User.Length == 0 ? "a pass-through header" : "'" + User + "'")} to instance '{Instance}' (HTTP {(int)response.StatusCode}): {body}"
+            );
         }
         return found;
     }
@@ -226,10 +294,14 @@ public sealed class Tm1Login
     /// with a session cookie.</summary>
     /// <returns>The same request.</returns>
     /// <exception cref="InvalidOperationException">A login through the application, whose token TM1 takes only at its
-    /// session endpoint (<see cref="SessionAsync"/>).</exception>
+    /// session endpoint (<see cref="SessionAsync"/>); or a pass-through login, which has no token.</exception>
     public async Task<HttpRequestMessage> AuthorizeWithTokenAsync(HttpRequestMessage request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (header is not null)
+        {
+            throw new InvalidOperationException(NoToken);
+        }
         if (keycloak is null)
         {
             throw new InvalidOperationException(
@@ -244,7 +316,7 @@ public sealed class Tm1Login
     }
 
     /// <inheritdoc/>
-    public override string ToString() => "Tm1Login[" + User + " in " + Instance + "]"; // never the secret
+    public override string ToString() => "Tm1Login[" + (User.Length == 0 ? "a pass-through header" : User) + " in " + Instance + "]"; // never the secret
 
     private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {

@@ -200,8 +200,6 @@ tm1Engine: true            # one database, tm1; log in as admin
       passes it on.
   - Tried against a TM1 11 server with users of its own, and in CAM security with the LDAP
     and the OIDC namespace.
-  - `PlanningAnalyticsEnvironment.fromConfig` doesn't read `passthrough` yet: a file with it
-    is refused there as an unknown setting.
 - **Everything the engine stores is in `pa-files/tm1-engine`:** `deployment` (settings, the
   databases and logs), `credentials`, and `datastore` (MongoDB's data). Keep or delete the three
   together: a database's changes since its last save are in MongoDB.

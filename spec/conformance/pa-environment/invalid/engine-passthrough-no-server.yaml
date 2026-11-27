@@ -1,0 +1,4 @@
+# error: tm1Engine.passthrough.server: name one of tm1.servers
+version: 1
+tm1: { servers: { legacy: {} } }
+tm1Engine: { passthrough: {} }

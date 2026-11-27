@@ -64,6 +64,23 @@ public static class Tm1EngineExamples
         return response.StatusCode;
     }
 
+    public static async Task<HttpStatusCode> PassThrough(Tm1EngineSource source, Tm1Source tm1)
+    {
+        // @start region = pass-through
+        // Starting the engine starts the TM1 11 server first; the server is yours to stop
+        await using var server = new Tm1ServerContainer(tm1).WithSeed(Tm1Seed.Sdata);
+        await using var engine = new Tm1EngineContainer(source).WithPassThrough(server);
+        await engine.StartAsync();
+        var db = engine.Database("tm1");
+        // The sample database's admin / apple, which TM1 v12 asks the server about
+        using var request = new HttpRequestMessage(HttpMethod.Get, db.RestUrl + "Cubes?$select=Name");
+        await db.PassThroughLogin().AuthorizeAsync(request);
+        // @end
+        using var http = new HttpClient(new HttpClientHandler { UseCookies = false });
+        using var response = await http.SendAsync(request);
+        return response.StatusCode;
+    }
+
     public static async Task<string> Container(Tm1EngineSource source)
     {
         // @start region = container

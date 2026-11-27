@@ -75,7 +75,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     public IContainer Container => container ?? throw new InvalidOperationException("The container isn't started yet");
 
     /// <inheritdoc/>
-    public bool IsRunning => container is { State: TestcontainersStates.Running };
+    public virtual bool IsRunning => container is { State: TestcontainersStates.Running };
 
     /// <summary>The host its ports are mapped on.</summary>
     public string Host => Container.Hostname;
@@ -94,6 +94,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
         env[name] = value;
         return Self;
     }
+
+    /// <summary>Takes an environment variable off again: for a container that sets one only in some configurations, and
+    /// is configured anew at each start.</summary>
+    private protected void RemoveEnv(string name) => env.Remove(name);
 
     /// <summary>Sets environment variables.</summary>
     public TSelf WithEnv(IReadOnlyDictionary<string, string> variables)
