@@ -35,7 +35,7 @@ test('a prompt is filled in from the build: package, install command, version an
 	assert.ok(text.includes('pip install skipcheck-tm1==1.2.3'), text);
 	assert.ok(text.includes('https://skipcheck.io/tm1-client/docs/python/'), text);
 	assert.ok(text.includes('https://skipcheck.io/tm1-client/walkthroughs/connect/'), text);
-	assert.ok(text.includes('https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/v1.2.3/agent-plugin/skills/tm1-setup/SKILL.md'), text);
+	assert.ok(text.includes('https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/v1.2.3/agent-plugin/skills/pa-setup/SKILL.md'), text);
 	assert.ok(!/\{\{/.test(text), text);
 	await assert.rejects(promptText(client, 'python', { template: 'See {{nothing}}.', version: release }), /no \{\{nothing\}\}/);
 	const docker = PROMPTED.find((p) => p.id === 'pa-docker');

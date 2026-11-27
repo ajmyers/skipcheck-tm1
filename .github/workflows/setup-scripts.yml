@@ -1,24 +1,19 @@
-# Tests the setup scripts: tm1-server's (docker/tm1-server/setup.sh and setup.ps1), and
-# pa-setup's (docker/pa-setup/setup.sh and setup.ps1), which start from nothing too and are
-# to replace them (#386).
+# Tests the setup scripts (docker/pa-setup/setup.sh and setup.ps1): the one pair for everything.
 #
-# CI has no IBM software, so TM1 can't start here. These jobs test everything up to
-# "docker compose up": options, the checks, the fail-fast errors when there's no
-# terminal, and the folder and .env a --no-start run leaves behind, using a fake
-# bundle (a tiny gzip file with the IBM file name). The full start is tested by
-# hand with a real bundle.
+# CI has no IBM software, so nothing can start here. These jobs test everything up to
+# "docker compose up": starting from nothing with a fake bundle (a tiny gzip file with the
+# IBM file name), the refusals, and the files a --no-start run leaves behind.
 #
-#   linux:   setup.sh under dash (Ubuntu's /bin/sh, so it stays POSIX) and setup.ps1
-#            under pwsh, against the same cases
-#   windows: setup.ps1 under Windows PowerShell 5.1 and pwsh. GitHub's Windows
-#            runners run Docker in Windows-containers mode, so the script must stop
-#            at that check with its fix (or at "Docker isn't running", when the
-#            runner's Docker service hasn't started yet).
+#   linux:   setup.sh under dash (Ubuntu's /bin/sh, so it stays POSIX) and setup.ps1 under
+#            pwsh, against an image of the setup tool built from this commit
+#   windows: setup.ps1 under Windows PowerShell 5.1 and pwsh. GitHub's Windows runners run
+#            Docker in Windows-containers mode, so the script must stop at that check with
+#            its fix (or at "Docker isn't running", when the runner's Docker service hasn't
+#            started yet).
 #
-#   pa-setup-linux:   pa-setup's setup.sh under dash and setup.ps1 under pwsh, against an
-#                     image built from this commit: starting from nothing with a fake
-#                     bundle, up to the files a --no-start run leaves behind
-#   pa-setup-windows: pa-setup's setup.ps1 under both PowerShells, up to its Docker check
+# The tool's own logic (what a start from nothing writes, and refuses) is tested in
+# scripts/tests/test_pa_setup_start.py, and the scripts against a stand-in docker in
+# scripts/tests/test_pa_setup.py: both in checkScripts.
 name: Setup scripts
 
 # Runs as part of CI (ci.yml calls it), so its result counts towards the required ci-ok check.
@@ -31,153 +26,6 @@ permissions:
 
 jobs:
   linux:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: docker/tm1-server
-    env:
-      CI: 'true'
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Fake bundle
-        run: |
-          mkdir -p "$RUNNER_TEMP/dl"
-          echo fake | gzip > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
-          echo fake | gzip > "$RUNNER_TEMP/dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz"
-          echo fake > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-win64_bundle.zip"
-
-      - name: setup.sh
-        run: |
-          set -u
-          dl=$RUNNER_TEMP/dl; t=$RUNNER_TEMP/sh
-          expect_fail() {  # expect_fail TEXT -- COMMAND...: fails with exit 1 and prints TEXT
-            text=$1; shift 2
-            set +e; out=$("$@" 2>&1); rc=$?; set -e
-            echo "$out" | tail -4
-            [ "$rc" = 1 ] || { echo "::error::expected exit 1, got $rc: $*"; exit 1; }
-            grep -qF -- "$text" <<<"$out" || { echo "::error::expected '$text' from: $*"; exit 1; }
-          }
-          sh setup.sh --help | grep -q -- '--bundle FILE'
-          expect_fail 'No TM1 source given' -- sh setup.sh --dir "$t"
-          expect_fail 'Unknown option: --frob' -- sh setup.sh --frob
-          expect_fail 'Choose one TM1 source' -- sh setup.sh --bundle x --url https://x
-          expect_fail "isn't the Linux TM1 Server download" -- sh setup.sh --dir "$t" --bundle "$dl/tm1server-0.0.0-1-win64_bundle.zip"
-          expect_fail 'must start with https://' -- sh setup.sh --dir "$t" --url ftp://x
-          expect_fail "there's no bin64/tm1s.exe" -- sh setup.sh --dir "$t" --tm1-home "$dl"
-          # A run that sets everything up
-          sh setup.sh --dir "$t" --bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" \
-            --image ghcr.io/ajmyers/tm1-server:edge --files-dir "$t/files" --samples --base-url "$PWD" --no-start
-          test -f "$t/compose.yaml" && test -f "$t/.env.example"
-          test -f "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
-          # The older full installer (Planning Analytics 2.1.2, 2.1.7) is taken as a bundle too
-          sh setup.sh --dir "$t-ml" --bundle "$dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz" \
-            --image ghcr.io/ajmyers/tm1-server:edge --base-url "$PWD" --no-start
-          test -f "$t-ml/bundles/tm1_linuxi38664h_0.0.0.1_ml.tar.gz"
-          grep -qx "TM1_SERVER_IMAGE='ghcr.io/ajmyers/tm1-server:edge'" "$t/.env"
-          grep -qx "TM1_FILES_DIR='$t/files'" "$t/.env"
-          grep -qx "COMPOSE_PROFILES='samples'" "$t/.env"
-          (cd "$t" && docker compose config --images | grep -qx 'ghcr.io/ajmyers/tm1-server:edge')
-          # Each server's folders are under TM1_FILES_DIR unless a *_DIR setting names a
-          # folder or one of the declared volumes
-          (cd "$t" && docker compose --profile samples config > "$t/folders.yaml" \
-            && TM1_DATA_DIR=tm1-data TM1_CONFIG_DIR=./elsewhere TM1_SDATA_LOGS_DIR=tm1-sdata-logs docker compose --profile samples config > "$t/moved.yaml")
-          for folder in tm1/config tm1/data tm1/logs sdata/config sdata/data sdata/logs admin/logs; do
-            grep -qx "        source: $t/files/$folder" "$t/folders.yaml"
-          done
-          if grep -B2 'target: /tm1/' "$t/folders.yaml" | grep -q 'type: volume'; then echo "a folder became a volume"; exit 1; fi
-          grep -B2 'target: /tm1/data' "$t/moved.yaml" | grep -qx '        source: tm1-data'
-          grep -B2 'target: /tm1/config' "$t/moved.yaml" | grep -qx "        source: $t/elsewhere"
-          grep -B2 'target: /tm1/logs' "$t/moved.yaml" | grep -qx '        source: tm1-sdata-logs'
-          grep -qx "        source: $t/files/tm1/logs" "$t/moved.yaml"
-          # A rerun keeps it all, and says so
-          out=$(sh setup.sh --dir "$t" --image other:1 --base-url "$PWD" --no-start 2>&1)
-          echo "$out"
-          grep -q 'Kept the existing .env' <<<"$out"
-          grep -q 'Not applied, because .env already exists: TM1_SERVER_IMAGE=other:1' <<<"$out"
-        shell: bash
-
-      - name: setup.ps1 passes no double quotes to docker
-        # Windows PowerShell 5.1 mangles double quotes inside native-command arguments
-        # (pwsh 7.3+ doesn't), so a docker template like {{index .Labels "x"}} breaks only
-        # on 5.1. CI's Windows runners can't run Linux containers to catch it, so check
-        # every Docker/DockerOk call in the source with PowerShell's own parser.
-        shell: pwsh
-        run: |
-          $tokens = $null; $errors = $null
-          $ast = [System.Management.Automation.Language.Parser]::ParseFile("$PWD/setup.ps1", [ref]$tokens, [ref]$errors)
-          $bad = $ast.FindAll({ param($n)
-              $n -is [System.Management.Automation.Language.CommandAst] -and
-              $n.GetCommandName() -in 'Docker', 'DockerOk' -and
-              ($n.CommandElements | Select-Object -Skip 1 | Where-Object { $_.PSObject.Properties['Value'] -and ([string]$_.Value).Contains('"') })
-            }, $true)
-          foreach ($b in $bad) { Write-Host "::error file=docker/tm1-server/setup.ps1,line=$($b.Extent.StartLineNumber)::docker argument contains a double quote; Windows PowerShell 5.1 mangles these" }
-          if ($bad) { exit 1 }
-
-      - name: setup.ps1 (pwsh)
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $dl = "$env:RUNNER_TEMP/dl"; $t = "$env:RUNNER_TEMP/ps"
-          function Expect-Fail([string]$Text, [string[]]$ScriptArgs) {
-            $out = (& pwsh -NoProfile -File ./setup.ps1 @ScriptArgs 2>&1 | Out-String)
-            $rc = $LASTEXITCODE
-            Write-Host ($out.Trim() -split "`n" | Select-Object -Last 4 | Out-String)
-            if ($rc -ne 1) { throw "expected exit 1, got $rc for $ScriptArgs" }
-            if (-not $out.Contains($Text)) { throw "expected '$Text' for $ScriptArgs" }
-          }
-          if (-not ((pwsh -NoProfile -File ./setup.ps1 -Help | Out-String).Contains('-Bundle FILE'))) { throw 'help' }
-          Expect-Fail 'No TM1 source given' @('-Dir', $t)
-          Expect-Fail 'Choose one TM1 source' @('-Bundle', 'x', '-Url', 'https://x')
-          Expect-Fail "isn't the Linux TM1 Server download" @('-Dir', $t, '-Bundle', "$dl/tm1server-0.0.0-1-win64_bundle.zip")
-          Expect-Fail 'must start with https://' @('-Dir', $t, '-Url', 'ftp://x')
-          pwsh -NoProfile -File ./setup.ps1 -Dir $t -Bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" -Image ghcr.io/ajmyers/tm1-server:edge -Samples -BaseUrl $PWD -NoStart
-          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 failed: $LASTEXITCODE" }
-          $envText = Get-Content -Raw "$t/.env"
-          if (-not $envText.Contains("TM1_SERVER_IMAGE='ghcr.io/ajmyers/tm1-server:edge'")) { throw '.env image' }
-          if (-not $envText.Contains("COMPOSE_PROFILES='samples'")) { throw '.env profile' }
-          $bytes = [IO.File]::ReadAllBytes("$t/.env")
-          if ($bytes[0] -eq 0xEF) { throw '.env has a byte-order mark' }
-          if (-not (Test-Path "$t/bundles/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz")) { throw 'bundle not copied' }
-          # The older full installer (Planning Analytics 2.1.2, 2.1.7) is taken as a bundle too
-          pwsh -NoProfile -File ./setup.ps1 -Dir "$t-ml" -Bundle "$dl/tm1_linuxi38664h_0.0.0.1_ml.tar.gz" -Image ghcr.io/ajmyers/tm1-server:edge -BaseUrl $PWD -NoStart
-          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 failed for the full installer: $LASTEXITCODE" }
-          if (-not (Test-Path "$t-ml/bundles/tm1_linuxi38664h_0.0.0.1_ml.tar.gz")) { throw 'full installer not copied' }
-
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: docker/tm1-server
-    env:
-      CI: 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        shell: [powershell, pwsh]   # Windows PowerShell 5.1, PowerShell 7
-    steps:
-      - uses: actions/checkout@v7
-      - name: setup.ps1 under ${{ matrix.shell }}
-        shell: pwsh
-        run: |
-          $exe = '${{ matrix.shell }}'
-          $help = (& $exe -NoProfile -File ./setup.ps1 -Help | Out-String)
-          if (-not $help.Contains('-Bundle FILE')) { throw "help failed: $help" }
-          $out = (& $exe -NoProfile -File ./setup.ps1 -Dir "$env:RUNNER_TEMP\t" -Bundle x 2>&1 | Out-String)
-          $rc = $LASTEXITCODE
-          Write-Host $out
-          if ($rc -ne 1) { throw "expected exit 1, got $rc" }
-          # Either Docker check may stop it: GitHub's runners use Windows containers, and
-          # their Docker service sometimes hasn't started yet.
-          if (-not ($out.Contains('Docker is running Windows containers') -or $out.Contains("Docker isn't running"))) {
-            throw 'expected a Docker check (Windows containers, or not running) to stop it'
-          }
-          if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
-          exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
-
-  pa-setup-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -256,7 +104,7 @@ jobs:
           if (-not (Get-Content -Raw "$t/.env").Contains('TM1_BUNDLE=/ibm/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz')) { throw '.env bundle' }
           if (-not (Test-Path "$t/compose.yaml")) { throw 'no compose.yaml' }
 
-  pa-setup-windows:
+  windows:
     runs-on: windows-latest
     timeout-minutes: 10
     defaults:

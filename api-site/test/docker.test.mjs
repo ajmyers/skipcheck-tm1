@@ -18,7 +18,7 @@ test("headings get GitHub's ids, numbered when they repeat", () => {
 });
 
 const source = 'docker/tm1-server/README.md';
-const repo = { exists: (file) => ['docker/tm1-server/setup.sh', 'docker/tm1-server/bundles', '.github/workflows/docker.yml'].includes(file), isDirectory: (file) => file.endsWith('bundles') };
+const repo = { exists: (file) => ['docker/tm1-server/compose.yaml', 'docker/tm1-server/bundles', '.github/workflows/docker.yml'].includes(file), isDirectory: (file) => file.endsWith('bundles') };
 const github = /^https:\/\/github\.com\/[^/]+\/[^/]+\/(blob|tree)\/master\/(.+)$/;
 
 test("a link to another README is that README's page, anchor kept", () => {
@@ -29,7 +29,7 @@ test("a link to another README is that README's page, anchor kept", () => {
 });
 
 test('a link to any other file in the repository is that file on GitHub', () => {
-	assert.deepEqual(github.exec(linkTarget('setup.sh', source, repo)).slice(1), ['blob', 'docker/tm1-server/setup.sh']);
+	assert.deepEqual(github.exec(linkTarget('compose.yaml', source, repo)).slice(1), ['blob', 'docker/tm1-server/compose.yaml']);
 	assert.deepEqual(github.exec(linkTarget('../../.github/workflows/docker.yml', source, repo)).slice(1), ['blob', '.github/workflows/docker.yml']);
 	assert.deepEqual(github.exec(linkTarget('bundles/', source, repo)).slice(1), ['tree', 'docker/tm1-server/bundles']);
 });

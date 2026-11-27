@@ -5,13 +5,12 @@ on your own computer, on **Mac, Windows or Linux**. It takes about 15 minutes, m
 of it installing Docker.
 
 > **Prefer a page that shows only your steps?** The interactive setup guide at
-> <https://skipcheck.io/tm1/> asks the same questions and shows just the commands for your
-> answers, including the setup script one-liner with your choices filled in.
+> <https://skipcheck.io/pa-docker/setup/> asks what you want to run and shows just the
+> commands for your answers.
 
-> **Want more than one TM1 server, or TM1 Web, PAW or Cognos?** This guide sets up one
-> TM1 server, and IBM's SData sample if you like. [`pa-setup`](../pa-setup/README.md)
-> sets up any combination from one file, `pa-environment.yaml`. Install Docker as in
-> [Step 1](#step-1-install-docker) here, then follow its README.
+> **Want more than one TM1 server, or TM1 Web, PAW or Cognos?** The setup script below is
+> [`pa-setup`](../pa-setup/README.md)'s: it sets up one TM1 server from a single command,
+> and any combination from one file, `pa-environment.yaml`.
 
 You make three choices along the way. Pick the option that fits; you can change
 any of them later:
@@ -22,36 +21,36 @@ any of them later:
 
 ## The fast way: the setup script
 
-Once Docker is installed ([Step 1](#step-1-install-docker)), one command does Steps 2
-to 5 for you. It asks the same questions as this guide, checks your computer as it
-goes (Docker, Rosetta on Apple Silicon, WSL 2 on Windows, free ports, the right
-bundle), starts TM1 and waits until it's ready:
+Once Docker is installed ([Step 1](#step-1-install-docker)), one command sets up and starts
+a TM1 server in the current folder. Say where TM1 comes from; for example, the bundle in
+your Downloads folder, with IBM's SData sample beside it:
 
 ```sh
 # Mac / Linux (Terminal)
-curl -fsSL https://skipcheck.io/tm1/setup.sh | sh
+mkdir -p ~/pa && cd ~/pa
+curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz --samples
 ```
 ```powershell
 # Windows (PowerShell)
-irm https://skipcheck.io/tm1/setup.ps1 | iex
+New-Item -ItemType Directory -Force $HOME\pa | Out-Null; Set-Location $HOME\pa
+& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) --bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" --samples
 ```
 
-To skip the questions, give the answers as options. For example, to use the bundle in
-your Downloads folder and also start the SData sample:
-
-```sh
-# Mac / Linux
-curl -fsSL https://skipcheck.io/tm1/setup.sh | sh -s -- --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz --samples
-```
-```powershell
-# Windows
-& ([scriptblock]::Create((irm https://skipcheck.io/tm1/setup.ps1))) -Bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz" -Samples
-```
-
-Add `--help` (`-Help` on Windows) to see every option, or let
-<https://skipcheck.io/tm1/> build the command for your choices. Without a terminal (in CI, or with
-`--yes`) it never asks: a missing answer is an error naming the option to add. Running
-it again is safe: it keeps your settings and the installed TM1, and says what it reused.
+- **With no option, at a terminal, it asks** where TM1 comes from. Without a terminal (in
+  CI, or with `--yes`) it never asks: a missing answer is an error naming the options.
+- **The other sources of [Step 3](#step-3-where-does-tm1-come-from) have options too:**
+  `--url` (with `--sha256`), `--tm1-home` and `--image`. `--help` lists every one.
+- **It's [`pa-setup`](../pa-setup/README.md)'s script,** the one setup script for everything
+  here. It writes `pa-environment.yaml` and `.env` in the folder, starts TM1, waits until
+  it's ready, and prints every address and login. `up`, `urls`, `logs` and `down` are the
+  same command with another last word.
+- **Running it again is safe:** a `pa-environment.yaml` that's there is used as it is, and
+  the installed TM1 is kept.
+- **Set up before with `skipcheck.io/tm1/setup.sh`?** That script was tm1-server's own, and
+  made a `tm1` folder with a `compose.yaml`. It's retired, and the address now serves this
+  script. Your `tm1` folder keeps working with `docker compose` as in
+  [Everyday commands](#everyday-commands). To move to pa-setup, start a new folder as above;
+  stop the old one first (`docker compose down` in it) if both would use port 8010.
 
 The rest of this guide does the same steps by hand, and explains each one.
 

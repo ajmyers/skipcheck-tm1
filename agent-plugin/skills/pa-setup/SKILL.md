@@ -15,9 +15,9 @@ result, and explain how to use it.
 
 If the user gave arguments, treat them as what they want or have: $ARGUMENTS
 
-For a single TM1 server and nothing else, the `tm1-setup` skill (tm1-server's own setup
-script) also works, and takes more TM1 sources (an installed `tm1_64` folder). Use this
-skill for anything more.
+For a single TM1 server and nothing else, there's a short way with no file to write:
+[One TM1 server, the short way](#one-tm1-server-the-short-way), below. It writes the same
+`pa-environment.yaml`, so anything more can be added to it afterwards.
 
 ## Rules
 
@@ -33,6 +33,46 @@ skill for anything more.
   the current folder. pa-setup asks questions only when it's run with no command, no
   `pa-environment.yaml` and a terminal: give it a command (`init`, `up`), or `--yes`, and it
   asks nothing.
+
+## One TM1 server, the short way
+
+When the user wants one TM1 server (and IBM's SData sample, if they like), say where TM1
+comes from and pa-setup writes the file and starts it, in the current folder:
+
+```sh
+mkdir -p ~/pa && cd ~/pa
+curl -fsSL https://skipcheck.io/pa/setup.sh | sh -s -- --yes --bundle ~/Downloads/tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz
+```
+```powershell
+New-Item -ItemType Directory -Force $HOME\pa | Out-Null; Set-Location $HOME\pa
+& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1))) --yes --bundle "$HOME\Downloads\tm1server-2.1.19-26031712-linuxi38664h_bundle.tar.gz"
+```
+
+| Where TM1 comes from | Option |
+|---|---|
+| The IBM bundle file, `tm1server-<version>-linuxi38664h_bundle.tar.gz` (the **Linux** download even on Mac or Windows; look in `~/Downloads` first) | `--bundle FILE` |
+| A folder holding several IBM downloads | `--ibm DIR` |
+| A download link to the bundle, e.g. a pre-signed one, optionally with its SHA-256 | `--url "$URL" [--sha256 HASH]` |
+| An installed `tm1_64` folder of a Linux TM1 server (it contains `bin64/tm1s.exe`) | `--tm1-home DIR` |
+| A private Docker image with TM1 built in | `--image IMAGE` |
+| TM1 v12's package, `tm1-v<version>-standalone-linux.tgz`: a TM1 v12 engine in place of the server | `--bundle FILE` |
+
+- **Other options:** `--samples` (IBM's SData sample, on port 8011), `--files-dir DIR`,
+  `--no-start`, `--timeout SECONDS`. `--help` lists them all.
+- **Always pass `--yes`,** or it may ask questions at a terminal.
+- **It sets up the folder it's run in:** `cd` there first. There's no `--dir`.
+- **A `pa-environment.yaml` that's already there is used as it is,** and the options are
+  said to be unused. To change what runs, edit the file and run `up`.
+- **If the download returns HTML instead of a script** (some networks get a bot check from
+  skipcheck.io), use the same script from GitHub:
+  `https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/docker/pa-setup/setup.sh`
+  (or `setup.ps1`).
+- **An older `./tm1` folder,** made by tm1-server's own setup script (retired), keeps working
+  with plain `docker compose` there. Don't run pa-setup in it: start a new folder, and stop
+  the old one first if it holds the same ports (ask before `docker compose down`).
+
+Then go to [5. Check it worked](#5-check-it-worked). For anything more than one server,
+follow the steps from 1.
 
 ## 1. Find out what the user wants and has
 

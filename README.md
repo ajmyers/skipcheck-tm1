@@ -25,7 +25,7 @@ Java is the reference: the other clients have its API, and their tests replay wh
 | [`docker/paw`](docker/paw) | Runs IBM's Planning Analytics Workspace Local images from your own PAW zip, next to `tm1-server`. No IBM software is included. |
 | [`docker/cognos-server`](docker/cognos-server) | Docker image for Cognos Analytics, for testing TM1's Cognos (CAM) security with test users through LDAP and OIDC. You supply your own licensed Cognos; no IBM software is included. |
 | [`docker/pa-setup`](docker/pa-setup) | One command for any mix of the above: TM1 servers, TM1 Web, PAW and Cognos, described in one file, `pa-environment.yaml`. |
-| [`agent-plugin`](agent-plugin) | Agent skills that set these up for you: `tm1-setup` for one TM1 server, `pa-setup` for the rest. |
+| [`agent-plugin`](agent-plugin) | An agent skill that sets these up for you: `pa-setup`, for one TM1 server or a whole environment. |
 
 The Java libraries require Java 17+, the Python client Python 3.11+, the .NET client .NET 10, the TypeScript client Node 22+ or a modern browser (its testcontainers, Node 22.22+).
 

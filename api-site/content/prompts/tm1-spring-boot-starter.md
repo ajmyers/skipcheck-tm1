@@ -14,6 +14,6 @@ Before you write code, ask me what the application should do, unless I've said a
 4. Look up the settings, the beans and each method you use in the docs: {{docs}}. The client's own docs are at {{site}}/tm1-client/docs/java/; they say where TM1 behaves in surprising ways, on the method it affects ("TM1 (11.8) ..."), so read them before working around an error. The landing pages, the walkthroughs and every type's overview are also in one file for agents: {{llms-full}}
 5. Start the application against my server, and show me what it printed.
 
-If I don't have a TM1 server, one can run on this computer in Docker, from my own licensed TM1 Server download. These instructions set it up: tm1-setup for one server, pa-setup for more, or for TM1 Web, Workspace or Cognos security:
+If I don't have a TM1 server, one can run on this computer in Docker, from my own licensed TM1 Server download. These instructions set it up, one server or more, with TM1 Web, Workspace or Cognos security if I want them:
 
 {{skills}}

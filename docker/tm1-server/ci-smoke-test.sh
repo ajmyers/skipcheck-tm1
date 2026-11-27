@@ -17,7 +17,8 @@ run() { docker run --rm "$@"; }  # image is linux/amd64 (pinned in the Dockerfil
 
 # 1. Shell scripts pass shellcheck
 if command -v shellcheck >/dev/null; then
-  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh "$here"/setup.sh && pass "shellcheck"
+  shellcheck -S warning "$here"/docker/*.sh "$here"/ci-smoke-test.sh || fail "shellcheck"
+  pass "shellcheck"
 else
   echo "skip - shellcheck not installed"
 fi
@@ -193,14 +194,5 @@ out=$(run -e TM1_CAM_NAMESPACE=OIDC -e TM1_CAM_NAMESPACE_TYPE=oidc -e TM1_CAM_AD
 grep -qxF 'admin CAMID("OIDC:u:admin")' <<<"$out" && grep -qxF 'group CAMID("OIDC:g:analysts")' <<<"$out" \
   || fail "cam-setup.py --print lacks OIDC CAMIDs: $out"
 pass "CAM setup builds CAMIDs (LDAP and OIDC, and keeps full CAMIDs whole)"
-
-# 8. The setup scripts show the same banner as the image (each embeds a copy)
-while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  for script in setup.sh setup.ps1; do
-    grep -qF -- "$line" "$here/$script" || fail "$script's banner differs from docker/banner.txt, at: $line"
-  done
-done <"$here/docker/banner.txt"
-pass "setup.sh and setup.ps1 show docker/banner.txt"
 
 echo "All smoke tests passed."
