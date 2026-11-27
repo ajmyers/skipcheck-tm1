@@ -216,6 +216,11 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
                 // The environment's one Keycloak: its address on the network is its issuer for Cognos and for the engine alike
                 tm1Engine.WithOAuth2(keycloak!);
             }
+            if (b.Tm1EnginePassThroughSet is { } passThrough)
+            {
+                // By the name the server has on the network already
+                tm1Engine.WithPassThrough(servers[passThrough], passThrough);
+            }
             // What the file said first; then, below, what the caller says
             Apply(b.FileTm1Engine, tm1Engine);
         }
@@ -255,7 +260,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
     /// <see cref="Tm1EngineContainer.WithDatabase(string, string)"/> in its <c>instance</c>, and <c>users</c> as
     /// <see cref="Tm1EngineContainer.WithUser"/>. <c>oauth2</c> is <see cref="EnvironmentBuilder.Tm1EngineOAuth2"/>, and a
     /// user's password is then their <see cref="Tm1EngineContainer.WithLogin"/> at Keycloak; without it the password is
-    /// checked and not used, as TM1 v12 keeps none. It runs beside <c>tm1</c>, or alone;</item>
+    /// checked and not used, as TM1 v12 keeps none. <c>passthrough</c> is <see cref="EnvironmentBuilder.Tm1EnginePassThrough"/>
+    /// to the server it names; with <c>cognos</c> the users are then Cognos's. It runs beside <c>tm1</c>, or alone;</item>
     /// <item><c>ibm</c>: each part's source, the folder as <see cref="Testcontainers.Tm1Source.Bundle"/>,
     /// <see cref="Testcontainers.Tm1WebSource.Bundle"/>, <see cref="Testcontainers.Tm1EngineSource.Bundle"/> and <see cref="Testcontainers.CognosSource.Zip"/>. A relative path is from the
     /// file's folder; <c>~</c> is the user's home;</item>
@@ -573,6 +579,8 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
 
         internal bool Tm1EngineOAuth2Set { get; private set; }
 
+        internal string? Tm1EnginePassThroughSet { get; private set; }
+
         // The file's own settings for the engine, kept when the caller adds theirs
         internal Action<Tm1EngineContainer>? FileTm1Engine { get; set; }
 
@@ -698,6 +706,18 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             return this;
         }
 
+        /// <summary>Has the TM1 v12 engine pass logins on to one of the environment's TM1 servers
+        /// (<see cref="Tm1EngineContainer.WithPassThrough(Tm1ServerContainer)"/>): that server's users log in to TM1 v12 with
+        /// what they have there. With <see cref="Cognos"/> they are Cognos's users. Log in with
+        /// <see cref="Testcontainers.Tm1Database.PassThroughLogin()"/>. Not together with <see cref="Tm1EngineOAuth2"/>.</summary>
+        /// <param name="server">The name of a server added with <see cref="Tm1(string)"/>.</param>
+        /// <returns>This builder.</returns>
+        public EnvironmentBuilder Tm1EnginePassThrough(string server)
+        {
+            Tm1EnginePassThroughSet = server ?? throw new ArgumentNullException(nameof(server));
+            return this;
+        }
+
         /// <summary>Where the engine gets TM1 v12 from, rather than <see cref="Testcontainers.Tm1EngineSource.Discover()"/>.</summary>
         public EnvironmentBuilder Tm1EngineSource(Tm1EngineSource source)
         {
@@ -785,6 +805,23 @@ public sealed partial class PlanningAnalyticsEnvironment : IStartable
             if (Tm1EngineOAuth2Set && Tm1EngineCustomizer is null)
             {
                 throw new InvalidOperationException("OAuth 2.0 logins are a TM1 v12 engine's: add Tm1Engine() too");
+            }
+            if (Tm1EnginePassThroughSet is not null)
+            {
+                if (Tm1EngineCustomizer is null)
+                {
+                    throw new InvalidOperationException("Pass-through logins are a TM1 v12 engine's: add Tm1Engine() too");
+                }
+                if (!Tm1Names.Contains(Tm1EnginePassThroughSet))
+                {
+                    throw new InvalidOperationException(
+                        $"The engine passes logins to {Tm1EnginePassThroughSet}, which isn't a TM1 server of the environment: add it with Tm1(name). Those there: [{string.Join(", ", Tm1Names)}]"
+                    );
+                }
+                if (Tm1EngineOAuth2Set)
+                {
+                    throw new InvalidOperationException("TM1 takes tokens or passes logins on, not both: use Tm1EngineOAuth2 or Tm1EnginePassThrough");
+                }
             }
             if (CamNamespaceSet == CognosContainer.Namespace.Oidc && KeycloakCustomizer is null)
             {

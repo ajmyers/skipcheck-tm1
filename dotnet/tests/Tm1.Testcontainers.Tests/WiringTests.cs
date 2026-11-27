@@ -585,6 +585,85 @@ public class PlanningAnalyticsEnvironmentTests
     }
 
     [Fact]
+    public void AnEnginePassesLoginsToOneOfTheEnvironmentsServers()
+    {
+        var env = EngineBuilder()
+            .Tm1("first")
+            .Tm1("legacy", server => server.WithSeed(Tm1Seed.Sdata))
+            .Tm1Engine(engine => engine.WithUser("analyst"))
+            .Tm1EnginePassThrough("legacy")
+            .Build();
+        var engine = env.Tm1Engine();
+        // The server named, not the first, by the name it has on the network already
+        Assert.Same(env.Tm1("legacy"), engine.PassThrough);
+        Assert.Equal("http://legacy:8010/api/v1/", engine.EnvMap["TM1_PASSTHROUGH_URL"]);
+        Assert.Contains("legacy", env.Tm1("legacy").NetworkAliases);
+        Assert.DoesNotContain(Tm1EngineContainer.PassThroughAlias, env.Tm1("legacy").NetworkAliases);
+        Assert.Contains(env.Tm1("legacy"), engine.Dependencies);
+        Assert.DoesNotContain(env.Tm1("first"), engine.Dependencies);
+        Assert.Equal("apple", env.Tm1Database("tm1").PassThroughLogin().Password);
+
+        // With CAM security the engine's users are Cognos's, and the servers' administrators its own
+        var cam = EngineBuilder()
+            .Tm1("legacy")
+            .Cognos(cognos => cognos.WithUser("admin", "adminpw").WithUser("analyst", "analystpw"))
+            .Tm1Engine(e => e.WithUser("analyst", "Analysts"))
+            .Tm1EnginePassThrough("legacy")
+            .Build();
+        cam.Tm1Engine().Configure();
+        Assert.Equal("LDAP", cam.Tm1Engine().EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("analyst:Analysts,admin:ADMIN", cam.Tm1Engine().EnvMap["TM1_USERS"]);
+        Assert.Equal(cam.Cognos().CamAuthorization("analyst"), cam.Tm1Database("tm1").PassThroughLogin("analyst").Authorization);
+
+        Assert.Contains(
+            "other, which isn't a TM1 server of the environment",
+            Assert.Throws<InvalidOperationException>(() => EngineBuilder().Tm1("legacy").Tm1Engine().Tm1EnginePassThrough("other").Build()).Message
+        );
+        Assert.Contains(
+            "TM1 takes tokens or passes logins on, not both",
+            Assert
+                .Throws<InvalidOperationException>(() => EngineBuilder().Tm1("legacy").Tm1Engine().Tm1EngineOAuth2().Tm1EnginePassThrough("legacy").Build())
+                .Message
+        );
+        Assert.Contains(
+            "Pass-through logins are a TM1 v12 engine's: add Tm1Engine() too",
+            Assert.Throws<InvalidOperationException>(() => Builder().Tm1("legacy").Tm1EnginePassThrough("legacy").Build()).Message
+        );
+    }
+
+    [Fact]
+    public void FromConfigPassesLoginsToTheServerNamed()
+    {
+        var env = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-passthrough.yaml")).Build();
+        var engine = env.Tm1Engine();
+        Assert.Same(env.Tm1("legacy"), engine.PassThrough);
+        engine.Configure();
+        Assert.Equal("http://legacy:8010/api/v1/", engine.EnvMap["TM1_PASSTHROUGH_URL"]);
+        Assert.Equal("analyst:Analysts", engine.EnvMap["TM1_USERS"]);
+        Assert.False(engine.EnvMap.ContainsKey("TM1_CAM_NAMESPACE"));
+
+        // passthrough: false is off
+        var off = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-passthrough-off.yaml")).Build();
+        Assert.Null(off.Tm1Engine().PassThrough);
+        Assert.False(off.Tm1Engine().EnvMap.ContainsKey("TM1_PASSTHROUGH_URL"));
+
+        // With cognos the engine's users are Cognos's, as Cognos spells them, and the TM1 servers' administrators are
+        // the engine's too
+        var cam = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-passthrough-cam.yaml")).Build();
+        cam.Tm1Engine().Configure();
+        Assert.Equal("LDAP", cam.Tm1Engine().EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("ldap", cam.Tm1Engine().EnvMap["TM1_CAM_NAMESPACE_TYPE"]);
+        Assert.Equal("analyst:Analysts,admin:Ops:ADMIN,viewer:ADMIN", cam.Tm1Engine().EnvMap["TM1_USERS"]);
+
+        // A server whose cfg takes it out of CAM security has users of its own
+        var own = PlanningAnalyticsEnvironment.FromConfig(Fixture("engine-passthrough-own-users.yaml")).Build();
+        own.Tm1Engine().Configure();
+        Assert.False(own.Tm1Engine().EnvMap.ContainsKey("TM1_CAM_NAMESPACE"));
+        Assert.Equal("planner:Planners", own.Tm1Engine().EnvMap["TM1_USERS"]);
+        Assert.StartsWith("Basic ", own.Tm1Database("tm1").PassThroughLogin().Authorization, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AnEnvironmentWithAnEngineCantBeReused()
     {
         // Whatever the developer's switch says: the same code must do the same everywhere

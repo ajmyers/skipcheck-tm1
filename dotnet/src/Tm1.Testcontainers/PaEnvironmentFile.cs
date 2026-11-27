@@ -244,9 +244,10 @@ internal sealed partial class PaEnvironmentFile
         int? enginePort = null;
         int? datastorePort = null;
         int? engineKeycloakPort = null;
+        string? enginePassThrough = null;
         if (engineSection is not null)
         {
-            Keys(engineSection, ["port", "databases", "users", "datastore", "oauth2"], "tm1Engine");
+            Keys(engineSection, ["port", "databases", "users", "datastore", "oauth2", "passthrough"], "tm1Engine");
             // name and instance, in the file's order
             var databases = new List<(string Name, string Instance)>();
             var raw = Get(engineSection, "databases");
@@ -292,10 +293,12 @@ internal sealed partial class PaEnvironmentFile
             // With oauth2 in the section a password is meant, so user:password says what it means: on, or false to keep
             // the passwords with OAuth 2.0 off
             var passwordUsed = Get(engineSection, "oauth2") is not null;
+            // With pass-through a password is the TM1 server's to know, not this file's
+            var passwordElsewhere = Get(engineSection, "passthrough") is not null and not false;
             var engineUsers = new List<EngineUser>();
             for (var i = 0; i < list.Count; i++)
             {
-                engineUsers.Add(ParseEngineUser(list[i], "tm1Engine.users[" + i + "]", passwordUsed));
+                engineUsers.Add(ParseEngineUser(list[i], "tm1Engine.users[" + i + "]", passwordUsed, passwordElsewhere));
             }
             var engineNames = new HashSet<string>(StringComparer.Ordinal);
             foreach (var user in engineUsers)
@@ -319,6 +322,59 @@ internal sealed partial class PaEnvironmentFile
                 }
                 engineKeycloakPort = Port(Get(o, "keycloakPort"), "tm1Engine.oauth2", 8181);
             }
+            var passthrough = Get(engineSection, "passthrough");
+            // Off when absent or false; on, it names the TM1 server that checks logins
+            if (passthrough is not null and not false)
+            {
+                if (passthrough is true)
+                {
+                    throw Error("tm1Engine.passthrough: name the TM1 server that checks names and passwords, e.g. passthrough: {server: legacy}");
+                }
+                var p = Keys(passthrough, ["server"], "tm1Engine.passthrough");
+                if (Get(p, "server") is not string wanted || !servers.Any(s => s.Name == wanted))
+                {
+                    throw Error(
+                        "tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in to TM1 v12 with their name and password there"
+                            + (servers.Count == 0 ? "" : " (" + string.Join(", ", servers.Select(s => s.Name)) + ")")
+                    );
+                }
+                if (engineKeycloakPort is not null)
+                {
+                    throw Error("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and refuse a name and password");
+                }
+                var serverCfg = servers.First(s => s.Name == wanted).Server.Cfg;
+                // Whatever its case: the server's image matches a tm1s.cfg parameter's name in any
+                var useSsl = CfgParameter(serverCfg, "UseSSL", "F").Trim();
+                if (!useSsl.Equals("f", StringComparison.OrdinalIgnoreCase) && !useSsl.Equals("false", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw Error(
+                        "tm1Engine.passthrough.server: "
+                            + wanted
+                            + " has cfg.UseSSL on, and the engine asks it over plain HTTP: take UseSSL out of that server's cfg"
+                    );
+                }
+                // With cognos a TM1 server is in CAM security, unless its cfg says another mode: the image applies cfg last
+                var mode = CfgParameter(serverCfg, "IntegratedSecurityMode", "5").Trim();
+                if (cam is not null && mode is "4" or "5")
+                {
+                    // Only Cognos's users log in to a TM1 server in CAM security
+                    var strangers = engineUsers
+                        .Where(user => !cam.Users.Any(known => known.Name.Equals(user.Name, StringComparison.OrdinalIgnoreCase)))
+                        .Select(user => user.Name)
+                        .ToList();
+                    if (strangers.Count > 0)
+                    {
+                        throw Error(
+                            "tm1Engine.users: "
+                                + string.Join(", ", strangers)
+                                + " isn't in cognos.users. With cognos, "
+                                + wanted
+                                + " is in CAM security, and passthrough logs in Cognos's users only: add the name to cognos.users, or take it out of tm1Engine.users"
+                        );
+                    }
+                }
+                enginePassThrough = wanted;
+            }
             enginePort = Port(Get(engineSection, "port"), "tm1Engine", 4444);
             // Published only when a port is given
             datastorePort = Get(ds, "port") is null ? null : Port(Get(ds, "port"), "tm1Engine.datastore", 27017);
@@ -331,7 +387,7 @@ internal sealed partial class PaEnvironmentFile
                     throw Error("tm1.servers." + name + ": that name is the TM1 v12 engine's here; give the server another");
                 }
             }
-            engine = new Engine(databases, engineUsers, engineKeycloakPort is not null);
+            engine = new Engine(databases, engineUsers, engineKeycloakPort is not null, enginePassThrough);
         }
 
         if (servers.Count == 0 && cam is null && engine is null)
@@ -395,6 +451,10 @@ internal sealed partial class PaEnvironmentFile
             if (engine.OAuth2)
             {
                 b.Tm1EngineOAuth2();
+            }
+            if (engine.PassThrough is not null)
+            {
+                b.Tm1EnginePassThrough(engine.PassThrough);
             }
         }
         // Whatever the file's sections: an engine added in code runs the file's image too
@@ -577,9 +637,22 @@ internal sealed partial class PaEnvironmentFile
         return new CognosContainer.User(userName, pw, [.. groupNames]);
     }
 
+    /// <summary>A tm1s.cfg parameter of a server's cfg, whatever the case of its name.</summary>
+    private static string CfgParameter(List<(string Key, string Value)> cfg, string parameter, string otherwise)
+    {
+        foreach (var (key, value) in cfg)
+        {
+            if (key.Equals(parameter, StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
+        }
+        return otherwise;
+    }
+
     /// <summary>pa_setup.parse_user with password_optional: an engine's user, whose password may be left out or empty,
     /// since TM1 v12 keeps none.</summary>
-    private EngineUser ParseEngineUser(object? entry, string where, bool passwordUsed)
+    private EngineUser ParseEngineUser(object? entry, string where, bool passwordUsed, bool passwordElsewhere)
     {
         object? name;
         object? password;
@@ -590,6 +663,9 @@ internal sealed partial class PaEnvironmentFile
             if (parts.Length == 2 && parts[1].Length > 0 && !passwordUsed)
             {
                 // The image's own form has groups there; here the second part is a password
+                var hint = passwordElsewhere
+                    ? "With passthrough the password is the one the user has on the TM1 server, and isn't written here: write " + parts[0] + "."
+                    : "A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.";
                 throw Error(
                     where
                         + ": '"
@@ -598,7 +674,9 @@ internal sealed partial class PaEnvironmentFile
                         + parts[0]
                         + "::"
                         + parts[1]
-                        + ". (A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps it, off.)"
+                        + ". ("
+                        + hint
+                        + ")"
                 );
             }
             if (parts.Length > 3)
@@ -704,7 +782,7 @@ internal sealed partial class PaEnvironmentFile
     [GeneratedRegex(@"[:\s]")]
     private static partial Regex PasswordBreak();
 
-    private sealed record Engine(List<(string Name, string Instance)> Databases, List<EngineUser> Users, bool OAuth2);
+    private sealed record Engine(List<(string Name, string Instance)> Databases, List<EngineUser> Users, bool OAuth2, string? PassThrough);
 
     private sealed record EngineUser(string Name, string Password, List<string> Groups);
 

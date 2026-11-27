@@ -158,6 +158,42 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
     /// <summary>The CAM namespace, or null without Cognos.</summary>
     public CognosContainer.Namespace? CamNamespace => Cognos is null ? null : camNamespace;
 
+    /// <summary>Whether the server ends up in CAM security: set with
+    /// <see cref="WithCamSecurity(CognosContainer, CognosContainer.Namespace, string[])"/>, unless a <c>tm1s.cfg</c> parameter given
+    /// as <c>TM1_CFG_IntegratedSecurityMode</c> says another mode than 4 or 5. The image applies those last, and takes a
+    /// parameter's name in any case.</summary>
+    internal bool InCamSecurity
+    {
+        get
+        {
+            if (Cognos is null)
+            {
+                return false;
+            }
+            var mode = Cfg("IntegratedSecurityMode");
+            return mode is null || mode.Trim() is "4" or "5";
+        }
+    }
+
+    /// <summary>Whether a <c>tm1s.cfg</c> parameter given as <c>TM1_CFG_UseSSL</c> turns TLS on.</summary>
+    internal bool UsesSsl =>
+        Cfg("UseSSL") is { } ssl
+        && !ssl.Trim().Equals("F", StringComparison.OrdinalIgnoreCase)
+        && !ssl.Trim().Equals("false", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A tm1s.cfg parameter given in the environment, whatever the case of its name.</summary>
+    private string? Cfg(string parameter)
+    {
+        foreach (var (name, value) in EnvMap)
+        {
+            if (name.Equals("TM1_CFG_" + parameter, StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
+        }
+        return null;
+    }
+
     /// <summary>The Cognos test users made TM1 administrators by <see cref="WithCamSecurity(CognosContainer, CognosContainer.Namespace, string[])"/>.</summary>
     internal IReadOnlyList<string> CamAdmins => camAdmins;
 

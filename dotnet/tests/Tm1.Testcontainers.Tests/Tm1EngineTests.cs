@@ -398,6 +398,227 @@ public class Tm1EngineWiringTests : TempDir
         Assert.Contains("(AuthorizeWithTokenAsync)", refused.Message);
     }
 
+    private static readonly Tm1Source Tm1Server = new Tm1Source.PrivateImage("tm1-server:test");
+
+    private static CognosContainer TestCognos() =>
+        new CognosContainer(new CognosSource.PrivateImage("cognos-server:test"))
+            .WithUser("admin", "adminpw", "Admins")
+            .WithUser("analyst", "analystpw", "Analysts")
+            .WithUser("viewer", "viewerpw", "Viewers");
+
+    [Fact]
+    public void PassesLoginsToATm1ServerOnItsNetwork()
+    {
+        var server = new Tm1ServerContainer(Tm1Server);
+        var engine = new Tm1EngineContainer(Source).WithPassThrough(server);
+        // The server's REST API by the name it gets on the network; the image's defaults are a TM1 11 server's, so the
+        // address is all it takes
+        Assert.Equal("http://tm1-passthrough:8010/api/v1/", engine.EnvMap["TM1_PASSTHROUGH_URL"]);
+        Assert.Single(engine.EnvMap.Keys, name => name.StartsWith("TM1_PASSTHROUGH_", StringComparison.Ordinal));
+        Assert.Contains(Tm1EngineContainer.PassThroughAlias, server.NetworkAliases);
+        Assert.NotNull(server.Network);
+        Assert.Same(engine.Network, server.Network);
+        Assert.Same(engine.Datastore.Network, server.Network);
+        Assert.Contains(server, engine.Dependencies);
+        Assert.Contains(engine.Datastore, engine.Dependencies);
+        Assert.Same(server, engine.PassThrough);
+        Assert.Null(new Tm1EngineContainer(Source).PassThrough);
+        // The same server again is nothing new; another is refused
+        Assert.Same(engine, engine.WithPassThrough(server));
+        Assert.Contains(
+            "already passes logins to another TM1 server",
+            Assert.Throws<InvalidOperationException>(() => engine.WithPassThrough(new Tm1ServerContainer(Tm1Server))).Message
+        );
+
+        // Moved off the server's network, TM1 couldn't reach it
+        Assert.Contains(
+            "set the network before WithPassThrough",
+            Assert.Throws<InvalidOperationException>(() => engine.WithNetwork(Network.NewNetwork())).Message
+        );
+        Assert.Same(engine, engine.WithNetwork(server.Network));
+
+        // A server that has a network already (Cognos's, say) is joined there, the datastore too
+        var network = Network.NewNetwork();
+        var placed = new Tm1ServerContainer(Tm1Server).WithNetwork(network);
+        var joining = new Tm1EngineContainer(Source).WithPassThrough(placed);
+        Assert.Same(network, joining.Network);
+        Assert.Same(network, joining.Datastore.Network);
+    }
+
+    [Fact]
+    public void TakesTokensOrPassesLoginsOnNotBoth()
+    {
+        // With both set TM1 takes tokens and refuses a name and password: half would be dead
+        var tokens = new Tm1EngineContainer(Source).WithOAuth2(new KeycloakContainer());
+        Assert.Contains(
+            "TM1 takes tokens or passes logins on, not both",
+            Assert.Throws<InvalidOperationException>(() => tokens.WithPassThrough(new Tm1ServerContainer(Tm1Server))).Message
+        );
+        var passing = new Tm1EngineContainer(Source).WithPassThrough(new Tm1ServerContainer(Tm1Server));
+        Assert.Contains(
+            "TM1 takes tokens or passes logins on, not both",
+            Assert.Throws<InvalidOperationException>(() => passing.WithOAuth2(new KeycloakContainer())).Message
+        );
+    }
+
+    [Fact]
+    public void NamesItsUsersByTheirCamidsBehindAServerInCamSecurity()
+    {
+        var cognos = TestCognos();
+        var server = new Tm1ServerContainer(Tm1Server);
+        var engine = new Tm1EngineContainer(Source).WithUser("Analyst", "Analysts").WithPassThrough(server);
+        // After WithPassThrough: what the server is in is read when the engine starts
+        server.WithCamSecurity(cognos, "viewer", "admin");
+        engine.Configure();
+        // The server answers a login with the user's CAMID, so the image is told the namespace and makes the users
+        // under theirs. Listed users first, as Cognos spells them; then the server's administrators, who are
+        // administrators here too
+        Assert.Equal("LDAP", engine.EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("ldap", engine.EnvMap["TM1_CAM_NAMESPACE_TYPE"]);
+        Assert.Equal("analyst:Analysts,viewer:ADMIN,admin:ADMIN", engine.EnvMap["TM1_USERS"]);
+        Assert.Same(cognos.Network, engine.Network);
+        // Configured again, as a start after a test's look does: the same
+        engine.Configure();
+        Assert.Equal("analyst:Analysts,viewer:ADMIN,admin:ADMIN", engine.EnvMap["TM1_USERS"]);
+
+        // An administrator who is listed keeps its groups, and gets ADMIN once
+        var listed = new Tm1EngineContainer(Source)
+            .WithUser("admin", "Ops", "admin")
+            .WithUser("viewer", "Readers")
+            .WithPassThrough(new Tm1ServerContainer(Tm1Server).WithCamSecurity(TestCognos(), CognosContainer.Namespace.Oidc, "viewer", "admin"));
+        listed.Configure();
+        Assert.Equal("OIDC", listed.EnvMap["TM1_CAM_NAMESPACE"]);
+        Assert.Equal("oidc", listed.EnvMap["TM1_CAM_NAMESPACE_TYPE"]);
+        Assert.Equal("admin:Ops:admin,viewer:Readers:ADMIN", listed.EnvMap["TM1_USERS"]);
+
+        // Only Cognos's users log in to a server in CAM security
+        var stranger = new Tm1EngineContainer(Source)
+            .WithUser("planner")
+            .WithPassThrough(new Tm1ServerContainer(Tm1Server).WithCamSecurity(TestCognos(), "admin"));
+        Assert.Contains("planner isn't one of Cognos's test users", Assert.Throws<InvalidOperationException>(stranger.Configure).Message);
+
+        // A server whose tm1s.cfg takes it out of CAM security has users of its own: the image applies those
+        // parameters last, whatever the case of their names
+        var own = new Tm1EngineContainer(Source)
+            .WithUser("planner", "Planners")
+            .WithPassThrough(new Tm1ServerContainer(Tm1Server).WithCamSecurity(TestCognos(), "admin").WithEnv("TM1_CFG_integratedsecuritymode", "1"));
+        own.Configure();
+        Assert.False(own.EnvMap.ContainsKey("TM1_CAM_NAMESPACE"));
+        Assert.Equal("planner:Planners", own.EnvMap["TM1_USERS"]);
+        // Without Cognos nothing changes for the users
+        var plain = new Tm1EngineContainer(Source).WithUser("planner").WithPassThrough(new Tm1ServerContainer(Tm1Server));
+        plain.Configure();
+        Assert.False(plain.EnvMap.ContainsKey("TM1_CAM_NAMESPACE"));
+        Assert.Equal("planner", plain.EnvMap["TM1_USERS"]);
+    }
+
+    [Fact]
+    public void RefusesAServerItCantAskOverPlainHttp()
+    {
+        // The engine asks over plain HTTP, and trusts no certificate of the server's
+        foreach (var on in new[] { "T", "true" })
+        {
+            var engine = new Tm1EngineContainer(Source).WithPassThrough(new Tm1ServerContainer(Tm1Server).WithEnv("TM1_CFG_usessl", on));
+            Assert.Contains("with UseSSL on", Assert.Throws<InvalidOperationException>(engine.Configure).Message);
+        }
+        var off = new Tm1EngineContainer(Source).WithPassThrough(new Tm1ServerContainer(Tm1Server).WithEnv("TM1_CFG_UseSSL", " f "));
+        off.Configure();
+        // A server that's running can't be given its name on the network any more
+        var running = new RunningServer(Tm1Server);
+        Assert.Contains(
+            "give WithPassThrough one that isn't started",
+            Assert.Throws<InvalidOperationException>(() => new Tm1EngineContainer(Source).WithPassThrough(running)).Message
+        );
+    }
+
+    private sealed class RunningServer(Tm1Source source) : Tm1ServerContainer(source)
+    {
+        public override bool IsRunning => true;
+    }
+
+    [Fact]
+    public async Task GivesAPassThroughLoginTheHeaderTheServerTakes()
+    {
+        var none = new Tm1EngineContainer(Source).Database("tm1");
+        Assert.Contains("give it a TM1 server with WithPassThrough", Assert.Throws<InvalidOperationException>(() => none.PassThroughLogin()).Message);
+        Assert.Throws<InvalidOperationException>(() => none.PassThroughLoginWith("Basic eA=="));
+
+        // A server with users of its own: Basic, with its own login's password
+        var server = new Tm1ServerContainer(Tm1Server).WithSeed(Tm1Seed.Sdata);
+        var database = new Tm1EngineContainer(Source).WithPassThrough(server).Database("tm1");
+        var own = database.PassThroughLogin();
+        Assert.True(own.IsPassThrough);
+        Assert.False(own.IsOAuth2);
+        Assert.Equal("admin", own.User);
+        Assert.Equal("apple", own.Password);
+        Assert.Equal(server.Authorization, own.Authorization);
+        Assert.StartsWith("Basic ", own.Authorization, StringComparison.Ordinal);
+        Assert.Equal("tm1", own.Instance);
+        Assert.Equal("", own.ClientId);
+        Assert.Equal("", own.ClientSecret);
+        Assert.Equal("Tm1Login[admin in tm1]", own.ToString());
+        Assert.Equal(own.Authorization, database.PassThroughLogin("ADMIN").Authorization);
+        // Another user's password is the test's to give
+        Assert.Contains("PassThroughLogin(user, password)", Assert.Throws<ArgumentException>(() => database.PassThroughLogin("planner")).Message);
+        Assert.Equal("Basic cGxhbm5lcjpwOnc=", database.PassThroughLogin("planner", "p:w").Authorization);
+        // It has no token and no session endpoint: the header is the login
+        Assert.Contains("has no token", (await Assert.ThrowsAsync<InvalidOperationException>(() => own.TokenAsync())).Message);
+        Assert.Contains("has no session to ask for", (await Assert.ThrowsAsync<InvalidOperationException>(() => own.SessionAsync("Basic eA=="))).Message);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "http://x/");
+        Assert.Contains("has no token", (await Assert.ThrowsAsync<InvalidOperationException>(() => own.AuthorizeWithTokenAsync(request))).Message);
+        // A header of the caller's own, a CAM passport say, names nobody
+        var passport = database.PassThroughLoginWith("CAMPassport abc");
+        Assert.Equal("CAMPassport abc", passport.Authorization);
+        Assert.Equal("", passport.User);
+        Assert.Equal("", passport.Password);
+        Assert.Equal("Tm1Login[a pass-through header in tm1]", passport.ToString());
+
+        // A server in CAM security: CAMNamespace, for any of Cognos's users, whose passwords Cognos has. Its own
+        // login is its first administrator's
+        var cam = new Tm1EngineContainer(Source)
+            .WithPassThrough(new Tm1ServerContainer(Tm1Server).WithCamSecurity(TestCognos(), "viewer", "admin"))
+            .Database("tm1");
+        Assert.Equal("viewer", cam.PassThroughLogin().User);
+        Assert.Equal(CognosContainer.CamAuthorization("viewer", "viewerpw", "LDAP"), cam.PassThroughLogin().Authorization);
+        Assert.Equal("analyst", cam.PassThroughLogin("ANALYST").User);
+        Assert.Equal("analystpw", cam.PassThroughLogin("analyst").Password);
+        Assert.Equal(CognosContainer.CamAuthorization("analyst", "other", "LDAP"), cam.PassThroughLogin("analyst", "other").Authorization);
+        Assert.Throws<ArgumentException>(() => cam.PassThroughLogin("nobody"));
+        // Its users are Cognos's, under their CAMIDs: a login through the application by a short name would be
+        // refused everywhere, so it says what to do
+        Assert.Contains("Log in with PassThroughLogin(\"analyst\")", Assert.Throws<ArgumentException>(() => cam.Login("analyst")).Message);
+        // A login that isn't pass-through is no header
+        var oauth2 = new Tm1EngineContainer(Source).WithLogin("admin", "pw").WithOAuth2(new KeycloakContainer());
+        Assert.Contains(
+            "Only a pass-through login is a header of its own",
+            Assert.Throws<InvalidOperationException>(() => oauth2.Database("tm1").OAuth2Login("admin").Authorization).Message
+        );
+    }
+
+    [Fact]
+    public async Task AStartThatFailsLeavesItsPassThroughServerWhereItIs()
+    {
+        // Not Java's: there the engine's network isn't removed with a start that failed. The server is the caller's,
+        // and keeps the network the engine made, which it's on
+        var server = new Tm1ServerContainer(Tm1Server);
+        var engine = new FailsToStart(Source);
+        engine.WithPassThrough(server);
+        var shared = engine.Network;
+        Assert.Same(shared, server.Network);
+        Assert.Equal("can't start", (await Assert.ThrowsAsync<InvalidOperationException>(() => engine.StartAsync())).Message);
+        Assert.Same(shared, engine.Network);
+        Assert.Same(shared, server.Network);
+        Assert.Same(shared, engine.Datastore.Network);
+        Assert.Equal(1, engine.Stopped);
+
+        // A server moved since WithPassThrough fails the start, with why, before anything starts
+        var moved = new Tm1EngineContainer(Source).WithPassThrough(new Tm1ServerContainer(Tm1Server));
+        moved.PassThrough!.WithNetwork(Network.NewNetwork());
+        Assert.Contains("set the network before WithPassThrough", (await Assert.ThrowsAsync<InvalidOperationException>(() => moved.StartAsync())).Message);
+        Assert.False(moved.PassThrough.IsRunning);
+        Assert.False(moved.Datastore.IsRunning);
+    }
+
     [Fact]
     public void ItsDatastoreIsOnItsNetworkBeforeAnythingStarts()
     {
@@ -872,5 +1093,199 @@ public class Tm1EngineOAuth2Tests(Tm1EngineOAuth2Tests.OwnEngine own, ITestOutpu
                 await keycloak.DisposeAsync();
             }
         }
+    }
+}
+
+/// <summary>Needs a TM1 11 and a TM1 v12 source, as Java's <c>@RequiresTm1</c> with <c>@RequiresTm1Engine</c>.</summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class RequiresTm1AndEngineFactAttribute : RequiresTm1EngineFactAttribute
+{
+    public RequiresTm1AndEngineFactAttribute()
+    {
+        Skip ??= RequiresTm1FactAttribute.Tm1SkipReason();
+    }
+
+    /// <summary>Why such a test is skipped, or null to run it.</summary>
+    public static string? SkipReason() => EngineSkipReason() ?? RequiresTm1FactAttribute.Tm1SkipReason();
+}
+
+/// <summary>Needs TM1 11, Cognos and TM1 v12, as Java's <c>@RequiresCognos</c> with <c>@RequiresTm1Engine</c>.</summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class RequiresCognosAndEngineFactAttribute : RequiresTm1EngineFactAttribute
+{
+    public RequiresCognosAndEngineFactAttribute()
+    {
+        Skip ??= new RequiresCognosFactAttribute().Skip;
+    }
+}
+
+/// <summary>Java's Tm1EnginePassThroughTest: pass-through logins against real TM1 v12 and TM1 11. An engine of the
+/// class's own, asking a TM1 11 server beside it who a name and password are. Skipped without Docker, a TM1 source or a
+/// TM1 v12 source.</summary>
+[Collection(OwnContainers.Name)]
+public class Tm1EnginePassThroughTests(Tm1EnginePassThroughTests.OwnEngine own) : IClassFixture<Tm1EnginePassThroughTests.OwnEngine>
+{
+    private Tm1Database Planning => own.Engine.Database("planning");
+
+    [RequiresTm1AndEngineFact]
+    public async Task TheServersOwnUserLogsIn()
+    {
+        // admin / apple of the sample database, sent to TM1 v12, which keeps no password
+        var (status, body) = await Tm1EngineRest.GetAsync(Planning, Planning.PassThroughLogin(), "ActiveUser?$select=Name,Type");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Type\":\"Admin\"", body, StringComparison.Ordinal);
+    }
+
+    [RequiresTm1AndEngineFact]
+    public async Task AUserOfBothLogsInAsThemselves()
+    {
+        var analyst = Planning.PassThroughLogin("analyst", "analystpw");
+        var (status, body) = await Tm1EngineRest.GetAsync(Planning, analyst, "ActiveUser?$select=Name,Type&$expand=Groups($select=Name)");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Name\":\"analyst\"", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"Type\":\"User\"", body, StringComparison.Ordinal);
+        Assert.Contains("Analysts", body, StringComparison.Ordinal);
+    }
+
+    [RequiresTm1AndEngineFact]
+    public async Task TheHeaderLogsInOnAnyRequest()
+    {
+        // As a client that logs in itself sends it: TM1 answers, and gives a session
+        var analyst = Planning.PassThroughLogin("analyst", "analystpw");
+        using var request = new HttpRequestMessage(HttpMethod.Get, Planning.RestUrl + "ActiveUser?$select=Name");
+        request.Headers.TryAddWithoutValidation("Authorization", analyst.Authorization);
+        var (status, _, cookies) = await Tm1EngineRest.SendForCookiesAsync(request);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains(cookies, cookie => cookie.StartsWith("TM1SessionId=", StringComparison.Ordinal));
+        Assert.Equal(own.Engine.Url + "tm1/auth/v1/", analyst.AuthUrl);
+        Assert.Equal(own.Engine.Url + "tm1/auth/v1/token", analyst.TokenUrl);
+        // A header of the caller's own making is passed on the same
+        var same = Planning.PassThroughLoginWith(analyst.Authorization);
+        Assert.Equal(HttpStatusCode.OK, (await Tm1EngineRest.GetAsync(Planning, same, "ActiveUser")).Status);
+    }
+
+    [RequiresTm1AndEngineFact]
+    public async Task AWrongPasswordIsRefused() =>
+        Assert.Contains(
+            "HTTP 401",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Planning.PassThroughLogin("analyst", "not-it").CookieAsync())).Message
+        );
+
+    [RequiresTm1AndEngineFact]
+    public async Task AUserTheDatabaseLacksIsRefused() =>
+        // The TM1 11 server knows the name and password; the TM1 v12 database has no such user
+        Assert.Contains(
+            "HTTP 403",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Planning.PassThroughLogin("stranger", "strangerpw").CookieAsync())).Message
+        );
+
+    [RequiresTm1AndEngineFact]
+    public async Task LoginsThroughTheApplicationStillWorkBesidePassThrough()
+    {
+        var (status, body) = await Tm1EngineRest.GetAsync(Planning, Planning.Login("analyst"), "ActiveUser?$select=Name");
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Contains("\"Name\":\"analyst\"", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The class's engine and its TM1 11 server, as Java's <c>@BeforeAll</c> and <c>@AfterAll</c>. Nothing
+    /// starts when the tests are skipped.</summary>
+    public sealed class OwnEngine : IAsyncLifetime
+    {
+        private Tm1ServerContainer? server;
+        private Tm1EngineContainer? engine;
+
+        public Tm1EngineContainer Engine =>
+            engine ?? throw new InvalidOperationException(RequiresTm1AndEngineFactAttribute.SkipReason() ?? "The engine isn't started");
+
+        public async Task InitializeAsync()
+        {
+            if (RequiresTm1AndEngineFactAttribute.SkipReason() is not null)
+            {
+                return;
+            }
+            server = new Tm1ServerContainer(Tm1Source.Discover() ?? throw new InvalidOperationException(RequiresTm1FactAttribute.NoSourceMessage)).WithSeed(
+                Tm1Seed.Sdata
+            );
+            engine = new Tm1EngineContainer(Tm1EngineSource.Discover() ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.NoSourceMessage))
+                .WithDatabase("planning")
+                .WithUser("analyst", "Analysts")
+                .WithPassThrough(server);
+            await engine.StartAsync();
+            // Two users of the TM1 11 server's own: one the engine has too, and one it lacks
+            foreach (var name in new[] { "analyst", "stranger" })
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Post, server.RestUrl + "Users")
+                {
+                    Content = new StringContent("{\"Name\":\"" + name + "\",\"Password\":\"" + name + "pw\"}", Encoding.UTF8, "application/json"),
+                };
+                request.Headers.TryAddWithoutValidation("Authorization", server.Authorization);
+                var (status, body) = await Tm1EngineRest.SendAsync(request);
+                Assert.True(status == HttpStatusCode.Created, body);
+            }
+        }
+
+        public async Task DisposeAsync()
+        {
+            if (engine is not null)
+            {
+                await engine.DisposeAsync();
+            }
+            // The server is the caller's to stop: the engine only started it first
+            if (server is not null)
+            {
+                await server.DisposeAsync();
+            }
+        }
+    }
+}
+
+/// <summary>Java's Tm1EnginePassThroughCamTest: pass-through logins to a TM1 11 server in Cognos (CAM) security,
+/// against real TM1 v12, TM1 11 and Cognos. Cognos's users log in to TM1 v12 as they do to TM1 11. Cognos takes
+/// minutes to start, so this class has one test. Skipped without Docker or a source for each.</summary>
+[Collection(OwnContainers.Name)]
+public class Tm1EnginePassThroughCamTests
+{
+    [RequiresCognosAndEngineFact]
+    public async Task CognosUsersLogInToTheEngine()
+    {
+        await using var cognos = new CognosContainer(
+            CognosSource.Discover() ?? throw new InvalidOperationException(RequiresCognosFactAttribute.NoSourceMessage)
+        )
+            .WithUser("admin", "adminpw", "Admins")
+            .WithUser("analyst", "analystpw", "Analysts")
+            .WithUser("viewer", "viewerpw", "Viewers");
+        await using var server = new Tm1ServerContainer(
+            Tm1Source.Discover() ?? throw new InvalidOperationException(RequiresTm1FactAttribute.NoSourceMessage)
+        ).WithCamSecurity(cognos, "admin");
+        await using var engine = new Tm1EngineContainer(
+            Tm1EngineSource.Discover() ?? throw new InvalidOperationException(RequiresTm1EngineFactAttribute.NoSourceMessage)
+        )
+            .WithUser("analyst", "Analysts")
+            .WithPassThrough(server);
+        await engine.StartAsync();
+        var db = engine.Database("tm1");
+
+        // A user the engine was given: under its CAMID, in the group it was given
+        var analyst = await Tm1EngineRest.GetAsync(db, db.PassThroughLogin("analyst"), "ActiveUser?$select=Name,Type&$expand=Groups($select=Name)");
+        Assert.Equal(HttpStatusCode.OK, analyst.Status);
+        Assert.Contains("CAMID(\\\"LDAP:u:uid=analyst,ou=people\\\")", analyst.Body, StringComparison.Ordinal);
+        Assert.Contains("\"Type\":\"User\"", analyst.Body, StringComparison.Ordinal);
+        Assert.Contains("Analysts", analyst.Body, StringComparison.Ordinal);
+
+        // The server's administrator is one here too
+        var admin = await Tm1EngineRest.GetAsync(db, db.PassThroughLogin(), "ActiveUser?$select=Name,Type");
+        Assert.Equal(HttpStatusCode.OK, admin.Status);
+        Assert.Contains("uid=admin,", admin.Body, StringComparison.Ordinal);
+        Assert.Contains("\"Type\":\"Admin\"", admin.Body, StringComparison.Ordinal);
+
+        // Cognos knows the viewer, and TM1 11 logs them in; the engine has no such user
+        Assert.Contains("HTTP 403", (await Assert.ThrowsAsync<InvalidOperationException>(() => db.PassThroughLogin("viewer").CookieAsync())).Message);
+        // Cognos checks the password
+        Assert.Contains(
+            "HTTP 401",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => db.PassThroughLogin("analyst", "not-it").CookieAsync())).Message
+        );
+        // The database's own admin still logs in through the application
+        Assert.Equal(HttpStatusCode.OK, (await Tm1EngineRest.GetAsync(db, db.Login(), "ActiveUser")).Status);
     }
 }

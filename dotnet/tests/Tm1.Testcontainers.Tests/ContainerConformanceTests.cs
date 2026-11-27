@@ -33,6 +33,12 @@ public class ContainerConformanceTests
     [RequiresTm1EngineFact]
     public Task EngineWithOAuth2() => Record("engine-oauth2");
 
+    [RequiresTm1AndEngineFact]
+    public Task EngineWithPassThrough() => Record("engine-passthrough");
+
+    [RequiresCognosAndEngineFact]
+    public Task EngineWithPassThroughToCamSecurity() => Record("engine-passthrough-cam");
+
     private static async Task Record(string scenario)
     {
         var home = Path.Combine(Repo.Root, "testcontainers-conformance", "scenarios");
@@ -62,6 +68,15 @@ public class ContainerConformanceTests
         {
             containers.Add(("tm1Engine", env.Tm1Engine().ContainerId));
             containers.Add(("tm1EngineDatastore", env.Tm1Engine().Datastore.ContainerId));
+        }
+        if (scenario.StartsWith("engine-passthrough", StringComparison.Ordinal))
+        {
+            containers.Add(("tm1Engine", env.Tm1Engine().ContainerId));
+            containers.Add(("tm1EngineDatastore", env.Tm1Engine().Datastore.ContainerId));
+        }
+        if (scenario == "engine-passthrough-cam")
+        {
+            containers.Add(("cognos", env.Cognos().ContainerId));
         }
         if (scenario == "cam-security")
         {

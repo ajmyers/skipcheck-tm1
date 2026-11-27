@@ -75,7 +75,7 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
     public IContainer Container => container ?? throw new InvalidOperationException("The container isn't started yet");
 
     /// <inheritdoc/>
-    public bool IsRunning => container is { State: TestcontainersStates.Running };
+    public virtual bool IsRunning => container is { State: TestcontainersStates.Running };
 
     /// <summary>The host its ports are mapped on.</summary>
     public string Host => Container.Hostname;
