@@ -28,4 +28,4 @@ RUN chmod 755 /usr/local/lib/pa-setup/*.py /usr/local/lib/pa-setup/*.sh
 
 WORKDIR /work
 ENTRYPOINT ["python3", "/usr/local/lib/pa-setup/pa_setup.py"]
-CMD ["up"]
+# No default command: with none, the tool starts what the file says, or from nothing

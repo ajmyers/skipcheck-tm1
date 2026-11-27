@@ -30,7 +30,9 @@ skill for anything more.
 - **Ask before anything destructive or disruptive:** `down`, removing Docker volumes,
   deleting `pa-files`, or stopping containers from another setup.
 - Every command runs **in the folder that holds `pa-environment.yaml`**: the scripts mount
-  the current folder. pa-setup never asks questions, so it runs fine without a terminal.
+  the current folder. pa-setup asks questions only when it's run with no command, no
+  `pa-environment.yaml` and a terminal: give it a command (`init`, `up`), or `--yes`, and it
+  asks nothing.
 
 ## 1. Find out what the user wants and has
 

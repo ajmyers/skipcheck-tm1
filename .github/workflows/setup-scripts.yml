@@ -1,4 +1,6 @@
-# Tests the tm1-server setup scripts (docker/tm1-server/setup.sh and setup.ps1).
+# Tests the setup scripts: tm1-server's (docker/tm1-server/setup.sh and setup.ps1), and
+# pa-setup's (docker/pa-setup/setup.sh and setup.ps1), which start from nothing too and are
+# to replace them (#386).
 #
 # CI has no IBM software, so TM1 can't start here. These jobs test everything up to
 # "docker compose up": options, the checks, the fail-fast errors when there's no
@@ -12,6 +14,11 @@
 #            runners run Docker in Windows-containers mode, so the script must stop
 #            at that check with its fix (or at "Docker isn't running", when the
 #            runner's Docker service hasn't started yet).
+#
+#   pa-setup-linux:   pa-setup's setup.sh under dash and setup.ps1 under pwsh, against an
+#                     image built from this commit: starting from nothing with a fake
+#                     bundle, up to the files a --no-start run leaves behind
+#   pa-setup-windows: pa-setup's setup.ps1 under both PowerShells, up to its Docker check
 name: Setup scripts
 
 # Runs as part of CI (ci.yml calls it), so its result counts towards the required ci-ok check.
@@ -168,4 +175,112 @@ jobs:
             throw 'expected a Docker check (Windows containers, or not running) to stop it'
           }
           if (-not $out.Contains('made by Andrew Myers')) { throw 'banner missing' }
+          exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
+
+  pa-setup-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: docker/pa-setup
+    env:
+      CI: 'true'
+      PA_SETUP_IMAGE: pa-setup:ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the setup tool's image, and fake downloads
+        run: |
+          docker build -q -t "$PA_SETUP_IMAGE" -f Dockerfile ..
+          mkdir -p "$RUNNER_TEMP/dl"
+          echo fake | gzip > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz"
+          echo fake > "$RUNNER_TEMP/dl/tm1server-0.0.0-1-win64_bundle.zip"
+
+      - name: setup.sh
+        run: |
+          set -u
+          here=$PWD; dl=$RUNNER_TEMP/dl
+          expect_fail() {  # expect_fail TEXT -- COMMAND...: fails with exit 2 and prints TEXT
+            text=$1; shift 2
+            set +e; out=$("$@" 2>&1); rc=$?; set -e
+            echo "$out" | tail -4
+            [ "$rc" = 2 ] || { echo "::error::expected exit 2, got $rc: $*"; exit 1; }
+            grep -qF -- "$text" <<<"$out" || { echo "::error::expected '$text' from: $*"; exit 1; }
+          }
+          sh setup.sh --help | grep -q -- '--bundle FILE'
+          t=$RUNNER_TEMP/sh; mkdir -p "$t" "$t-empty"; cd "$t-empty"
+          expect_fail 'Say where TM1 comes from' -- sh "$here/setup.sh"
+          expect_fail "isn't the Linux TM1 Server download" -- sh "$here/setup.sh" --bundle "$dl/tm1server-0.0.0-1-win64_bundle.zip"
+          expect_fail "there's no tm1server-9-linuxi38664h_bundle.tar.gz in $dl" -- sh "$here/setup.sh" --bundle "$dl/tm1server-9-linuxi38664h_bundle.tar.gz"
+          expect_fail 'Choose one TM1 source' -- sh "$here/setup.sh" --bundle "$dl/x" --url https://x
+          expect_fail "there's no bin64/tm1s.exe in it" -- sh "$here/setup.sh" --tm1-home "$dl"
+          expect_fail 'Say where TM1 comes from' -- sh "$here/setup.sh" --samples
+          expect_fail "there's no folder $dl/nosuch" -- sh "$here/setup.sh" --ibm "$dl/nosuch"
+          expect_fail 'mkdir -p tm1 && cd tm1' -- sh "$here/setup.sh" --dir tm1
+          test -z "$(ls -A)"   # nothing was written by a run that was refused
+          # A run that sets everything up, piped as from curl
+          cd "$t"
+          sh -s -- --bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" --samples --no-start < "$here/setup.sh"
+          grep -qx "ibm: \"$dl\"   # the folder holding your IBM downloads" pa-environment.yaml
+          # .env is the user's to read: the tool is root in its container
+          grep -qx 'TM1_BUNDLE=/ibm/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz' .env
+          test "$(stat -c %u .env)" = "$(id -u)" && test "$(stat -c %u pa-environment.yaml)" = "$(id -u)"
+          docker compose -f compose.yaml config --services | sort | tr '\n' ' ' | grep -qx 'sdata tm1 tm1-admin '
+          # A rerun keeps the file, and says the options weren't used
+          out=$(sh "$here/setup.sh" --url https://x.example/b --no-start 2>&1); echo "$out"
+          grep -q "Using the pa-environment.yaml that's here" <<<"$out"
+          ! grep -q '^TM1_BUNDLE_URL' .env
+        shell: bash
+
+      - name: setup.ps1 (pwsh)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $here = $PWD.Path; $dl = "$env:RUNNER_TEMP/dl"; $t = "$env:RUNNER_TEMP/ps"
+          New-Item -ItemType Directory -Force $t, "$t-empty" | Out-Null
+          function Expect-Fail([string]$Text, [string[]]$ScriptArgs) {
+            $out = (& pwsh -NoProfile -File "$here/setup.ps1" @ScriptArgs 2>&1 | Out-String)
+            $rc = $LASTEXITCODE
+            Write-Host ($out.Trim() -split "`n" | Select-Object -Last 4 | Out-String)
+            if ($rc -ne 2) { throw "expected exit 2, got $rc for $ScriptArgs" }
+            if (-not $out.Contains($Text)) { throw "expected '$Text' for $ScriptArgs" }
+          }
+          if (-not ((pwsh -NoProfile -File "$here/setup.ps1" --help | Out-String).Contains('--bundle FILE'))) { throw 'help' }
+          Set-Location "$t-empty"
+          Expect-Fail 'Say where TM1 comes from' @()
+          Expect-Fail "isn't the Linux TM1 Server download" @('--bundle', "$dl/tm1server-0.0.0-1-win64_bundle.zip")
+          Expect-Fail 'Choose one TM1 source' @('--bundle', "$dl/x", '--url', 'https://x')
+          Set-Location $t
+          pwsh -NoProfile -File "$here/setup.ps1" --bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" --samples --no-start
+          if ($LASTEXITCODE -ne 0) { throw "setup.ps1 failed: $LASTEXITCODE" }
+          if (-not (Get-Content -Raw "$t/.env").Contains('TM1_BUNDLE=/ibm/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz')) { throw '.env bundle' }
+          if (-not (Test-Path "$t/compose.yaml")) { throw 'no compose.yaml' }
+
+  pa-setup-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: docker/pa-setup
+    env:
+      CI: 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [powershell, pwsh]   # Windows PowerShell 5.1, PowerShell 7
+    steps:
+      - uses: actions/checkout@v7
+      - name: setup.ps1 under ${{ matrix.shell }}
+        shell: pwsh
+        run: |
+          $exe = '${{ matrix.shell }}'
+          $out = (& $exe -NoProfile -File ./setup.ps1 --bundle x 2>&1 | Out-String)
+          $rc = $LASTEXITCODE
+          Write-Host $out
+          if ($rc -ne 1) { throw "expected exit 1, got $rc" }
+          # Either Docker check may stop it: GitHub's runners use Windows containers, and
+          # their Docker service sometimes hasn't started yet.
+          if (-not ($out.Contains('Docker is running Windows containers') -or $out.Contains("Docker isn't running"))) {
+            throw 'expected a Docker check (Windows containers, or not running) to stop it'
+          }
           exit 0   # the step would otherwise end with the expected exit 1 left in $LASTEXITCODE
