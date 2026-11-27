@@ -631,7 +631,9 @@ class Tm1EngineContainer(GenericContainer):
         self.logger.info("TM1 %s is up at %s (%s), with %s", self._version, self.url, self._source.describe(), self.databases())
 
     def stop(self, force: bool = True, delete_volume: bool = True) -> None:
-        """Stops the engine, then its datastore, and removes the network if the engine made it."""
+        """Stops the engine, then its datastore, and removes the network if the engine made it. A
+        Keycloak or a TM1 server of yours that's still on that network keeps it until it's stopped,
+        and removes it then."""
         try:
             super().stop(force, delete_volume)
         finally:
@@ -644,12 +646,40 @@ class Tm1EngineContainer(GenericContainer):
                 self._version = None
                 # Only its own: a network it was given is whoever gave it's to remove. And not from
                 # under a Keycloak or a TM1 server that's still on it, which is the caller's to stop:
-                # Docker would refuse, and the network then goes with the test session, as they may
-                keycloak = self._keycloak
-                server = self._pass_through
-                left = (keycloak is not None and keycloak._container is not None) or (server is not None and server._container is not None)
-                if self.network is self._own_network and not left:
-                    self._own_network.close()
+                # Docker would refuse. Whichever of them stops last removes it then
+                own = self._own_network
+                if self.network is own:
+                    left = self._still_on(own)
+                    if not left:
+                        own.close()
+                    for container in left:
+                        # Once for a network, however often the engine is stopped
+                        container._after_stop[id(own)] = lambda: self._remove_left(own)
+
+    def _still_on(self, network: Any) -> list[GenericContainer]:
+        """The containers the engine depends on, and theirs (a TM1 server's Cognos), that are the
+        caller's to stop and still there on a network. Not the datastore, which the engine stops."""
+        found: list[GenericContainer] = []
+        seen: set[int] = {id(self), id(self._datastore)}
+        waiting = list(self.dependencies)
+        while waiting:
+            container = waiting.pop()
+            if id(container) in seen or not isinstance(container, GenericContainer):
+                continue
+            seen.add(id(container))
+            waiting.extend(container.dependencies)
+            if container.network is network and container._container is not None:
+                found.append(container)
+        return found
+
+    def _remove_left(self, network: Network) -> None:
+        """Removes a network the engine made and left under a container of the caller's, now that
+        one has stopped: unless another is still on it, whose stop comes here again, or the engine
+        was started on it again, whose own stop removes it."""
+        if (self._container is not None or self._datastore._container is not None) and self.network is network:
+            return
+        if not self._still_on(network):
+            network.close()
 
     def _await_setup(self) -> None:
         """Waits until the image has created every instance, application, database and user, and

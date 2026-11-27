@@ -401,6 +401,150 @@ def test_leaves_its_network_under_a_tm1_server_that_is_still_running() -> None:
     assert own.closed == 1
 
 
+class _Recording(Network):
+    """A network that counts how often it's removed, and can refuse."""
+
+    def __init__(self, refuses: bool = False) -> None:
+        super().__init__()
+        self.closed = 0
+        self.refuses = refuses
+
+    def close(self) -> None:
+        self.closed += 1
+        if self.refuses:
+            raise OSError("the network has active endpoints")
+
+
+class _Removable:
+    """A created container, as far as stop() asks."""
+
+    def remove(self, **_: object) -> None:
+        pass
+
+
+def test_a_tm1_server_left_on_the_engines_network_removes_it_when_it_stops() -> None:
+    server = Tm1ServerContainer(TM1)
+    engine = Tm1EngineContainer(SOURCE)
+    own = _Recording()
+    engine._own_network = own
+    engine.with_network(own).with_pass_through(server)
+    server._container = _Removable()
+    # Twice: the network is handed over once
+    engine.stop()
+    engine.stop()
+    assert own.closed == 0
+    # The caller stops the server after the engine: the network isn't left in Docker
+    server.stop()
+    assert own.closed == 1
+    server.stop()
+    assert own.closed == 1
+
+    # With Cognos on it too (with_cam_security after with_pass_through), whichever stops last
+    cognos = cognos_with_users()
+    server = Tm1ServerContainer(TM1)
+    engine = Tm1EngineContainer(SOURCE)
+    own = _Recording()
+    engine._own_network = own
+    engine.with_network(own).with_pass_through(server)
+    server.with_cam_security(cognos, "admin")
+    assert cognos.network is own
+    server._container, cognos._container = _Removable(), _Removable()
+    engine.stop()
+    server.stop()
+    assert own.closed == 0
+    cognos.stop()
+    assert own.closed == 1
+
+    # An engine started again on it keeps it, and removes it at its own stop
+    server = Tm1ServerContainer(TM1)
+    engine = Tm1EngineContainer(SOURCE)
+    own = _Recording()
+    engine._own_network = own
+    engine.with_network(own).with_pass_through(server)
+    server._container = _Removable()
+    engine.stop()
+    engine._container = _Removable()
+    server.stop()
+    assert own.closed == 0
+    engine.stop()
+    assert own.closed == 1
+
+    # A network Docker won't remove doesn't fail the server's stop
+    server = Tm1ServerContainer(TM1)
+    engine = Tm1EngineContainer(SOURCE)
+    stuck = _Recording(refuses=True)
+    engine._own_network = stuck
+    engine.with_network(stuck).with_pass_through(server)
+    server._container = _Removable()
+    engine.stop()
+    server.stop()
+    assert stuck.closed == 1 and server._container is None
+
+    # And a network the engine was given is never the engine's, or the server's, to remove
+    given = _Recording()
+    server = Tm1ServerContainer(TM1).with_network(given)
+    engine = Tm1EngineContainer(SOURCE).with_pass_through(server)
+    assert engine.network is given
+    server._container = _Removable()
+    engine.stop()
+    server.stop()
+    assert given.closed == 0
+
+
+def test_a_keycloak_left_on_the_engines_network_removes_it_when_it_stops() -> None:
+    keycloak = KeycloakContainer()
+    engine = Tm1EngineContainer(SOURCE)
+    own = _Recording()
+    engine._own_network = own
+    engine.with_network(own).with_oauth2(keycloak)
+    keycloak._container = _Removable()
+    engine.stop()
+    engine.stop()
+    assert own.closed == 0
+    # The caller stops the Keycloak after the engine: the network isn't left in Docker
+    keycloak.stop()
+    assert own.closed == 1
+    keycloak.stop()
+    assert own.closed == 1
+
+    # A network the Keycloak brought stays
+    given = _Recording()
+    placed = KeycloakContainer().with_network(given)
+    joining = Tm1EngineContainer(SOURCE).with_oauth2(placed)
+    placed._container = _Removable()
+    joining.stop()
+    placed.stop()
+    assert given.closed == 0
+
+
+def test_a_failed_start_leaves_its_network_to_the_tm1_server_it_started() -> None:
+    class Failed(BaseException):
+        pass
+
+    server = Tm1ServerContainer(TM1)
+    engine = Tm1EngineContainer(SOURCE)
+    own = _Recording()
+    engine._own_network = own
+    engine.with_network(own).with_pass_through(server)
+    engine.datastore.start = lambda: engine.datastore  # type: ignore[method-assign]
+
+    def started() -> Tm1ServerContainer:
+        server._container = _Removable()
+        return server
+
+    def failing() -> None:
+        raise Failed
+
+    server.start = started  # type: ignore[method-assign]
+    engine.configure = failing  # type: ignore[method-assign]
+    with pytest.raises(Failed):
+        engine.start()
+    # The server the engine started is the caller's to stop, and takes the network with it
+    assert own.closed == 0
+    server.stop()
+    assert own.closed == 1
+
+
 def test_its_datastore_is_on_its_network_before_anything_starts() -> None:
     # Not only once the engine starts or is configured: an environment starts what the engine
     # depends on first, and TM1 couldn't reach a datastore left off the network
