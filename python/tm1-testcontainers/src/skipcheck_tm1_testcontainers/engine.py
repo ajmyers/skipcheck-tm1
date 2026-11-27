@@ -23,7 +23,8 @@ from .sources import Tm1EngineSource
 from .tm1 import default_image
 
 if TYPE_CHECKING:
-    from .cognos import KeycloakContainer
+    from .cognos import CognosContainer, KeycloakContainer
+    from .tm1 import Tm1ServerContainer
 
 __all__ = ["Tm1Database", "Tm1EngineContainer", "Tm1Login"]
 
@@ -32,6 +33,12 @@ _OTHER_NETWORK = (
     "The engine takes tokens from a Keycloak on another network, which TM1 couldn't reach from this one: "
     "set the network before with_oauth2, or give the Keycloak the same"
 )
+_SERVER_OTHER_NETWORK = (
+    "The engine passes logins to a TM1 server on another network, which TM1 couldn't reach from this one: "
+    "set the network before with_pass_through, or give the server the same"
+)
+_ONE_WAY = "TM1 takes tokens or passes logins on, not both: with both set it takes tokens and refuses a name and password. Use with_oauth2 or with_pass_through"
+_NO_TOKEN = "A pass-through login has no token: it's the header TM1 passes on (authorization), or the session that gives (authorize, cookie)"
 _STARTUP_TIMEOUT = 5 * 60.0
 _COMMAND_TIMEOUT = 3 * 60
 # The image waits up to five minutes for a new database to be ready: longer than that, so its
@@ -122,6 +129,10 @@ class Tm1EngineContainer(GenericContainer):
     """The volume package installs are cached in, shared by every engine container on this Docker
     host. Only the first container to see a package installs it. Remove the volume to clear it."""
 
+    PASS_THROUGH_ALIAS: ClassVar[str] = "tm1-passthrough"
+    """The name a TM1 server has on the engine's network when logins are passed to it
+    (:meth:`with_pass_through`)."""
+
     OAUTH2_REALM: ClassVar[str] = "tm1"
     """The Keycloak realm an engine with :meth:`with_oauth2` takes tokens from."""
     OAUTH2_CLIENT: ClassVar[str] = "tm1"
@@ -141,6 +152,9 @@ class Tm1EngineContainer(GenericContainer):
         # The users who can log in through OAuth 2.0, and what with
         self._passwords: dict[str, str] = {}
         self._keycloak: KeycloakContainer | None = None
+        # The TM1 server logins are passed to, and its name on the network
+        self._pass_through: Tm1ServerContainer | None = None
+        self._pass_through_alias = self.PASS_THROUGH_ALIAS
         self._credentials: dict[str, Any] | None = None
         self._credentials_lock = threading.Lock()
         self._version: Tm1Version | None = None
@@ -169,11 +183,16 @@ class Tm1EngineContainer(GenericContainer):
     def with_network(self, network: Any) -> Self:
         """Puts the engine, and its datastore with it, on a network. They have one of their own
         unless this is called; a network that's given is never removed by the engine. A RuntimeError
-        if the engine takes tokens from a Keycloak (:meth:`with_oauth2`) that's on another."""
+        if the engine takes tokens from a Keycloak (:meth:`with_oauth2`), or passes logins to a
+        TM1 server (:meth:`with_pass_through`), that's on another."""
         joined = getattr(self, "_keycloak", None)
         if joined is not None and joined.network is not network:
             # The Keycloak is the caller's, and may serve others: it isn't moved from here
             raise RuntimeError(_OTHER_NETWORK)
+        asked = getattr(self, "_pass_through", None)
+        if asked is not None and asked.network is not network:
+            # The server is the caller's, and may be in an environment: it isn't moved
+            raise RuntimeError(_SERVER_OTHER_NETWORK)
         super().with_network(network)
         # At once, not when the engine starts: whatever starts the engine may start what it
         # depends on first, as an environment does, and the datastore must be here by then
@@ -238,6 +257,8 @@ class Tm1EngineContainer(GenericContainer):
             raise ValueError("keycloak must not be None")
         if self._keycloak is keycloak:
             return self
+        if self._pass_through is not None:
+            raise RuntimeError(_ONE_WAY)
         if self._keycloak is not None:
             raise RuntimeError("The engine already takes tokens from another Keycloak, which would start beside this one under the same name: give it one")
         if keycloak.is_running:
@@ -264,6 +285,66 @@ class Tm1EngineContainer(GenericContainer):
         self.with_env("TM1_OAUTH2_AUDIENCE", self.OAUTH2_CLIENT)
         self.with_env("TM1_OAUTH2_ID_CLAIMS", "preferred_username")
         return self
+
+    def with_pass_through(self, server: Tm1ServerContainer) -> Self:
+        """Passes logins on to a TM1 11 server ("pass-through"): TM1 v12 asks it who a login is, so
+        that server's users log in here with what they have there. A test logs in with
+        :meth:`Tm1Database.pass_through_login`. Logins through the engine's application
+        (:meth:`Tm1Database.login`) keep working beside it.
+
+        * A user has to be in the database too: add each with :meth:`with_user`. ``admin`` always
+          is.
+        * **A server in Cognos (CAM) security** (:meth:`Tm1ServerContainer.with_cam_security`) answers
+          a login with the user's CAMID. The engine's users are then Cognos's test users, each made
+          under its CAMID, and the server's administrators are administrators here too. TM1 v12
+          learns no groups from Cognos: a user has the groups :meth:`with_user` gives.
+        * Not together with :meth:`with_oauth2`: with both, TM1 takes tokens and refuses the rest.
+
+        The server joins the engine's network, unless it has one already, which the engine and its
+        datastore then join. Starting the engine starts the server first. Give it one that isn't
+        started: it gets the name the engine reaches it by, :attr:`PASS_THROUGH_ALIAS`, so one
+        network holds one such server. It's yours to stop, after the engine."""
+        return self._with_pass_through(server, None)
+
+    def _with_pass_through(self, server: Tm1ServerContainer, alias: str | None) -> Self:
+        """As with_pass_through, to a server that has a name on the network already: an
+        environment's."""
+        if server is None:
+            raise ValueError("server must not be None")
+        # The very server, not one configured like it
+        if self._pass_through is server:
+            return self
+        if self._pass_through is not None:
+            raise RuntimeError("The engine already passes logins to another TM1 server")
+        if self._keycloak is not None:
+            raise RuntimeError(_ONE_WAY)
+        if server.is_running:
+            # A name on the network is given when a container is created
+            raise RuntimeError(
+                "This TM1 server is already running, without the name the engine reaches it by: "
+                "give with_pass_through one that isn't started, and the engine starts it"
+            )
+        if server.network is not None:
+            self.with_network(server.network)
+        else:
+            # The engine's own, or a new one if it was taken off it
+            self._join_network()
+            network = self.network
+            assert network is not None
+            server.with_network(network)
+        if alias is None:
+            server.with_network_aliases(self.PASS_THROUGH_ALIAS)
+        self._pass_through = server
+        self._pass_through_alias = self.PASS_THROUGH_ALIAS if alias is None else alias
+        self.depends_on(server)
+        # The image's defaults are a TM1 11 server's: the address is all it takes
+        self.with_env("TM1_PASSTHROUGH_URL", f"http://{self._pass_through_alias}:{server.REST_PORT}/api/v1/")
+        return self
+
+    @property
+    def pass_through(self) -> Tm1ServerContainer | None:
+        """The TM1 server logins are passed to, or None without :meth:`with_pass_through`."""
+        return self._pass_through
 
     def with_login(self, user: str, password: str) -> Self:
         """Gives a user a password to log in with through OAuth 2.0 (:meth:`with_oauth2`). TM1 v12
@@ -375,6 +456,12 @@ class Tm1EngineContainer(GenericContainer):
 
     def _login(self, instance: str, user: str) -> Tm1Login:
         """A login to an instance, through its first application whose secret the image holds."""
+        if self._passes_to_cam() and user.lower() != "admin" and not user.startswith("CAMID("):
+            # TM1 would make a session for the name and refuse it everywhere (403)
+            raise ValueError(
+                f"{user} isn't a user of this engine by that name: it passes logins to a TM1 server in CAM security, so its users are Cognos's, "
+                f'each under its CAMID. Log in with pass_through_login("{user}"), or name the CAMID'
+            )
         for found in self._read_credentials().get("instances") or []:
             if found.get("name") != instance:
                 continue
@@ -383,6 +470,62 @@ class Tm1EngineContainer(GenericContainer):
                 if application.get("clientSecret"):
                     return Tm1Login(f"{self.url}{instance}/auth/v1/", instance, str(application.get("clientId", "")), str(application["clientSecret"]), user)
         raise RuntimeError(f"The instance {instance} has no application to log in through")
+
+    def _pass_through_login(self, database: Tm1Database, user: str | None, password: str | None) -> Tm1Login:
+        """A pass-through login: the header the TM1 server takes, for a user it knows. Without a
+        user, the server's own login; without a password, the one the containers know."""
+        from .cognos import CognosContainer
+
+        server = self._pass_through_server()
+        cam = server._in_cam_security()
+        # The server's own login: in CAM security its first administrator, which the server itself
+        # only takes for its own once it's configured
+        name = user if user is not None else server._cam_admins[0] if cam else server.username
+        known = password
+        if known is None and cam:
+            # Cognos has every test user's password
+            cognos = server.cognos
+            assert cognos is not None
+            found = next((candidate for candidate in cognos.users if candidate.name.lower() == name.lower()), None)
+            if found is None:
+                raise ValueError(
+                    f"{name} isn't one of Cognos's test users, whose passwords the containers know: add it with CognosContainer.with_user, "
+                    "or give a password with pass_through_login(user, password)"
+                )
+            name, known = found.name, found.password
+        elif known is None:
+            if name.lower() != server.username.lower():
+                raise ValueError(
+                    f"Only the TM1 server's own login ({server.username}) has a password the containers know: "
+                    "give this user's with pass_through_login(user, password)"
+                )
+            # As the server spells it
+            name, known = server.username, server.password
+        if cam:
+            namespace = server.cam_namespace
+            assert namespace is not None
+            authorization = CognosContainer.cam_authorization_for(name, known, namespace.id)
+        else:
+            authorization = "Basic " + base64.b64encode(f"{name}:{known}".encode()).decode("ascii")
+        return Tm1Login._pass_through(database, name, known, authorization)
+
+    def _pass_through_login_with(self, database: Tm1Database, authorization: str) -> Tm1Login:
+        """A pass-through login with a header of the caller's own, such as a CAM passport."""
+        self._pass_through_server()
+        if authorization is None:
+            raise ValueError("authorization must not be None")
+        return Tm1Login._pass_through(database, "", "", authorization)
+
+    def _pass_through_server(self) -> Tm1ServerContainer:
+        server = self._pass_through
+        if server is None:
+            raise RuntimeError("This engine passes no logins on: give it a TM1 server with with_pass_through")
+        return server
+
+    def _passes_to_cam(self) -> bool:
+        """Whether logins are passed to a server in CAM security, whose users are Cognos's."""
+        server = self._pass_through
+        return server is not None and server._in_cam_security()
 
     def _oauth2_login(self, database: Tm1Database, user: str) -> Tm1Login:
         """A login through OAuth 2.0, as a user given a password with with_login."""
@@ -449,16 +592,37 @@ class Tm1EngineContainer(GenericContainer):
     def _join_network(self) -> None:
         """Puts the engine and its datastore on one network: the one given, or their own. They
         are on it since it was set (with_network); this holds it if either was moved since. A
-        RuntimeError if the engine's Keycloak was moved to another since with_oauth2: TM1 couldn't
-        reach its issuer."""
+        RuntimeError if the engine's Keycloak was moved to another since with_oauth2, or its TM1
+        server since with_pass_through: TM1 couldn't reach it."""
         self.with_network(self.network if self.network is not None else self._own_network)
 
     def configure(self) -> None:
         """Called before the container is created: passes the databases and the users to the image."""
         self._join_network()
         self.with_env("TM1_DATABASES", ",".join(self._configured()))
-        if self._users:
-            self.with_env("TM1_USERS", ",".join(":".join([name, *groups]) for name, groups in self._users.items()))
+        # name -> groups, as the image is given them
+        wanted = {name: list(groups) for name, groups in self._users.items()}
+        server = self._pass_through
+        if server is not None and server._uses_ssl():
+            raise RuntimeError("The engine passes logins to a TM1 server with UseSSL on, and asks it over plain HTTP: take TM1_CFG_UseSSL off that server")
+        if server is not None and server._in_cam_security():
+            # Read now, not in with_pass_through: with_cam_security may have come after it. The
+            # server answers a login with the user's CAMID, so the image makes the users under theirs
+            cognos = server.cognos
+            namespace = server.cam_namespace
+            assert cognos is not None and namespace is not None
+            self.with_env("TM1_CAM_NAMESPACE", namespace.id)
+            self.with_env("TM1_CAM_NAMESPACE_TYPE", namespace.type)
+            # As Cognos spells it: the name goes into the CAMID
+            wanted = {_cognos_user(cognos, name): list(groups) for name, groups in self._users.items()}
+            # TM1 v12 learns no groups from Cognos: the server's administrators are made
+            # administrators here, after the users listed
+            for admin in server._cam_admins:
+                groups = wanted.setdefault(_cognos_user(cognos, admin), [])
+                if all(group.lower() != "admin" for group in groups):
+                    groups.append("ADMIN")
+        if wanted:
+            self.with_env("TM1_USERS", ",".join(":".join([name, *groups]) for name, groups in wanted.items()))
 
     def container_is_started(self) -> None:
         """Called once the gateway answers: waits for the image to set TM1 up, and reads its version."""
@@ -479,10 +643,12 @@ class Tm1EngineContainer(GenericContainer):
                 self._credentials = None
                 self._version = None
                 # Only its own: a network it was given is whoever gave it's to remove. And not from
-                # under a Keycloak that's still on it, which is the caller's to stop: Docker would
-                # refuse, and the network then goes with the test session, as Keycloak may
+                # under a Keycloak or a TM1 server that's still on it, which is the caller's to stop:
+                # Docker would refuse, and the network then goes with the test session, as they may
                 keycloak = self._keycloak
-                if self.network is self._own_network and (keycloak is None or keycloak._container is None):
+                server = self._pass_through
+                left = (keycloak is not None and keycloak._container is not None) or (server is not None and server._container is not None)
+                if self.network is self._own_network and not left:
                     self._own_network.close()
 
     def _await_setup(self) -> None:
@@ -577,6 +743,17 @@ class Tm1EngineContainer(GenericContainer):
         # Tm1EngineSource.PrivateImage: TM1 is already in the image
 
 
+def _cognos_user(cognos: CognosContainer, name: str) -> str:
+    """A Cognos test user's name as Cognos has it, whatever its case here."""
+    for user in cognos.users:
+        if user.name.lower() == name.lower():
+            return user.name
+    raise RuntimeError(
+        f"{name} isn't one of Cognos's test users. The engine passes logins to a TM1 server in CAM security, which logs in Cognos's users only: "
+        "add the user with CognosContainer.with_user, or take it off the engine"
+    )
+
+
 def _instance_and_name(instance_or_name: str, name: str | None) -> tuple[str, str]:
     """Java's overloads: (name), in the default instance, or (instance, name)."""
     if name is None:
@@ -638,6 +815,32 @@ class Tm1Database:
         password."""
         return self._engine._oauth2_login(self, user)
 
+    def pass_through_login(self, user: str | None = None, password: str | None = None) -> Tm1Login:
+        """A pass-through login: it sends TM1 v12 what the TM1 11 server takes, and TM1 v12 asks that
+        server who that is.
+
+        * ``pass_through_login()``: as the server's own user (:attr:`Tm1ServerContainer.username`):
+          the administrator of a server with its own users, or the first administrator of one in
+          Cognos (CAM) security.
+        * ``pass_through_login(user)``: as a user whose password the containers know: one of
+          Cognos's test users when the server is in CAM security, and otherwise the server's own
+          user only. A ValueError if the user's password isn't known.
+        * ``pass_through_login(user, password)``: with a name and password of your own: a user you
+          created on the TM1 11 server, or a wrong password to see refused. They go as ``Basic``, or
+          as ``CAMNamespace`` when the server is in CAM security.
+
+        A RuntimeError if the engine has no :meth:`Tm1EngineContainer.with_pass_through`."""
+        if user is None and password is not None:
+            raise ValueError("user must not be None")
+        return self._engine._pass_through_login(self, user, password)
+
+    def pass_through_login_with(self, authorization: str) -> Tm1Login:
+        """A pass-through login with an ``Authorization`` header of your own, which TM1 v12 passes
+        on as it is: ``"CAMPassport " + passport`` from a Cognos logon, say. The login has no user
+        name or password. A RuntimeError if the engine has no
+        :meth:`Tm1EngineContainer.with_pass_through`."""
+        return self._engine._pass_through_login_with(self, authorization)
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Tm1Database) and self._engine is other._engine and self._instance == other._instance and self._name == other._name
 
@@ -662,7 +865,11 @@ class Tm1Login:
 
     A login from :meth:`Tm1Database.oauth2_login` is through OAuth 2.0 instead
     (:attr:`is_oauth2`): its tokens come from the engine's Keycloak, for the user's
-    :attr:`password` there, and TM1 takes one on any request (:meth:`authorize_with_token`)."""
+    :attr:`password` there, and TM1 takes one on any request (:meth:`authorize_with_token`).
+
+    A login from :meth:`Tm1Database.pass_through_login` is a pass-through login
+    (:attr:`is_pass_through`), with the ``Authorization`` header a TM1 11 server takes
+    (:attr:`authorization`). :meth:`authorize` and :meth:`cookie` work for all three."""
 
     def __init__(self, auth_url: str, instance: str, client_id: str, client_secret: str, user: str) -> None:
         if user is None:
@@ -679,6 +886,8 @@ class Tm1Login:
         self._keycloak: KeycloakContainer | None = None
         self._password = ""
         self._database: Tm1Database | None = None
+        # A pass-through login: the header the TM1 server behind the engine takes
+        self._authorization: str | None = None
 
     @classmethod
     def _oauth2(cls, keycloak: KeycloakContainer, database: Tm1Database, user: str, password: str) -> Tm1Login:
@@ -691,6 +900,32 @@ class Tm1Login:
         login._database = database
         return login
 
+    @classmethod
+    def _pass_through(cls, database: Tm1Database, user: str, password: str, authorization: str) -> Tm1Login:
+        """A pass-through login, with the header a TM1 server behind the engine takes."""
+        login = cls("", database.instance, "", "", user)
+        login._password = password
+        login._database = database
+        login._authorization = authorization
+        return login
+
+    @property
+    def is_pass_through(self) -> bool:
+        """Whether this is a pass-through login (:meth:`Tm1Database.pass_through_login`): one TM1
+        v12 checks with a TM1 11 server."""
+        return self._authorization is not None
+
+    @property
+    def authorization(self) -> str:
+        """The ``Authorization`` header of a pass-through login, as a client that logs in itself
+        sends it on any request: ``Basic`` with the user's name and password on the TM1 11 server,
+        or ``CAMNamespace`` when that server is in Cognos (CAM) security. A RuntimeError for a login
+        that isn't pass-through."""
+        if self._authorization is None:
+            how = "with a token (authorize_with_token)" if self._keycloak is not None else "through the application (client_id, client_secret and user)"
+            raise RuntimeError(f"Only a pass-through login is a header of its own: this one logs in {how}")
+        return self._authorization
+
     @property
     def is_oauth2(self) -> bool:
         """Whether this is a login through OAuth 2.0 (:meth:`Tm1Database.oauth2_login`), rather than
@@ -699,8 +934,9 @@ class Tm1Login:
 
     @property
     def password(self) -> str:
-        """The user's password at the identity provider, for an OAuth 2.0 login; empty otherwise,
-        as TM1 v12 keeps none."""
+        """The user's password: at the identity provider for an OAuth 2.0 login, and on the TM1 11
+        server (or in Cognos) for a pass-through login. Empty otherwise, as TM1 v12 keeps none, and
+        for a pass-through login made from a header alone."""
         return self._password
 
     @property
@@ -709,7 +945,8 @@ class Tm1Login:
         login, as seen from the host, and TM1's own otherwise."""
         keycloak = self._keycloak
         if keycloak is None:
-            return self._auth_url + "token"
+            # A pass-through login has no token: this is where TM1 gives its own
+            return self.auth_url + "token"
         return f"{keycloak.url}/realms/{Tm1EngineContainer.OAUTH2_REALM}/protocol/openid-connect/token"
 
     @property
@@ -719,17 +956,20 @@ class Tm1Login:
 
     @property
     def user(self) -> str:
-        """The TM1 user this logs in as."""
+        """The user this logs in as. For a pass-through login it's the name on the TM1 11 server, or
+        in Cognos: with a server in CAM security the user's name in TM1 v12 is its CAMID. Empty for
+        a pass-through login made from a header alone."""
         return self._user
 
     @property
     def client_id(self) -> str:
-        """The application's client ID."""
+        """The application's client ID; the Keycloak client's for an OAuth 2.0 login, and empty for
+        a pass-through login, which goes through no application."""
         return self._client_id
 
     @property
     def client_secret(self) -> str:
-        """The application's client secret."""
+        """The application's client secret; empty for an OAuth 2.0 or a pass-through login."""
         return self._client_secret
 
     @property
@@ -741,17 +981,17 @@ class Tm1Login:
 
     def cookie(self) -> str:
         """The session cookie, ``TM1SessionId=...``, for a ``Cookie`` header. Logs in the first time,
-        with the application's credentials as Basic authentication, or for an OAuth 2.0 login with
-        a token from the provider, and keeps the session. A RuntimeError if TM1 refuses the login."""
+        with the application's credentials as Basic authentication, for an OAuth 2.0 login with a
+        token from the provider, or for a pass-through login with its header, and keeps the session.
+        A RuntimeError if TM1 refuses the login."""
         with self._lock:
-            if self._cookie is None and self._database is not None:
+            if self._cookie is None and self._authorization is not None and self._database is not None:
+                # TM1 asks the server behind it who this is, on the first request that carries the
+                # header, and gives a session
+                self._cookie = self._session_cookie(self._get_anywhere(self._database, self._authorization))
+            if self._cookie is None and self._keycloak is not None and self._database is not None:
                 # TM1 gives a session to the first request that carries the provider's token
-                anywhere = self._database.rest_url + "ActiveUser?$select=Name"
-                try:
-                    response = httpx2.get(anywhere, headers={"Authorization": "Bearer " + self.token()}, timeout=_REQUEST_TIMEOUT)
-                except httpx2.HTTPError as e:
-                    raise RuntimeError(f"Couldn't reach TM1 at {self.auth_url}") from e
-                self._cookie = self._session_cookie(response)
+                self._cookie = self._session_cookie(self._get_anywhere(self._database, "Bearer " + self.token()))
             if self._cookie is None:
                 basic = base64.b64encode(f"{self._client_id}:{self._client_secret}".encode()).decode("ascii")
                 self._cookie = self.session("Basic " + basic)
@@ -764,7 +1004,9 @@ class Tm1Login:
         application's credentials.
 
         For an OAuth 2.0 login, an access token for the user from the provider, by the password
-        grant: a new one each time."""
+        grant: a new one each time. A RuntimeError for a pass-through login, which has no token."""
+        if self._authorization is not None:
+            raise RuntimeError(_NO_TOKEN)
         keycloak = self._keycloak
         if keycloak is not None:
             return keycloak._access_token(Tm1EngineContainer.OAUTH2_REALM, self._client_id, self._user, self._password)
@@ -785,7 +1027,11 @@ class Tm1Login:
         """Logs the user in with an ``Authorization`` header of your own, such as
         ``"Bearer " + login.token()``, and returns the new session's cookie, ``TM1SessionId=...``. Each
         call makes a session; :meth:`cookie` keeps one. A RuntimeError if TM1 refuses the login, or
-        for an OAuth 2.0 login, which has no session endpoint to ask."""
+        for an OAuth 2.0 or a pass-through login, which has no session endpoint to ask."""
+        if self._authorization is not None:
+            raise RuntimeError(
+                "A pass-through login has no session to ask for: TM1 takes its header on any request (authorization), and cookie() keeps the session that gives"
+            )
         if self._keycloak is not None:
             raise RuntimeError(
                 "An OAuth 2.0 login has no session to ask for: TM1 takes its token on any request (authorize_with_token), and cookie() keeps the session that gives"
@@ -793,6 +1039,13 @@ class Tm1Login:
         if authorization is None:
             raise ValueError("authorization must not be None")
         return self._session_cookie(self._post("session", {"User": self._user}, {"Authorization": authorization}))
+
+    def _get_anywhere(self, database: Tm1Database, authorization: str) -> httpx2.Response:
+        """A request that only logs in: TM1 answers one that carries a login with a session."""
+        try:
+            return httpx2.get(database.rest_url + "ActiveUser?$select=Name", headers={"Authorization": authorization}, timeout=_REQUEST_TIMEOUT)
+        except httpx2.HTTPError as e:
+            raise RuntimeError(f"Couldn't reach TM1 at {self.auth_url}") from e
 
     def _session_cookie(self, response: httpx2.Response) -> str:
         cookies = (value.split(";", 1)[0].strip() for value in response.headers.get_list("set-cookie"))
@@ -814,7 +1067,9 @@ class Tm1Login:
         token of its own would send it: to its headers, as a dict, or to an ``httpx2.Request``. For
         an OAuth 2.0 login, a new token from the provider each time; TM1 answers with a session
         cookie. A RuntimeError for a login through the application, whose token TM1 takes only at
-        its session endpoint (:meth:`session`)."""
+        its session endpoint (:meth:`session`), and for a pass-through login, which has none."""
+        if self._authorization is not None:
+            raise RuntimeError(_NO_TOKEN)
         if self._keycloak is None:
             raise RuntimeError('TM1 takes its own token only where a session is asked for: use session("Bearer " + token()), or authorize for the cookie')
         headers: MutableMapping[str, str] = getattr(request, "headers", request)  # type: ignore[assignment]
@@ -824,7 +1079,7 @@ class Tm1Login:
 
     def __repr__(self) -> str:
         # Never the secret
-        return f"Tm1Login[{self._user} in {self._instance}]"
+        return f"Tm1Login[{self._user or 'a pass-through header'} in {self._instance}]"
 
     def _post(self, path: str, body: dict[str, str], headers: dict[str, str]) -> httpx2.Response:
         try:

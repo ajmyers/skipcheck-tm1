@@ -246,6 +246,28 @@ class Tm1ServerContainer(GenericContainer):
         None if TM1 uses its own (native) security."""
         return None if self._cognos is None else self._cam_namespace
 
+    def _in_cam_security(self) -> bool:
+        """Whether the server ends up in CAM security: set with :meth:`with_cam_security`, unless a
+        ``tm1s.cfg`` parameter given as ``TM1_CFG_IntegratedSecurityMode`` says another mode than 4
+        or 5. The image applies those last, and takes a parameter's name in any case."""
+        if self._cognos is None:
+            return False
+        mode = self._cfg("IntegratedSecurityMode")
+        return mode is None or mode.strip() in ("4", "5")
+
+    def _uses_ssl(self) -> bool:
+        """Whether a ``tm1s.cfg`` parameter given as ``TM1_CFG_UseSSL`` turns TLS on."""
+        ssl = self._cfg("UseSSL")
+        return ssl is not None and ssl.strip().lower() not in ("f", "false")
+
+    def _cfg(self, parameter: str) -> str | None:
+        """A tm1s.cfg parameter given in the environment, whatever the case of its name."""
+        wanted = f"TM1_CFG_{parameter}".lower()
+        for name, value in self.env.items():
+            if name.lower() == wanted:
+                return str(value)
+        return None
+
     @property
     def authorization(self) -> str:
         """The ``Authorization`` header to log in with: ``Basic``, or ``CAMNamespace`` in CAM

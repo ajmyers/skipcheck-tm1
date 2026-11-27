@@ -10,7 +10,16 @@ from contextlib import closing
 import httpx2
 import pytest
 
-from skipcheck_tm1_testcontainers import KeycloakContainer, Tm1Database, Tm1EngineContainer, Tm1EngineSource, Tm1Login
+from skipcheck_tm1_testcontainers import (
+    KeycloakContainer,
+    Tm1Database,
+    Tm1EngineContainer,
+    Tm1EngineSource,
+    Tm1Login,
+    Tm1Seed,
+    Tm1ServerContainer,
+    Tm1Source,
+)
 
 # @start region = test-class
 # Every test in the module needs TM1 v12, and is skipped without one
@@ -45,6 +54,21 @@ def oauth2(source: Tm1EngineSource) -> None:
         db: Tm1Database = engine.database("tm1")
         # A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
         headers = db.oauth2_login("analyst").authorize_with_token({})
+        response = httpx2.get(db.rest_url + "Cubes?$select=Name", headers=headers)
+        # @end
+        assert response.status_code == 200
+
+
+def pass_through(source: Tm1EngineSource, tm1: Tm1Source) -> None:
+    # @start region = pass-through
+    # A TM1 11 server that isn't started: the engine starts it first
+    server = Tm1ServerContainer(tm1).with_seed(Tm1Seed.SDATA)
+    engine = Tm1EngineContainer(source).with_pass_through(server)
+    # Entering the block starts the server, then the engine; the server is yours to close
+    with closing(server), engine:
+        db: Tm1Database = engine.database("tm1")
+        # The sample database's admin / apple, which TM1 v12 asks the server about
+        headers = db.pass_through_login().authorize({})
         response = httpx2.get(db.rest_url + "Cubes?$select=Name", headers=headers)
         # @end
         assert response.status_code == 200

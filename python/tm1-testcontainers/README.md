@@ -156,6 +156,50 @@ with closing(keycloak), engine:
 - In a `PlanningAnalyticsEnvironment`, `tm1_engine_oauth2()` does the same with the environment's
   Keycloak, added if `keycloak()` wasn't called; in `pa-environment.yaml` it's `tm1Engine.oauth2`.
 
+### Pass-through logins
+
+TM1 v12 can also ask a TM1 11 server who a login is. `with_pass_through(server)` has the engine pass
+logins on to a `Tm1ServerContainer`, so that server's users log in to TM1 v12 with the name and
+password they have there: TM1 v12 keeps none itself.
+
+```python
+from contextlib import closing
+
+server = Tm1ServerContainer(tm1).with_seed(Tm1Seed.SDATA)  # not started: the engine starts it first
+engine = Tm1EngineContainer(source).with_pass_through(server)
+with closing(server), engine:
+    db = engine.database("tm1")
+    headers = db.pass_through_login().authorize({})  # the sample database's admin / apple
+    httpx2.get(db.rest_url + "Cubes?$select=Name", headers=headers)
+```
+
+- **A user must be a user of the engine too** (`with_user`); `admin` always is. Logins through the
+  application (`db.login(user)`) keep working beside it.
+- **Behind a server in Cognos (CAM) security** (`with_cam_security`) the engine's users are
+  Cognos's test users, each made under its CAMID, and the server's administrators are
+  administrators of the engine. A user has the groups `with_user` gives. A user of the engine
+  that Cognos doesn't have is refused when the engine is configured or started, and
+  `db.login(user)` by a short name says to use `pass_through_login`.
+- **Four forms of login**, each a `Tm1Login` (`is_pass_through`) whose `authorization` is the
+  header sent, and whose `cookie()` and `authorize(headers)` keep the session it gives:
+  - `db.pass_through_login()`: the server's own user, or the first administrator of one in CAM
+    security;
+  - `db.pass_through_login(user)`: a user whose password the containers know: one of Cognos's
+    test users in CAM security, otherwise the server's own user only;
+  - `db.pass_through_login(user, password)`: a name and password of your own, sent as `Basic`, or
+    as `CAMNamespace` in CAM security;
+  - `db.pass_through_login_with(authorization)`: a header of your own, passed on as it is.
+
+  `token()`, `session(...)` and `authorize_with_token(...)` refuse: the header is the login.
+- **Not together with OAuth 2.0.** `with_pass_through` and `with_oauth2` refuse each other, in
+  either order.
+- **Give the engine a server that isn't started yet**, without `TM1_CFG_UseSSL` on. It joins the
+  engine's network (or the engine the server's, if it has one) under the name `tm1-passthrough`,
+  and is yours to stop, after the engine; `with Tm1ServerContainer(...) as server` would start it
+  too soon.
+- In a `PlanningAnalyticsEnvironment`, `tm1_engine_pass_through(name)` does the same with the
+  server added as `tm1(name)`; in `pa-environment.yaml` it's `tm1Engine.passthrough`.
+
 `Tm1EngineSource.discover()` reads these, in this order:
 
 | Setting | Source |

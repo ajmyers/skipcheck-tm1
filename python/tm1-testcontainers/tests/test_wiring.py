@@ -20,6 +20,7 @@ from skipcheck_tm1_testcontainers import (
     PawSource,
     PlanningAnalyticsEnvironment,
     Tm1AdminServerContainer,
+    Tm1EngineContainer,
     Tm1EngineSource,
     Tm1Seed,
     Tm1ServerContainer,
@@ -471,6 +472,76 @@ def test_an_engine_takes_o_auth2_tokens_from_the_environments_keycloak() -> None
         builder().tm1("legacy").tm1_engine_oauth2().build()
     with pytest.raises(RuntimeError, match=r"add cognos\(...\) or tm1_engine_oauth2\(\) too"):
         builder().tm1("legacy").keycloak().build()
+
+
+def test_an_engine_passes_logins_to_one_of_the_environments_servers() -> None:
+    env = (
+        engine_builder()
+        .tm1("first")
+        .tm1("legacy", lambda server: server.with_seed(Tm1Seed.SDATA))
+        .tm1_engine(lambda engine: engine.with_user("analyst"))
+        .tm1_engine_pass_through("legacy")
+        .build()
+    )
+    engine = env.tm1_engine()
+    # The server named, not the first, by the name it has on the network already
+    assert engine.pass_through is env.tm1("legacy")
+    assert engine.env_map["TM1_PASSTHROUGH_URL"] == "http://legacy:8010/api/v1/"
+    assert "legacy" in env.tm1("legacy").network_aliases
+    assert Tm1EngineContainer.PASS_THROUGH_ALIAS not in env.tm1("legacy").network_aliases
+    assert env.tm1("legacy") in engine.dependencies and env.tm1("first") not in engine.dependencies
+    assert env.tm1_database("tm1").pass_through_login().password == "apple"
+
+    # With CAM security the engine's users are Cognos's, and the servers' administrators its own
+    cam = (
+        engine_builder()
+        .tm1("legacy")
+        .cognos(lambda cognos: cognos.with_user("admin", "adminpw").with_user("analyst", "analystpw"))
+        .tm1_engine(lambda e: e.with_user("analyst", "Analysts"))
+        .tm1_engine_pass_through("legacy")
+        .build()
+    )
+    cam.tm1_engine().configure()
+    assert cam.tm1_engine().env_map["TM1_CAM_NAMESPACE"] == "LDAP"
+    assert cam.tm1_engine().env_map["TM1_USERS"] == "analyst:Analysts,admin:ADMIN"
+    assert cam.tm1_database("tm1").pass_through_login("analyst").authorization == cam.cognos().cam_authorization("analyst")
+
+    with pytest.raises(RuntimeError, match="other, which isn't a TM1 server of the environment"):
+        engine_builder().tm1("legacy").tm1_engine().tm1_engine_pass_through("other").build()
+    with pytest.raises(RuntimeError, match="TM1 takes tokens or passes logins on, not both"):
+        engine_builder().tm1("legacy").tm1_engine().tm1_engine_oauth2().tm1_engine_pass_through("legacy").build()
+    with pytest.raises(RuntimeError, match=r"Pass-through logins are a TM1 v12 engine's: add tm1_engine\(\) too"):
+        builder().tm1("legacy").tm1_engine_pass_through("legacy").build()
+
+
+def test_from_config_passes_logins_to_the_server_named() -> None:
+    env = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-passthrough.yaml").build()
+    engine = env.tm1_engine()
+    assert engine.pass_through is env.tm1("legacy")
+    engine.configure()
+    assert engine.env_map["TM1_PASSTHROUGH_URL"] == "http://legacy:8010/api/v1/"
+    assert engine.env_map["TM1_USERS"] == "analyst:Analysts"
+    assert "TM1_CAM_NAMESPACE" not in engine.env_map
+
+    # passthrough: false is off
+    off = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-passthrough-off.yaml").build()
+    assert off.tm1_engine().pass_through is None
+    assert "TM1_PASSTHROUGH_URL" not in off.tm1_engine().env_map
+
+    # With cognos the engine's users are Cognos's, as Cognos spells them, and the TM1 servers'
+    # administrators are the engine's too
+    cam = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-passthrough-cam.yaml").build()
+    cam.tm1_engine().configure()
+    assert cam.tm1_engine().env_map["TM1_CAM_NAMESPACE"] == "LDAP"
+    assert cam.tm1_engine().env_map["TM1_CAM_NAMESPACE_TYPE"] == "ldap"
+    assert cam.tm1_engine().env_map["TM1_USERS"] == "analyst:Analysts,admin:Ops:ADMIN,viewer:ADMIN"
+
+    # A server whose cfg takes it out of CAM security has users of its own
+    own = PlanningAnalyticsEnvironment.from_config(FIXTURES / "engine-passthrough-own-users.yaml").build()
+    own.tm1_engine().configure()
+    assert "TM1_CAM_NAMESPACE" not in own.tm1_engine().env_map
+    assert own.tm1_engine().env_map["TM1_USERS"] == "planner:Planners"
+    assert own.tm1_database("tm1").pass_through_login().authorization.startswith("Basic ")
 
 
 def test_from_config_turns_o_auth2_on_with_the_users_who_have_a_password() -> None:

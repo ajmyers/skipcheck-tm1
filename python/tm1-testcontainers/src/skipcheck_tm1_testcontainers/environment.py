@@ -166,6 +166,9 @@ class PlanningAnalyticsEnvironment:
                 # The environment's one Keycloak: its address on the network is its issuer for
                 # Cognos and for the engine alike
                 engine.with_oauth2(self._keycloak)
+            if b._tm1_engine_pass_through is not None:
+                # By the name the server has on the network already
+                engine._with_pass_through(servers[b._tm1_engine_pass_through], b._tm1_engine_pass_through)
             # What the file said first; then, below, what the caller says
             _apply(b._file_tm1_engine, engine)
         self._tm1_engine = engine
@@ -208,8 +211,9 @@ class PlanningAnalyticsEnvironment:
           :meth:`Tm1EngineContainer.with_database` in its ``instance``, and ``users`` as
           :meth:`Tm1EngineContainer.with_user`. ``oauth2`` is :meth:`Builder.tm1_engine_oauth2`,
           and a user's password is then their :meth:`Tm1EngineContainer.with_login` at Keycloak;
-          without it the password is checked and not used, as TM1 v12 keeps none. It runs beside
-          ``tm1``, or alone;
+          without it the password is checked and not used, as TM1 v12 keeps none. ``passthrough``
+          is :meth:`Builder.tm1_engine_pass_through` to the server it names; with ``cognos`` the
+          users are then Cognos's. It runs beside ``tm1``, or alone;
         * ``ibm``: each part's source, the folder as :class:`Tm1Source.Bundle`,
           :class:`Tm1WebSource.Bundle`, :class:`CognosSource.Zip` and :class:`Tm1EngineSource.Bundle`. A relative path is from the
           file's folder; ``~`` is the user's home;
@@ -387,6 +391,7 @@ class PlanningAnalyticsEnvironment:
             # The file's own settings for the engine, kept when the caller adds theirs
             self._file_tm1_engine: Callable[[Tm1EngineContainer], Any] | None = None
             self._tm1_engine_oauth2 = False
+            self._tm1_engine_pass_through: str | None = None
 
         def tm1(self, name: str, customizer: Callable[[Tm1ServerContainer], Any] = _nothing) -> Self:
             """A TM1 server, its network alias and server name ``name``."""
@@ -472,6 +477,15 @@ class PlanningAnalyticsEnvironment:
             self._tm1_engine_oauth2 = True
             return self
 
+        def tm1_engine_pass_through(self, server: str) -> Self:
+            """Has the TM1 v12 engine pass logins on to one of the environment's TM1 servers
+            (:meth:`Tm1EngineContainer.with_pass_through`), the one added with :meth:`tm1` under
+            this name: that server's users log in to TM1 v12 with what they have there. With
+            :meth:`cognos` they are Cognos's users. Log in with
+            :meth:`Tm1Database.pass_through_login`. Not together with :meth:`tm1_engine_oauth2`."""
+            self._tm1_engine_pass_through = _required(server)
+            return self
+
         def tm1_engine_source(self, source: Tm1EngineSource) -> Self:
             """Where the engine gets TM1 v12 from, instead of what :meth:`Tm1EngineSource.discover`
             finds."""
@@ -532,6 +546,16 @@ class PlanningAnalyticsEnvironment:
                 )
             if self._tm1_engine_oauth2 and self._tm1_engine is None:
                 raise RuntimeError("OAuth 2.0 logins are a TM1 v12 engine's: add tm1_engine() too")
+            if self._tm1_engine_pass_through is not None:
+                if self._tm1_engine is None:
+                    raise RuntimeError("Pass-through logins are a TM1 v12 engine's: add tm1_engine() too")
+                if self._tm1_engine_pass_through not in self._tm1:
+                    raise RuntimeError(
+                        f"The engine passes logins to {self._tm1_engine_pass_through}, which isn't a TM1 server of the environment: "
+                        f"add it with tm1(name). Those there: [{', '.join(self._tm1)}]"
+                    )
+                if self._tm1_engine_oauth2:
+                    raise RuntimeError("TM1 takes tokens or passes logins on, not both: use tm1_engine_oauth2 or tm1_engine_pass_through")
             if self._cam_namespace is Namespace.OIDC and self._keycloak is None:
                 raise RuntimeError("CAM security through OIDC needs keycloak()")
             return PlanningAnalyticsEnvironment(self, reuse_enabled)
