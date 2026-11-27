@@ -10,13 +10,14 @@ built for local development and integration tests of TM1 client libraries.
 
 **New here? Follow [GETTING-STARTED.md](GETTING-STARTED.md)** for step-by-step
 instructions on Mac, Windows and Linux, or let the setup script do them:
-`curl -fsSL https://skipcheck.io/tm1/setup.sh | sh` (Mac/Linux, [`setup.sh`](setup.sh)) or
-`irm https://skipcheck.io/tm1/setup.ps1 | iex` (Windows, [`setup.ps1`](setup.ps1)).
-The interactive guide at <https://skipcheck.io/tm1/> shows only the steps for your
-choices. This README is the reference.
+`curl -fsSL https://skipcheck.io/pa/setup.sh | sh` (Mac/Linux) or
+`& ([scriptblock]::Create((irm https://skipcheck.io/pa/setup.ps1)))` (Windows). It's
+[`pa-setup`](../pa-setup/README.md)'s script, the one setup script for everything here.
+The interactive guide at <https://skipcheck.io/pa-docker/setup/> shows only the steps for
+your choices. This README is the reference.
 
-**More than one TM1 server, or TM1 Web, PAW or Cognos?** Use [`pa-setup`](../pa-setup/README.md):
-you describe the environment in one file, `pa-environment.yaml`, and one command starts it
+**More than one TM1 server, or TM1 Web, PAW or Cognos?** [`pa-setup`](../pa-setup/README.md)
+does those too: you describe the environment in one file, `pa-environment.yaml`, and one command starts it
 and prints every address and login. It runs this image, so the settings below still apply.
 
 The shortest path: put your IBM bundle (`tm1server-*-linuxi38664h_bundle.tar.gz`)

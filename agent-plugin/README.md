@@ -7,8 +7,7 @@ options, checks everything is healthy, and tells you how to connect.
 
 | Skill | What it sets up |
 |---|---|
-| [`tm1-setup`](skills/tm1-setup/SKILL.md) | One TM1 server, with [tm1-server](../docker/tm1-server/GETTING-STARTED.md)'s setup script |
-| [`pa-setup`](skills/pa-setup/SKILL.md) | Any combination of TM1 servers, TM1 Web, PAW, and Cognos security with LDAP and OIDC test users, with [pa-setup](../docker/pa-setup/README.md) and `pa-environment.yaml` |
+| [`pa-setup`](skills/pa-setup/SKILL.md) | One TM1 server from your IBM download, or any combination of TM1 servers, a TM1 v12 engine, TM1 Web, PAW, and Cognos security with LDAP and OIDC test users, with [pa-setup](../docker/pa-setup/README.md) and `pa-environment.yaml` |
 
 More TM1 tooling will be added as the project grows.
 
@@ -23,25 +22,26 @@ More TM1 tooling will be added as the project grows.
 /plugin install tm1@skipcheck-tm1
 ```
 
-Then ask Claude to set up TM1, or run `/tm1:tm1-setup` (optionally followed by your bundle's
-path) or `/tm1:pa-setup` (optionally followed by what you want to run).
+Then ask Claude to set up TM1, or run `/tm1:pa-setup` (optionally followed by your bundle's
+path, or what you want to run). The `tm1-setup` skill is gone: `pa-setup` sets up one TM1
+server too.
 
 ## Codex, Gemini CLI, Cursor and other agents with skills
 
-Each skill is a plain `SKILL.md`, so any agent that reads skills can use them. Copy them
+The skill is a plain `SKILL.md`, so any agent that reads skills can use it. Copy it
 into your user skills folder (`~/.agents/skills` is read by Codex and Gemini CLI, and by
 Cursor):
 
 ```sh
-for skill in tm1-setup pa-setup; do
+for skill in pa-setup; do
   mkdir -p ~/.agents/skills/$skill
   curl -fsSL -o ~/.agents/skills/$skill/SKILL.md \
     https://raw.githubusercontent.com/ajmyers/skipcheck-tm1/master/agent-plugin/skills/$skill/SKILL.md
 done
 ```
 
-Agents without skills can be pointed at the same files: *"follow these instructions to set
-up TM1"*, with one of the URLs above.
+Agents without skills can be pointed at the same file: *"follow these instructions to set
+up TM1"*, with the URL above.
 
 ---
 
