@@ -54,4 +54,7 @@ if ($env:PA_IMAGE_TAG) { $dockerArgs += @('-e', "PA_IMAGE_TAG=$($env:PA_IMAGE_TA
 if ($env:CI) { $dockerArgs += @('-e', "CI=$($env:CI)") }
 if (-not [Console]::IsInputRedirected) { $dockerArgs += '-it' }
 & docker @dockerArgs $image @args
-exit $LASTEXITCODE
+# Run as a file, the tool's exit code is the script's. Piped from the web, as the one-liners
+# above run it (a script block, or iex), exit would close the user's PowerShell window: the
+# code is left in $LASTEXITCODE.
+if ($PSCommandPath) { exit $LASTEXITCODE }

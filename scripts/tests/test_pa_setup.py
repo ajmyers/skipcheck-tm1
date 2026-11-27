@@ -194,6 +194,31 @@ def test_fetches_the_setup_tools_image_where_an_environment_starts(
     assert arguments(docker)[-3:] == ["--bundle", "a b.tar.gz", "--no-start"]
 
 
+@pytest.mark.skipif(
+    shutil.which("pwsh") is None and not os.environ.get("CI"),
+    reason="PowerShell isn't installed",
+)
+@pytest.mark.parametrize(
+    "piped",
+    [
+        "& ([scriptblock]::Create((Get-Content -Raw '{script}'))) urls",
+        "Get-Content -Raw '{script}' | Invoke-Expression",
+    ],
+    ids=["script block", "iex"],
+)
+def test_setup_ps1_piped_from_the_web_leaves_the_window_open(
+    docker: Path, tmp_path: Path, piped: str
+) -> None:
+    # The documented one-liners run the script's text, not a file: an exit there ends the
+    # user's PowerShell, window and all. What comes after it must still run
+    command = piped.format(script=SETUP / "setup.ps1") + "; 'STILL HERE'"
+    result = run(
+        ["pwsh", "-NoProfile", "-Command", command], tmp_path, environment(docker)
+    )
+    assert "STILL HERE" in result.stdout, result.stdout + result.stderr
+    assert arguments(docker)[-1] in ("urls", "ghcr.io/ajmyers/pa-setup:edge")
+
+
 def test_setup_sh_says_so_when_docker_isnt_installed(tmp_path: Path) -> None:
     # A path with nothing on it: the real docker, where there is one, must not be found and run
     empty = tmp_path / "empty"
