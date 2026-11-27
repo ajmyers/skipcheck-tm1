@@ -6,7 +6,8 @@
 Runs in its own container (see setup.sh / setup.ps1), with the Docker socket and the
 folder holding pa-environment.yaml mounted at /work:
 
-  pa-setup init [options]     write a starting pa-environment.yaml (see "Starting from nothing")
+  pa-setup init [options]     write a starting pa-environment.yaml, and start nothing: every
+                              part to uncomment, or with the options below, the file for them
   pa-setup up                 generate compose.yaml, start everything, wait, print URLs
   pa-setup pull               fetch the current images of everything the file runs
   pa-setup generate           only write compose.yaml
@@ -28,7 +29,7 @@ With a TM1 v12 engine (tm1Engine):
 Options: -f FILE (default pa-environment.yaml in the current folder).
 
 Starting from nothing: say where TM1 comes from, and a pa-environment.yaml for one TM1
-server is written and started. With a terminal and none of these, you're asked.
+server is written and started (no command). With a terminal and none of these, you're asked.
 
   --bundle FILE     your IBM download, tm1server-<ver>-linuxi38664h_bundle.tar.gz; or TM1
                     v12's, tm1-v<ver>-standalone-linux.tgz, for a TM1 v12 engine
@@ -580,6 +581,8 @@ def generate(m):
         env = {"TM1_DATASTORE_URL": f"mongodb://{DATASTORE_USER}:{DATASTORE_PASSWORD}@tm1-engine-mongo:27017",
                "TM1_DATABASES": ",".join(f"{d['instance']}/{name}" for name, d in engine["databases"].items()),
                "TM1_ENGINE_BUNDLE_URL": "${TM1_ENGINE_BUNDLE_URL:-}",
+               # One package of several in the ibm folder; without it the newest is taken
+               "TM1_ENGINE_BUNDLE": "${TM1_ENGINE_BUNDLE:-}",
                "TM1_ENGINE_BUNDLE_SHA256": "${TM1_ENGINE_BUNDLE_SHA256:-}"}
         listed = [(u["name"], list(u["groups"])) for u in engine["users"]]
         if engine["passthrough"] and engine["passthrough"]["cam"]:
@@ -689,6 +692,7 @@ def write_compose(m):
     if not os.path.exists(env_file):
         with open(env_file, "w", encoding="utf-8") as f:
             f.write(ENV_HEADER)
+        own(env_file)
 
 
 # ---- running ---------------------------------------------------------------------
@@ -1023,6 +1027,8 @@ ENGINE_BUNDLE = r"tm1-v.+-standalone-linux\.tgz"
 BUNDLE_HELP = ("It should be named tm1server-<version>-linuxi38664h_bundle.tar.gz (for Planning Analytics 2.1.2 "
                "to 2.1.7, tm1_linuxi38664h_<version>_ml.tar.gz): the Linux download, even on Mac or Windows. "
                "For TM1 v12: tm1-v<version>-standalone-linux.tgz")
+# What .env says about where TM1 comes from: all set, or taken out, by a start from nothing
+SOURCE_SETTINGS = ("TM1_BUNDLE", "TM1_BUNDLE_URL", "TM1_BUNDLE_SHA256", "TM1_HOME_DIR", "TM1_ENGINE_BUNDLE")
 START_OPTIONS = ("bundle", "ibm", "url", "sha256", "tm1_home", "image", "samples", "engine", "files_dir")
 
 
@@ -1040,7 +1046,7 @@ def host_has(directory, name):
         return None
     # --mount, not -v: a folder that isn't there is refused, where -v would make it
     done = subprocess.run(["docker", "run", "--rm", "--entrypoint", "test", "--mount",
-                           f"type=bind,source={directory},target=/host,readonly", image, "-e", "/host/" + name],
+                           f"type=bind,source={directory},target=/host,readonly", image, "-e", "/host/" + name],  # name "" asks for the folder itself
                           check=False, capture_output=True)
     if done.returncode in (0, 1):
         return done.returncode == 0
@@ -1056,7 +1062,16 @@ def interactive(a):
 
 def ask_start(a):
     """Asks where TM1 comes from, filling in the options nobody gave."""
-    ask = input
+    def ask(question):
+        try:
+            answer = input(question).strip()
+        except EOFError:
+            answer = ""
+        if not answer and not question.endswith("]: "):  # one with a default may be left empty
+            raise ConfigError("No answer. Say where TM1 comes from with an option instead: --bundle FILE, "
+                              "--url URL or --tm1-home DIR")
+        return answer
+
     log("Where does TM1 come from?\n"
         "  1  The IBM download file (tm1server-...-linuxi38664h_bundle.tar.gz)   [most people]\n"
         "  2  A link to that file (e.g. a pre-signed S3, R2, GCS or Azure URL)\n"
@@ -1077,19 +1092,28 @@ def ask_start(a):
 
 def starting_file(a):
     """The pa-environment.yaml text and .env settings for what was asked: (text, settings)."""
+    engine, server = bool(a.engine), True
+    # With an engine, --ibm may stand beside another source: it's where the engine's package is
     sources = [name for name, value in (("--bundle", a.bundle), ("--ibm", a.ibm), ("--url", a.url),
-                                        ("--tm1-home", a.tm1_home)) if value]
+                                        ("--tm1-home", a.tm1_home))
+               if value and not (name == "--ibm" and engine)]
     if len(sources) > 1:
         raise ConfigError(f"Choose one TM1 source: {' and '.join(sources)} were both given")
     if a.sha256 and not a.url:
         raise ConfigError("--sha256 checks the file --url downloads: give the link too")
-    settings = {}
+    if not (sources or a.ibm or a.image):
+        raise ConfigError("Say where TM1 comes from: --bundle FILE, --ibm DIR, --url URL, --tm1-home DIR or "
+                          "--image IMAGE")
+    # Every source setting of .env, so that an earlier start's don't outlive it: unset is taken out
+    settings = dict.fromkeys(SOURCE_SETTINGS)
     ibm = a.ibm
-    engine, server = bool(a.engine), True
+    if ibm and host_has(host_path(ibm, "--ibm"), "") is False:
+        raise ConfigError(f"--ibm: there's no folder {ibm}")
     if a.bundle:
         folder, name = host_split(host_path(a.bundle, "--bundle"))
         if re.fullmatch(ENGINE_BUNDLE, name):
             engine, server = True, False  # TM1 v12's package: an engine, and no TM1 11 server
+            settings["TM1_ENGINE_BUNDLE"] = "/ibm/" + name
         elif any(re.fullmatch(pattern, name) for pattern in TM1_BUNDLES):
             settings["TM1_BUNDLE"] = "/ibm/" + name  # this one, whatever else the folder holds
         else:
@@ -1107,12 +1131,16 @@ def starting_file(a):
             settings["TM1_BUNDLE_SHA256"] = a.sha256.strip().lower()
     if a.tm1_home:
         home = host_path(a.tm1_home, "--tm1-home")
-        if host_has(home, "bin64") is False:
-            raise ConfigError(f"{a.tm1_home} isn't an installed TM1 Server: there's no bin64 in it. "
-                              "Give the tm1_64 folder itself")
+        for program in ("tm1s.exe", "tm1admsrv.exe"):
+            if host_has(home, "bin64/" + program) is False:
+                raise ConfigError(f"{a.tm1_home} isn't an installed TM1 Server: there's no bin64/{program} in it. "
+                                  "Give the tm1_64 folder of a Linux TM1 Server install (usually "
+                                  "/opt/ibm/cognos/tm1_64)")
         settings["TM1_HOME_DIR"] = home
-    if not (a.bundle or a.url or a.tm1_home or a.image) and not ibm:
-        ibm = "./ibm"  # the folder to put the IBM downloads in
+    if engine and not ibm:
+        raise ConfigError("--engine: TM1 v12's package comes from a folder. Say which with --ibm DIR")
+    if a.samples and not server:
+        raise ConfigError("--samples is a TM1 11 sample server, and TM1 v12's package starts none: leave it out")
     quoted = json.dumps  # a YAML string, whatever the path holds
     lines = ["# pa-environment.yaml: what pa-setup runs. Start it with: setup.sh up",
              "# Every section is optional. Format: https://github.com/ajmyers/skipcheck-tm1/tree/master/docker/pa-setup",
@@ -1140,19 +1168,37 @@ ENV_HEADER = ("# Secrets for pa-setup, kept out of pa-environment.yaml. Uncommen
               "# TM1_HOME_DIR=/opt/ibm/cognos/tm1_64\n")
 
 
+def own(path):
+    """Gives a file this tool wrote to whoever owns the folder: it runs as root in its container,
+    and on Linux the file would be root's on the host, a .env unreadable to its user."""
+    try:
+        folder = os.stat(WORK)
+        os.chown(path, folder.st_uid, folder.st_gid)
+    except OSError:
+        pass  # Docker Desktop maps owners itself, and refuses this
+
+
 def write_env(settings):
-    """Sets NAME=value lines in .env, keeping everything else that's there."""
+    """Sets NAME=value lines in .env, and takes out those whose value is None, keeping everything
+    else that's there. Returns the names taken out."""
     env_file = os.path.join(WORK, ".env")
     try:
         with open(env_file, encoding="utf-8") as f:
             lines = f.read().splitlines()
     except OSError:
+        if all(value is None for value in settings.values()):
+            return []  # nothing to say, and no file to say it in
         lines = ENV_HEADER.splitlines()
+    removed = []
     for name, value in settings.items():
         kept = [line for line in lines if not line.strip().startswith(name + "=")]
-        lines = kept + [f"{name}={value}"]
+        if value is None and len(kept) != len(lines):
+            removed.append(name)
+        lines = kept + ([f"{name}={value}"] if value is not None else [])
     with open(os.open(env_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
+    own(env_file)
+    return removed
 
 
 def write_start(a, path, ask):
@@ -1161,9 +1207,12 @@ def write_start(a, path, ask):
     text, settings = starting_file(a)
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    if settings:
-        write_env(settings)
-    log(f"Wrote {a.file}" + (" and .env" if settings else "") + ". Edit it any time, then run: setup.sh up")
+    own(path)
+    removed = write_env(settings)
+    wrote_env = any(value is not None for value in settings.values())
+    log(f"Wrote {a.file}" + (" and .env" if wrote_env else "") + ". Edit it any time, then run: setup.sh up")
+    if removed:
+        log(f"Took {', '.join(removed)} out of .env: an earlier start's, which this one doesn't use.")
 
 
 def main():
@@ -1209,11 +1258,13 @@ def main():
         if command == "init":
             if os.path.exists(path):
                 raise ConfigError(f"{a.file} already exists; edit it, then run 'up'")
-            if starting or interactive(a):
-                write_start(a, path, ask=not starting)
+            if starting:
+                write_start(a, path, ask=False)
             else:
+                # Every part, to uncomment: init asks nothing, with or without a terminal
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(SAMPLE)
+                own(path)
                 log(f"Wrote {a.file}. Edit it, then run: setup.sh up")
             return 0
         if command is None:

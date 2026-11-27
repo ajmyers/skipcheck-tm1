@@ -119,7 +119,8 @@ def test_tm1_v12s_package_is_an_engine_and_no_tm1_server(
         "ibm": "C:\\Users\\me\\Downloads",
         "tm1Engine": True,
     }
-    assert env == {}
+    # This package, whatever else the folder holds
+    assert env == {"TM1_ENGINE_BUNDLE": "/ibm/tm1-v12.6.7-standalone-linux.tgz"}
     assert list(generated(pa_setup)["services"]) == ["tm1-engine-mongo", "tm1-engine"]
 
 
@@ -209,6 +210,18 @@ def test_an_installed_folder_is_the_tm1_servers_install(
         (["--source", "image"], "--source image needs --image"),
         (["--timeout", "soon"], "--timeout is a number of seconds"),
         (["--timeout", "0"], "--timeout is a number of seconds"),
+        # A start needs a source: a sample server or a folder for the files isn't one
+        (["--samples"], "Say where TM1 comes from: --bundle FILE"),
+        (["--files-dir", "/data"], "Say where TM1 comes from"),
+        # An engine's package comes from a folder, which a link or an installed TM1 11 isn't
+        (
+            ["--url", "https://x", "--engine"],
+            "--engine: TM1 v12's package comes from a folder",
+        ),
+        (
+            ["--bundle", "/dl/tm1-v12.6.7-standalone-linux.tgz", "--samples"],
+            "--samples is a TM1 11 sample server",
+        ),
     ],
 )
 def test_refuses_what_it_cant_start_from(
@@ -262,9 +275,12 @@ def test_looks_on_the_host_for_what_it_was_pointed_at(
     ]
     assert main(pa_setup, monkeypatch, "init", "--tm1-home", "/opt/tm1") == 2
     assert (
-        "/opt/tm1 isn't an installed TM1 Server: there's no bin64 in it"
+        "/opt/tm1 isn't an installed TM1 Server: there's no bin64/tm1s.exe in it"
         in capsys.readouterr().err
     )
+    assert main(pa_setup, monkeypatch, "init", "--ibm", "~/Downlaods") == 2
+    assert "--ibm: there's no folder ~/Downlaods" in capsys.readouterr().err
+    assert asked[-1][-2:] == ["-e", "/host/"]
     # A folder that isn't there is Docker's to refuse, and an answer all the same
     found["code"], found["said"] = (
         125,
@@ -378,7 +394,7 @@ SERVER = {"tm1": {"port": 8010}}
         (
             ["4", "/dl/tm1-v12.6.7-standalone-linux.tgz"],
             {"ibm": "/dl", "tm1Engine": True},
-            {},
+            {"TM1_ENGINE_BUNDLE": "/ibm/tm1-v12.6.7-standalone-linux.tgz"},
         ),
     ],
 )
@@ -399,6 +415,109 @@ def test_asks_where_tm1_comes_from_when_someone_is_there(
     ) == {"version": 1, **written}
     assert pa_setup.read_env() == env
     assert list(asked) == []
+
+
+@pytest.mark.parametrize("answers", [["1", ""], ["2"], ["9"], []])
+def test_an_answer_that_isnt_one_stops_it(
+    pa_setup: ModuleType,
+    ran: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    answers: list[str],
+) -> None:
+    # An empty path, the end of input, a choice that isn't one: nothing is written or started
+    monkeypatch.setattr(pa_setup, "interactive", lambda a: True)
+    asked = iter(answers)
+
+    def answer(prompt: str = "") -> str:
+        try:
+            return next(asked)
+        except StopIteration:
+            raise EOFError from None
+
+    monkeypatch.setattr(builtins, "input", answer)
+    assert main(pa_setup, monkeypatch) == 2
+    said = capsys.readouterr().err
+    assert (
+        "isn't one of 1, 2, 3 or 4" in said
+        if answers == ["9"]
+        else "No answer." in said
+    )
+    assert ran == [] and not (Path(pa_setup.WORK) / "pa-environment.yaml").exists()
+
+
+def test_an_engine_beside_another_source_takes_its_package_from_ibm(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    written, env = options(
+        pa_setup,
+        monkeypatch,
+        "--url",
+        "https://x.example/b",
+        "--engine",
+        "--ibm",
+        "~/Downloads",
+    )
+    servers = {"tm1": {"port": 8010}}
+    assert written == {
+        "version": 1,
+        "ibm": "~/Downloads",
+        "tm1": {"servers": servers},
+        "tm1Engine": True,
+    }
+    assert env == {"TM1_BUNDLE_URL": "https://x.example/b"}
+
+
+def test_a_new_start_takes_an_earlier_ones_source_out_of_env(
+    pa_setup: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # A folder used before: its .env would send the new start to the old download, or check the
+    # new one against the old one's hash
+    env = Path(pa_setup.WORK) / ".env"
+    env.write_text(
+        "COGNOS_ZIP_URL=https://kept\nTM1_BUNDLE_URL=https://old\nTM1_BUNDLE_SHA256=abc\nTM1_HOME_DIR=/old\n"
+    )
+    assert main(pa_setup, monkeypatch, "init", "--bundle", f"/dl/{BUNDLE}") == 0
+    assert pa_setup.read_env() == {
+        "COGNOS_ZIP_URL": "https://kept",
+        "TM1_BUNDLE": f"/ibm/{BUNDLE}",
+    }
+    assert (
+        "Took TM1_BUNDLE_URL, TM1_BUNDLE_SHA256, TM1_HOME_DIR out of .env"
+        in capsys.readouterr().out
+    )
+    # With nothing for .env and none there, none is made
+    env.unlink()
+    (Path(pa_setup.WORK) / "pa-environment.yaml").unlink()
+    assert main(pa_setup, monkeypatch, "init", "--image", "registry.example/tm1:1") == 0
+    assert not env.exists()
+
+
+def test_what_it_writes_is_given_to_the_folders_owner(
+    pa_setup: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The tool is root in its container: on Linux the files would be root's on the host, and a
+    # .env only root could read
+    owned: list[tuple[str, int, int]] = []
+    monkeypatch.setattr(
+        pa_setup.os,
+        "chown",
+        lambda path, uid, gid: owned.append((Path(path).name, uid, gid)),
+    )
+    work = Path(pa_setup.WORK)
+    assert main(pa_setup, monkeypatch, "init", "--bundle", f"/dl/{BUNDLE}") == 0
+    owner = (work.stat().st_uid, work.stat().st_gid)
+    assert owned == [("pa-environment.yaml", *owner), (".env", *owner)]
+
+    # And a refusal to change the owner, as Docker Desktop's mounts give, is nothing to stop for
+    def refuse(path: str, uid: int, gid: int) -> None:
+        raise PermissionError(path)
+
+    monkeypatch.setattr(pa_setup.os, "chown", refuse)
+    (work / "pa-environment.yaml").unlink()
+    assert main(pa_setup, monkeypatch, "init") == 0
 
 
 def test_asks_nothing_when_told_or_when_nobody_is_there(
@@ -427,6 +546,8 @@ def test_init_with_nothing_said_writes_the_file_to_edit(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    # Whoever is there: init asks nothing, so the file with every part is always to be had
+    monkeypatch.setattr(pa_setup, "interactive", lambda a: True)
     assert main(pa_setup, monkeypatch, "init") == 0
     path = Path(pa_setup.WORK) / "pa-environment.yaml"
     assert path.read_text() == pa_setup.SAMPLE

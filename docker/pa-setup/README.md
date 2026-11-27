@@ -47,9 +47,9 @@ the first release.
 | Command | What it does |
 |---|---|
 | (none) | Starts what the file says, as `up`. **With no file**, starts from nothing: one TM1 server from where you say TM1 comes from (below), or from your answers at a terminal. |
-| `init` | Writes a starting `pa-environment.yaml` and starts nothing. With the options below, the file for them; with none, at a terminal, it asks; otherwise a file with every part to uncomment. |
+| `init` | Writes a starting `pa-environment.yaml` and starts nothing: a file with every part to uncomment, or with the options below, the file for them. It asks nothing. |
 | `pull` | Fetches the current images of everything the file runs. `up` uses whatever image of a tag is already on the machine, and the default tag, `edge`, is rebuilt on every change. |
-| `up` (default) | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed (PAW isn't: run `down` before taking `paw` out). |
+| `up` | Writes `compose.yaml`, starts everything, waits until it's healthy, prints the URLs. Safe to rerun after changing the file: a part you took out is stopped and removed (PAW isn't: run `down` before taking `paw` out). |
 | `urls` | Prints every service's address and login |
 | `status` | Lists the containers and their health |
 | `logs [service...]` | Recent logs, e.g. `logs planning cognos` |
@@ -66,16 +66,16 @@ Where TM1 comes from, for a new `pa-environment.yaml` with one TM1 server. Pick 
 
 | Option | |
 |---|---|
-| `--bundle FILE` | Your IBM download: `tm1server-<version>-linuxi38664h_bundle.tar.gz`, the Linux one, even on Mac or Windows (Planning Analytics 2.1.2 to 2.1.7: `tm1_linuxi38664h_<version>_ml.tar.gz`). Its folder becomes `ibm`, and this file is the one installed, whatever else the folder holds. With TM1 v12's package, `tm1-v<version>-standalone-linux.tgz`, you get a TM1 v12 engine in place of the TM1 server. |
+| `--bundle FILE` | Your IBM download: `tm1server-<version>-linuxi38664h_bundle.tar.gz`, the Linux one, even on Mac or Windows (Planning Analytics 2.1.2 to 2.1.7: `tm1_linuxi38664h_<version>_ml.tar.gz`). Its folder becomes `ibm`, and this file is the one installed, whatever else the folder holds. With TM1 v12's package, `tm1-v<version>-standalone-linux.tgz`, you get a TM1 v12 engine in place of the TM1 server, from that package. |
 | `--ibm DIR` | The folder holding your IBM downloads, when there are several: the newest TM1 bundle in it is installed |
 | `--url URL` | A link to the TM1 bundle, e.g. a pre-signed S3, R2, GCS or Azure link. It goes in `.env`. `--sha256 HASH` checks the download. |
-| `--tm1-home DIR` | An installed `tm1_64` folder on this computer (the one containing `bin64`). It goes in `.env` as `TM1_HOME_DIR`. |
+| `--tm1-home DIR` | The `tm1_64` folder of a **Linux** TM1 Server install on this computer (the one containing `bin64/tm1s.exe`; usually `/opt/ibm/cognos/tm1_64`). It goes in `.env` as `TM1_HOME_DIR`. A Windows install can't run in the container. |
 | `--image IMAGE` | The `tm1-server` image, e.g. a private one with TM1 built in |
 
 | And | |
 |---|---|
 | `--samples` | Also run IBM's SData sample server, on port 8011 |
-| `--engine` | Also run a TM1 v12 engine: its package has to be in the `ibm` folder |
+| `--engine` | Also run a TM1 v12 engine. Its package has to be in the `ibm` folder: with `--url`, `--tm1-home` or `--image`, say which with `--ibm DIR` too |
 | `--files-dir DIR` | Where each server's config, data and logs go (default: `pa-files` in the current folder) |
 | `-y`, `--yes` | Ask nothing |
 | `--no-start` | Write the files and start nothing |
@@ -85,10 +85,13 @@ Where TM1 comes from, for a new `pa-environment.yaml` with one TM1 server. Pick 
   parts. A file that's already there is never written over: the options are then for a
   new one, and say so.
 - **It sets up the folder it's run in.** `cd` there first.
+- **A new start replaces what `.env` says about where TM1 comes from.** In a folder used
+  before, an earlier start's link, hash or folder is taken out, and said.
 - **A file or folder you point at is looked for before anything is written,** from a
   container with its folder mounted: the setup tool itself sees only the current folder.
 - **Piped from `curl`, questions are asked at the terminal itself.** With no terminal, or
-  with `CI` set, nothing is asked: say where TM1 comes from, or it stops and says so.
+  with `CI` set, nothing is asked: say where TM1 comes from, or it stops and says so. `init`
+  never asks.
 
 `-f other.yaml` uses another file in the same folder; give each file its own `name`, or one's `up` and `down` remove the other's containers. The generated `compose.yaml` works with plain
 `docker compose` too, but change `pa-environment.yaml` and rerun `up` rather than editing it.
@@ -142,8 +145,8 @@ pre-signed S3 URLs) instead of files in `ibm` (`TM1_BUNDLE_URL`, `TM1_WEB_BUNDLE
 
 **Two more settings live in `.env`**, as they're this computer's and not the environment's:
 `TM1_HOME_DIR`, an installed `tm1_64` folder that every TM1 server runs in place of a
-bundle (the name `tm1-testcontainers` reads too), and `TM1_BUNDLE`, the one bundle to
-install of several in `ibm`, as `/ibm/<file name>`.
+bundle (the name `tm1-testcontainers` reads too), and `TM1_BUNDLE` and `TM1_ENGINE_BUNDLE`,
+the one bundle or TM1 v12 package to install of several in `ibm`, as `/ibm/<file name>`.
 
 ## TM1 v12
 

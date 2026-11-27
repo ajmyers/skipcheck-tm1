@@ -213,14 +213,18 @@ jobs:
           expect_fail "isn't the Linux TM1 Server download" -- sh "$here/setup.sh" --bundle "$dl/tm1server-0.0.0-1-win64_bundle.zip"
           expect_fail "there's no tm1server-9-linuxi38664h_bundle.tar.gz in $dl" -- sh "$here/setup.sh" --bundle "$dl/tm1server-9-linuxi38664h_bundle.tar.gz"
           expect_fail 'Choose one TM1 source' -- sh "$here/setup.sh" --bundle "$dl/x" --url https://x
-          expect_fail "there's no bin64 in it" -- sh "$here/setup.sh" --tm1-home "$dl"
+          expect_fail "there's no bin64/tm1s.exe in it" -- sh "$here/setup.sh" --tm1-home "$dl"
+          expect_fail 'Say where TM1 comes from' -- sh "$here/setup.sh" --samples
+          expect_fail "there's no folder $dl/nosuch" -- sh "$here/setup.sh" --ibm "$dl/nosuch"
           expect_fail 'mkdir -p tm1 && cd tm1' -- sh "$here/setup.sh" --dir tm1
           test -z "$(ls -A)"   # nothing was written by a run that was refused
           # A run that sets everything up, piped as from curl
           cd "$t"
           sh -s -- --bundle "$dl/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz" --samples --no-start < "$here/setup.sh"
           grep -qx "ibm: \"$dl\"   # the folder holding your IBM downloads" pa-environment.yaml
+          # .env is the user's to read: the tool is root in its container
           grep -qx 'TM1_BUNDLE=/ibm/tm1server-0.0.0-1-linuxi38664h_bundle.tar.gz' .env
+          test "$(stat -c %u .env)" = "$(id -u)" && test "$(stat -c %u pa-environment.yaml)" = "$(id -u)"
           docker compose -f compose.yaml config --services | sort | tr '\n' ' ' | grep -qx 'sdata tm1 tm1-admin '
           # A rerun keeps the file, and says the options weren't used
           out=$(sh "$here/setup.sh" --url https://x.example/b --no-start 2>&1); echo "$out"

@@ -21,8 +21,13 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   Write-Error 'pa-setup needs Docker Desktop: https://www.docker.com/products/docker-desktop/'
   exit 1
 }
-docker info *> $null
-if ($LASTEXITCODE -ne 0) {
+# Windows PowerShell 5.1 turns what a program writes to its error stream into an error of
+# the script's own when it's redirected: not to be stopped by it, here and for the pull below
+$ErrorActionPreference = 'Continue'
+docker info 2>&1 | Out-Null
+$running = $LASTEXITCODE -eq 0
+$ErrorActionPreference = 'Stop'
+if (-not $running) {
   Write-Error "Docker isn't running (docker info failed). Start Docker Desktop and try again."
   exit 1
 }
@@ -37,7 +42,9 @@ if ((docker info --format '{{.OSType}}') -ne 'linux') {
 # network, or for an image of your own (PA_SETUP_IMAGE), what's here is used.
 $first = if ($args.Count -gt 0) { [string]$args[0] } else { '' }
 if ($first -eq '' -or $first.StartsWith('-') -or $first -eq 'init' -or $first -eq 'pull') {
-  docker pull -q $image *> $null
+  $ErrorActionPreference = 'Continue'
+  docker pull -q $image 2>&1 | Out-Null
+  $ErrorActionPreference = 'Stop'
 }
 
 $dir = (Get-Location).Path
