@@ -431,6 +431,81 @@ class PlanningAnalyticsEnvironmentTest {
 	}
 
 	@Test
+	void anEnginePassesLoginsToOneOfTheEnvironmentsServers() {
+		var env = engineBuilder().tm1("first")
+			.tm1("legacy", server -> server.withSeed(Tm1Seed.SDATA))
+			.tm1Engine(engine -> engine.withUser("analyst"))
+			.tm1EnginePassThrough("legacy")
+			.build();
+		var engine = env.tm1Engine();
+		// The server named, not the first, by the name it has on the network already
+		assertThat(engine.getPassThrough()).isSameAs(env.tm1("legacy"));
+		assertThat(engine.getEnvMap()).containsEntry("TM1_PASSTHROUGH_URL", "http://legacy:8010/api/v1/");
+		assertThat(env.tm1("legacy").getNetworkAliases()).contains("legacy")
+			.doesNotContain(Tm1EngineContainer.PASS_THROUGH_ALIAS);
+		assertThat(engine.getDependencies()).contains(env.tm1("legacy")).doesNotContain(env.tm1("first"));
+		assertThat(env.tm1Database("tm1").passThroughLogin().getPassword()).isEqualTo("apple");
+
+		// With CAM security the engine's users are Cognos's, and the servers'
+		// administrators its own
+		var cam = engineBuilder().tm1("legacy")
+			.cognos(cognos -> cognos.withUser("admin", "adminpw").withUser("analyst", "analystpw"))
+			.tm1Engine(e -> e.withUser("analyst", "Analysts"))
+			.tm1EnginePassThrough("legacy")
+			.build();
+		cam.tm1Engine().configure();
+		assertThat(cam.tm1Engine().getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "LDAP")
+			.containsEntry("TM1_USERS", "analyst:Analysts,admin:ADMIN");
+		assertThat(cam.tm1Database("tm1").passThroughLogin("analyst").getAuthorization())
+			.isEqualTo(cam.cognos().camAuthorization("analyst"));
+
+		assertThatIllegalStateException()
+			.isThrownBy(() -> engineBuilder().tm1("legacy").tm1Engine().tm1EnginePassThrough("other").build())
+			.withMessageContaining("other, which isn't a TM1 server of the environment");
+		assertThatIllegalStateException()
+			.isThrownBy(() -> engineBuilder().tm1("legacy")
+				.tm1Engine()
+				.tm1EngineOAuth2()
+				.tm1EnginePassThrough("legacy")
+				.build())
+			.withMessageContaining("TM1 takes tokens or passes logins on, not both");
+		assertThatIllegalStateException()
+			.isThrownBy(() -> builder().tm1("legacy").tm1EnginePassThrough("legacy").build())
+			.withMessageContaining("Pass-through logins are a TM1 v12 engine's: add tm1Engine() too");
+	}
+
+	@Test
+	void fromConfigPassesLoginsToTheServerNamed() {
+		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough.yaml")).build();
+		var engine = env.tm1Engine();
+		assertThat(engine.getPassThrough()).isSameAs(env.tm1("legacy"));
+		engine.configure();
+		assertThat(engine.getEnvMap()).containsEntry("TM1_PASSTHROUGH_URL", "http://legacy:8010/api/v1/")
+			.containsEntry("TM1_USERS", "analyst:Analysts")
+			.doesNotContainKey("TM1_CAM_NAMESPACE");
+
+		// passthrough: false is off
+		var off = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-off.yaml")).build();
+		assertThat(off.tm1Engine().getPassThrough()).isNull();
+		assertThat(off.tm1Engine().getEnvMap()).doesNotContainKey("TM1_PASSTHROUGH_URL");
+
+		// With cognos the engine's users are Cognos's, as Cognos spells them, and the TM1
+		// servers' administrators are the engine's too
+		var cam = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-cam.yaml")).build();
+		cam.tm1Engine().configure();
+		assertThat(cam.tm1Engine().getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "LDAP")
+			.containsEntry("TM1_CAM_NAMESPACE_TYPE", "ldap")
+			.containsEntry("TM1_USERS", "analyst:Analysts,admin:Ops:ADMIN,viewer:ADMIN");
+
+		// A server whose cfg takes it out of CAM security has users of its own
+		var own = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-passthrough-own-users.yaml")).build();
+		own.tm1Engine().configure();
+		assertThat(own.tm1Engine().getEnvMap()).doesNotContainKey("TM1_CAM_NAMESPACE")
+			.containsEntry("TM1_USERS", "planner:Planners");
+		assertThat(own.tm1Database("tm1").passThroughLogin().getAuthorization()).startsWith("Basic ");
+	}
+
+	@Test
 	void fromConfigTurnsOAuth2OnWithTheUsersWhoHaveAPassword() {
 		var env = PlanningAnalyticsEnvironment.fromConfig(fixture("engine-oauth2.yaml")).build();
 		var engine = env.tm1Engine();

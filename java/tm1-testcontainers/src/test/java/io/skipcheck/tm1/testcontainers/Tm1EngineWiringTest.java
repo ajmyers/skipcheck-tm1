@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -206,6 +207,193 @@ class Tm1EngineWiringTest {
 		// made
 		var stray = new Tm1EngineContainer(SOURCE).withLogin("nobody", "pw");
 		assertThatIllegalStateException().isThrownBy(stray::realm).withMessageContaining("isn't a user of the engine");
+	}
+
+	private static final Tm1Source TM1 = new Tm1Source.PrivateImage("tm1-server:test");
+
+	private static CognosContainer cognos() {
+		return new CognosContainer(new CognosSource.PrivateImage("cognos-server:test"))
+			.withUser("admin", "adminpw", "Admins")
+			.withUser("analyst", "analystpw", "Analysts")
+			.withUser("viewer", "viewerpw", "Viewers");
+	}
+
+	@Test
+	void passesLoginsToATm1ServerOnItsNetwork() {
+		var server = new Tm1ServerContainer(TM1);
+		var engine = new Tm1EngineContainer(SOURCE).withPassThrough(server);
+		// The server's REST API by the name it gets on the network; the image's defaults
+		// are a TM1 11 server's, so the address is all it takes
+		assertThat(engine.getEnvMap()).containsEntry("TM1_PASSTHROUGH_URL", "http://tm1-passthrough:8010/api/v1/");
+		assertThat(engine.getEnvMap().keySet()).filteredOn(name -> name.startsWith("TM1_PASSTHROUGH_")).hasSize(1);
+		assertThat(server.getNetworkAliases()).contains(Tm1EngineContainer.PASS_THROUGH_ALIAS);
+		assertThat(server.getNetwork()).isNotNull()
+			.isSameAs(engine.getNetwork())
+			.isSameAs(engine.getDatastore().getNetwork());
+		assertThat(engine.getDependencies()).contains(server, engine.getDatastore());
+		assertThat(engine.getPassThrough()).isSameAs(server);
+		assertThat(new Tm1EngineContainer(SOURCE).getPassThrough()).isNull();
+		// The same server again is nothing new; another is refused
+		assertThat(engine.withPassThrough(server)).isSameAs(engine);
+		assertThatIllegalStateException().isThrownBy(() -> engine.withPassThrough(new Tm1ServerContainer(TM1)))
+			.withMessageContaining("already passes logins to another TM1 server");
+
+		// Moved off the server's network, TM1 couldn't reach it
+		assertThatIllegalStateException().isThrownBy(() -> engine.withNetwork(Network.newNetwork()))
+			.withMessageContaining("set the network before withPassThrough");
+		assertThat(engine.withNetwork(server.getNetwork())).isSameAs(engine);
+
+		// A server that has a network already (Cognos's, say) is joined there, the
+		// datastore too
+		Network network = Network.newNetwork();
+		var placed = new Tm1ServerContainer(TM1).withNetwork(network);
+		var joining = new Tm1EngineContainer(SOURCE).withPassThrough(placed);
+		assertThat(joining.getNetwork()).isSameAs(network).isSameAs(joining.getDatastore().getNetwork());
+	}
+
+	@Test
+	void takesTokensOrPassesLoginsOnNotBoth() {
+		// With both set TM1 takes tokens and refuses a name and password: half would be
+		// dead
+		var tokens = new Tm1EngineContainer(SOURCE).withOAuth2(new KeycloakContainer());
+		assertThatIllegalStateException().isThrownBy(() -> tokens.withPassThrough(new Tm1ServerContainer(TM1)))
+			.withMessageContaining("TM1 takes tokens or passes logins on, not both");
+		var passing = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1));
+		assertThatIllegalStateException().isThrownBy(() -> passing.withOAuth2(new KeycloakContainer()))
+			.withMessageContaining("TM1 takes tokens or passes logins on, not both");
+	}
+
+	@Test
+	void namesItsUsersByTheirCamidsBehindAServerInCamSecurity() {
+		var cognos = cognos();
+		var server = new Tm1ServerContainer(TM1);
+		var engine = new Tm1EngineContainer(SOURCE).withUser("Analyst", "Analysts").withPassThrough(server);
+		// After withPassThrough: what the server is in is read when the engine starts
+		server.withCamSecurity(cognos, "viewer", "admin");
+		engine.configure();
+		// The server answers a login with the user's CAMID, so the image is told the
+		// namespace and makes the users under theirs. Listed users first, as Cognos
+		// spells
+		// them; then the server's administrators, who are administrators here too
+		assertThat(engine.getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "LDAP")
+			.containsEntry("TM1_CAM_NAMESPACE_TYPE", "ldap")
+			.containsEntry("TM1_USERS", "analyst:Analysts,viewer:ADMIN,admin:ADMIN");
+		assertThat(engine.getNetwork()).isSameAs(cognos.getNetwork());
+
+		// An administrator who is listed keeps its groups, and gets ADMIN once
+		var listed = new Tm1EngineContainer(SOURCE).withUser("admin", "Ops", "admin")
+			.withUser("viewer", "Readers")
+			.withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), CognosContainer.Namespace.OIDC,
+					"viewer", "admin"));
+		listed.configure();
+		assertThat(listed.getEnvMap()).containsEntry("TM1_CAM_NAMESPACE", "OIDC")
+			.containsEntry("TM1_CAM_NAMESPACE_TYPE", "oidc")
+			.containsEntry("TM1_USERS", "admin:Ops:admin,viewer:Readers:ADMIN");
+
+		// Only Cognos's users log in to a server in CAM security
+		var stranger = new Tm1EngineContainer(SOURCE).withUser("planner")
+			.withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin"));
+		assertThatIllegalStateException().isThrownBy(stranger::configure)
+			.withMessageContaining("planner isn't one of Cognos's test users");
+
+		// A server whose tm1s.cfg takes it out of CAM security has users of its own: the
+		// image applies those parameters last, whatever the case of their names
+		var own = new Tm1EngineContainer(SOURCE).withUser("planner", "Planners")
+			.withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin")
+				.withEnv("TM1_CFG_integratedsecuritymode", "1"));
+		own.configure();
+		assertThat(own.getEnvMap()).doesNotContainKey("TM1_CAM_NAMESPACE")
+			.containsEntry("TM1_USERS", "planner:Planners");
+		// Without Cognos nothing changes for the users
+		var plain = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1));
+		plain.configure();
+		assertThat(plain.getEnvMap()).doesNotContainKey("TM1_CAM_NAMESPACE").containsEntry("TM1_USERS", "planner");
+	}
+
+	@Test
+	void refusesAServerItCantAskOverPlainHttp() {
+		// The engine asks over plain HTTP, and trusts no certificate of the server's
+		for (String on : new String[] { "T", "true" }) {
+			var engine = new Tm1EngineContainer(SOURCE)
+				.withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_usessl", on));
+			assertThatIllegalStateException().isThrownBy(engine::configure).withMessageContaining("with UseSSL on");
+		}
+		var off = new Tm1EngineContainer(SOURCE)
+			.withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_UseSSL", " f "));
+		off.configure();
+		// A server that's running can't be given its name on the network any more
+		var running = new Tm1ServerContainer(TM1) {
+			@Override
+			public boolean isRunning() {
+				return true;
+			}
+		};
+		assertThatIllegalStateException().isThrownBy(() -> new Tm1EngineContainer(SOURCE).withPassThrough(running))
+			.withMessageContaining("give withPassThrough one that isn't started");
+	}
+
+	@Test
+	void givesAPassThroughLoginTheHeaderTheServerTakes() {
+		var none = new Tm1EngineContainer(SOURCE).database("tm1");
+		assertThatIllegalStateException().isThrownBy(none::passThroughLogin)
+			.withMessageContaining("give it a TM1 server with withPassThrough");
+		assertThatIllegalStateException().isThrownBy(() -> none.passThroughLoginWith("Basic eA=="));
+
+		// A server with users of its own: Basic, with its own login's password
+		var server = new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA);
+		var database = new Tm1EngineContainer(SOURCE).withPassThrough(server).database("tm1");
+		Tm1Login own = database.passThroughLogin();
+		assertThat(own.isPassThrough()).isTrue();
+		assertThat(own.isOAuth2()).isFalse();
+		assertThat(own.getUser()).isEqualTo("admin");
+		assertThat(own.getPassword()).isEqualTo("apple");
+		assertThat(own.getAuthorization()).isEqualTo(server.getAuthorization()).startsWith("Basic ");
+		assertThat(own.getInstance()).isEqualTo("tm1");
+		assertThat(own.getClientId()).isEmpty();
+		assertThat(own.getClientSecret()).isEmpty();
+		assertThat(own).hasToString("Tm1Login[admin in tm1]");
+		assertThat(database.passThroughLogin("ADMIN").getAuthorization()).isEqualTo(own.getAuthorization());
+		// Another user's password is the test's to give
+		assertThatIllegalArgumentException().isThrownBy(() -> database.passThroughLogin("planner"))
+			.withMessageContaining("passThroughLogin(user, password)");
+		assertThat(database.passThroughLogin("planner", "p:w").getAuthorization()).isEqualTo("Basic cGxhbm5lcjpwOnc=");
+		// It has no token and no session endpoint: the header is the login
+		assertThatIllegalStateException().isThrownBy(own::token).withMessageContaining("has no token");
+		assertThatIllegalStateException().isThrownBy(() -> own.session("Basic eA=="))
+			.withMessageContaining("has no session to ask for");
+		assertThatIllegalStateException()
+			.isThrownBy(() -> own.authorizeWithToken(HttpRequest.newBuilder(URI.create("http://x/"))))
+			.withMessageContaining("has no token");
+		// A header of the caller's own, a CAM passport say, names nobody
+		Tm1Login passport = database.passThroughLoginWith("CAMPassport abc");
+		assertThat(passport.getAuthorization()).isEqualTo("CAMPassport abc");
+		assertThat(passport.getUser()).isEmpty();
+		assertThat(passport.getPassword()).isEmpty();
+		assertThat(passport).hasToString("Tm1Login[a pass-through header in tm1]");
+
+		// A server in CAM security: CAMNamespace, for any of Cognos's users, whose
+		// passwords Cognos has. Its own login is its first administrator's
+		var cam = new Tm1EngineContainer(SOURCE)
+			.withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "viewer", "admin"))
+			.database("tm1");
+		assertThat(cam.passThroughLogin().getUser()).isEqualTo("viewer");
+		assertThat(cam.passThroughLogin().getAuthorization())
+			.isEqualTo(CognosContainer.camAuthorization("viewer", "viewerpw", "LDAP"));
+		assertThat(cam.passThroughLogin("ANALYST").getUser()).isEqualTo("analyst");
+		assertThat(cam.passThroughLogin("analyst").getPassword()).isEqualTo("analystpw");
+		assertThat(cam.passThroughLogin("analyst", "other").getAuthorization())
+			.isEqualTo(CognosContainer.camAuthorization("analyst", "other", "LDAP"));
+		assertThatIllegalArgumentException().isThrownBy(() -> cam.passThroughLogin("nobody"));
+		// Its users are Cognos's, under their CAMIDs: a login through the application by
+		// a
+		// short name would be refused everywhere, so it says what to do
+		assertThatIllegalArgumentException().isThrownBy(() -> cam.login("analyst"))
+			.withMessageContaining("Log in with passThroughLogin(\"analyst\")");
+		// A login that isn't pass-through is no header
+		var oauth2 = new Tm1EngineContainer(SOURCE).withLogin("admin", "pw").withOAuth2(new KeycloakContainer());
+		assertThatIllegalStateException()
+			.isThrownBy(() -> oauth2.database("tm1").oauth2Login("admin").getAuthorization())
+			.withMessageContaining("Only a pass-through login is a header of its own");
 	}
 
 	@Test

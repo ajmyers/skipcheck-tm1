@@ -1,0 +1,18 @@
+# Pass-through to a TM1 server in CAM security: the engine's users are Cognos's, named as Cognos
+# spells them, and the TM1 servers' administrators are administrators of the engine too
+version: 1
+ibm: ibm
+cognos:
+  users:
+    - admin:adminpw:Admins
+    - analyst:analystpw:Analysts
+    - viewer:viewerpw:Viewers
+  cam: { admins: [viewer, admin] }
+tm1:
+  servers:
+    legacy: { cfg: { IntegratedSecurityMode: 5 } }
+tm1Engine:
+  users:
+    - Analyst::Analysts
+    - ADMIN::Ops
+  passthrough: { server: legacy }

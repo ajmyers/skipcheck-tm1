@@ -1,0 +1,4 @@
+# error: tm1Engine.passthrough must be a mapping
+version: 1
+tm1: { servers: { legacy: {} } }
+tm1Engine: { passthrough: legacy }

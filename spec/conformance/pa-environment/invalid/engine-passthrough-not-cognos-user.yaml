@@ -1,0 +1,5 @@
+# error: tm1Engine.users: planner, other isn't in cognos.users
+version: 1
+cognos: { users: ['admin:adminpw:Admins', 'analyst:analystpw'] }
+tm1: { servers: { legacy: {} } }
+tm1Engine: { users: [analyst, planner, other], passthrough: { server: legacy } }

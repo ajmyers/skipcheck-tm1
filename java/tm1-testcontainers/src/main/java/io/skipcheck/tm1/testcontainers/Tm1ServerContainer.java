@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.BiConsumer;
@@ -344,6 +345,38 @@ public class Tm1ServerContainer extends GenericContainer<Tm1ServerContainer> {
 	 */
 	public CognosContainer.@Nullable Namespace getCamNamespace() {
 		return cognos == null ? null : camNamespace;
+	}
+
+	/**
+	 * Whether the server ends up in CAM security: set with {@link #withCamSecurity},
+	 * unless a {@code tm1s.cfg} parameter given as {@code TM1_CFG_IntegratedSecurityMode}
+	 * says another mode than 4 or 5. The image applies those last, and takes a
+	 * parameter's name in any case.
+	 */
+	boolean inCamSecurity() {
+		if (cognos == null) {
+			return false;
+		}
+		String mode = cfg("IntegratedSecurityMode");
+		return mode == null || mode.strip().equals("4") || mode.strip().equals("5");
+	}
+
+	/**
+	 * Whether a {@code tm1s.cfg} parameter given as {@code TM1_CFG_UseSSL} turns TLS on.
+	 */
+	boolean usesSsl() {
+		String ssl = cfg("UseSSL");
+		return ssl != null && !ssl.strip().equalsIgnoreCase("F") && !ssl.strip().equalsIgnoreCase("false");
+	}
+
+	/** A tm1s.cfg parameter given in the environment, whatever the case of its name. */
+	private @Nullable String cfg(String parameter) {
+		for (Map.Entry<String, String> entry : getEnvMap().entrySet()) {
+			if (entry.getKey().equalsIgnoreCase("TM1_CFG_" + parameter)) {
+				return entry.getValue();
+			}
+		}
+		return null;
 	}
 
 	/** The Cognos test users made TM1 administrators by {@link #withCamSecurity}. */

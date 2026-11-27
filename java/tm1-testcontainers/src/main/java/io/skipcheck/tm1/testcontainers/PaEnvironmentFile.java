@@ -238,8 +238,10 @@ final class PaEnvironmentFile {
 		Integer enginePort = null;
 		Integer datastorePort = null;
 		Integer engineKeycloakPort = null;
+		String enginePassThrough = null;
 		if (engineSection != null) {
-			keys(engineSection, List.of("port", "databases", "users", "datastore", "oauth2"), "tm1Engine");
+			keys(engineSection, List.of("port", "databases", "users", "datastore", "oauth2", "passthrough"),
+					"tm1Engine");
 			// name -> instance, in the file's order
 			Map<String, String> databases = new LinkedHashMap<>();
 			Object raw = engineSection.get("databases");
@@ -288,9 +290,12 @@ final class PaEnvironmentFile {
 			// it
 			// means: on, or false to keep the passwords with OAuth 2.0 off
 			boolean passwordUsed = engineSection.get("oauth2") != null;
+			// With pass-through a password is the TM1 server's to know, not this file's
+			boolean passwordElsewhere = engineSection.get("passthrough") != null
+					&& !Boolean.FALSE.equals(engineSection.get("passthrough"));
 			List<EngineUser> engineUsers = new ArrayList<>();
 			for (int i = 0; i < list.size(); i++) {
-				engineUsers.add(engineUser(list.get(i), "tm1Engine.users[" + i + "]", passwordUsed));
+				engineUsers.add(engineUser(list.get(i), "tm1Engine.users[" + i + "]", passwordUsed, passwordElsewhere));
 			}
 			Set<String> engineNames = new LinkedHashSet<>();
 			for (EngineUser user : engineUsers) {
@@ -314,6 +319,52 @@ final class PaEnvironmentFile {
 				}
 				engineKeycloakPort = port(o.get("keycloakPort"), "tm1Engine.oauth2", 8181);
 			}
+			Object passthrough = engineSection.get("passthrough");
+			// Off when absent or false; on, it names the TM1 server that checks logins
+			if (passthrough != null && !Boolean.FALSE.equals(passthrough)) {
+				if (Boolean.TRUE.equals(passthrough)) {
+					throw error("tm1Engine.passthrough: name the TM1 server that checks names and passwords, "
+							+ "e.g. passthrough: {server: legacy}");
+				}
+				Map<?, ?> p = keys(passthrough, List.of("server"), "tm1Engine.passthrough");
+				if (!(p.get("server") instanceof String wanted) || !servers.containsKey(wanted)) {
+					throw error("tm1Engine.passthrough.server: name one of tm1.servers, whose users then log in "
+							+ "to TM1 v12 with their name and password there"
+							+ (servers.isEmpty() ? "" : " (" + String.join(", ", servers.keySet()) + ")"));
+				}
+				if (engineKeycloakPort != null) {
+					throw error("tm1Engine: oauth2 and passthrough can't both be on: TM1 would take tokens and "
+							+ "refuse a name and password");
+				}
+				Map<String, String> serverCfg = servers.get(wanted).cfg();
+				// Whatever its case: the server's image matches a tm1s.cfg parameter's
+				// name in any
+				String useSsl = cfgParameter(serverCfg, "UseSSL", "F");
+				if (!useSsl.strip().equalsIgnoreCase("f") && !useSsl.strip().equalsIgnoreCase("false")) {
+					throw error("tm1Engine.passthrough.server: " + wanted + " has cfg.UseSSL on, and the engine "
+							+ "asks it over plain HTTP: take UseSSL out of that server's cfg");
+				}
+				// With cognos a TM1 server is in CAM security, unless its cfg says
+				// another
+				// mode: the image applies cfg last
+				String mode = cfgParameter(serverCfg, "IntegratedSecurityMode", "5").strip();
+				if (cam != null && (mode.equals("4") || mode.equals("5"))) {
+					// Only Cognos's users log in to a TM1 server in CAM security
+					List<String> strangers = new ArrayList<>();
+					for (EngineUser user : engineUsers) {
+						if (cam.users().stream().noneMatch(known -> known.name().equalsIgnoreCase(user.name()))) {
+							strangers.add(user.name());
+						}
+					}
+					if (!strangers.isEmpty()) {
+						throw error("tm1Engine.users: " + String.join(", ", strangers) + " isn't in cognos.users. "
+								+ "With cognos, " + wanted + " is in CAM security, and passthrough logs in "
+								+ "Cognos's users only: add the name to cognos.users, or take it out of "
+								+ "tm1Engine.users");
+					}
+				}
+				enginePassThrough = wanted;
+			}
 			enginePort = port(engineSection.get("port"), "tm1Engine", 4444);
 			// Published only when a port is given
 			datastorePort = ds.get("port") == null ? null : port(ds.get("port"), "tm1Engine.datastore", 27017);
@@ -328,7 +379,7 @@ final class PaEnvironmentFile {
 							+ ": that name is the TM1 v12 engine's here; give the server another");
 				}
 			}
-			engine = new Engine(databases, engineUsers, engineKeycloakPort != null);
+			engine = new Engine(databases, engineUsers, engineKeycloakPort != null, enginePassThrough);
 		}
 
 		if (servers.isEmpty() && cam == null && engine == null) {
@@ -389,6 +440,9 @@ final class PaEnvironmentFile {
 			};
 			if (engine.oauth2()) {
 				b.tm1EngineOAuth2();
+			}
+			if (engine.passThrough() != null) {
+				b.tm1EnginePassThrough(engine.passThrough());
 			}
 		}
 		// Whatever the file's sections: an engine added in code runs the file's image too
@@ -546,11 +600,22 @@ final class PaEnvironmentFile {
 		return new CognosContainer.User(userName, pw, List.copyOf(groupNames));
 	}
 
+	/** A tm1s.cfg parameter of a server's cfg, whatever the case of its name. */
+	private static String cfgParameter(Map<String, String> cfg, String parameter, String otherwise) {
+		for (Map.Entry<String, String> setting : cfg.entrySet()) {
+			if (setting.getKey().equalsIgnoreCase(parameter)) {
+				return setting.getValue();
+			}
+		}
+		return otherwise;
+	}
+
 	/**
 	 * pa_setup.parse_user with password_optional: an engine's user, whose password may be
 	 * left out or empty, since TM1 v12 keeps none.
 	 */
-	private EngineUser engineUser(@Nullable Object entry, String where, boolean passwordUsed) {
+	private EngineUser engineUser(@Nullable Object entry, String where, boolean passwordUsed,
+			boolean passwordElsewhere) {
 		Object name;
 		Object password;
 		List<Object> groups = new ArrayList<>();
@@ -559,9 +624,13 @@ final class PaEnvironmentFile {
 			if (parts.length == 2 && !parts[1].isEmpty() && !passwordUsed) {
 				// The image's own form has groups there; here the second part is a
 				// password
+				String hint = passwordElsewhere
+						? "With passthrough the password is the one the user has on the TM1 server, and isn't "
+								+ "written here: write " + parts[0] + "."
+						: "A password kept for OAuth 2.0 logins needs oauth2 in the section: oauth2: false keeps "
+								+ "it, off.";
 				throw error(where + ": '" + text + "' reads as a password, which TM1 v12 doesn't keep: "
-						+ "for a group, write " + parts[0] + "::" + parts[1] + ". (A password kept for OAuth 2.0 "
-						+ "logins needs oauth2 in the section: oauth2: false keeps it, off.)");
+						+ "for a group, write " + parts[0] + "::" + parts[1] + ". (" + hint + ")");
 			}
 			if (parts.length > 3) {
 				throw error(
@@ -646,7 +715,8 @@ final class PaEnvironmentFile {
 		return new IllegalArgumentException(file + ": " + message);
 	}
 
-	private record Engine(Map<String, String> databases, List<EngineUser> users, boolean oauth2) {
+	private record Engine(Map<String, String> databases, List<EngineUser> users, boolean oauth2,
+			@Nullable String passThrough) {
 	}
 
 	private record EngineUser(String name, String password, List<String> groups) {

@@ -1,0 +1,4 @@
+# error: tm1Engine.passthrough: unknown setting(s) url
+version: 1
+tm1: { servers: { legacy: {} } }
+tm1Engine: { passthrough: { server: legacy, url: 'http://legacy:8010/api/v1/' } }

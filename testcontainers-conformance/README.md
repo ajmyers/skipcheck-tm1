@@ -18,7 +18,7 @@ TM1_BUNDLE_DIR=~/Downloads ./gradlew containerConformance --continue
 
 - Each language's `ContainerConformanceTest` runs in turn: Java, Python, .NET, TypeScript.
 - A scenario that needs TM1 Web or Cognos is skipped without a source for it
-  (`TM1_WEB_BUNDLE_DIR`, `COGNOS_ZIP_DIR`).
+  (`TM1_WEB_BUNDLE_DIR`, `COGNOS_ZIP_DIR` or `COGNOS_PRIVATE_IMAGE`).
 - Then [`scripts/compare-containers.py`](../scripts/compare-containers.py) compares what each wrote
   to `build/container-conformance/<language>/<scenario>.json`, and prints each difference.
 - A scenario that some language ran and another didn't fails the run, and so does a run where
@@ -41,6 +41,8 @@ images and no `ibm` folder, so each part's source is what the machine is set up 
 | [`servers-and-web`](scenarios/servers-and-web.yaml) | Two TM1 servers, their Admin Server, TM1 Web | TM1, TM1 Web |
 | [`cam-security`](scenarios/cam-security.yaml) | Two TM1 servers in CAM security, Cognos, Keycloak | TM1, Cognos |
 | [`engine-oauth2`](scenarios/engine-oauth2.yaml) | A TM1 v12 engine taking OAuth 2.0 logins, its MongoDB, and Keycloak | TM1 v12 |
+| [`engine-passthrough`](scenarios/engine-passthrough.yaml) | A TM1 v12 engine passing logins on to a TM1 server, and its MongoDB | TM1, TM1 v12 |
+| [`engine-passthrough-cam`](scenarios/engine-passthrough-cam.yaml) | The same, with the TM1 server in CAM security: the engine's users are Cognos's | TM1, TM1 v12, Cognos |
 | [`engine`](scenarios/engine.yaml) | A TM1 v12 engine with two databases and a user, and its MongoDB | TM1 v12 |
 
 A line `# unordered: <container> <container>` names containers that don't depend on each other: a

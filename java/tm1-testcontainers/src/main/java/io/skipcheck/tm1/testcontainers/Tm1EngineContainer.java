@@ -8,9 +8,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -110,6 +112,19 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 
 	static final String INSTALL_PATH = "/opt/ibm/tm1-engine";
 
+	/**
+	 * The name a TM1 server has on the engine's network when logins are passed to it
+	 * ({@link #withPassThrough}).
+	 */
+	public static final String PASS_THROUGH_ALIAS = "tm1-passthrough";
+
+	private static final String SERVER_OTHER_NETWORK = "The engine passes logins to a TM1 server on another "
+			+ "network, which TM1 couldn't reach from this one: set the network before withPassThrough, or give "
+			+ "the server the same";
+
+	private static final String ONE_WAY = "TM1 takes tokens or passes logins on, not both: with both set it "
+			+ "takes tokens and refuses a name and password. Use withOAuth2 or withPassThrough";
+
 	private static final String OTHER_NETWORK = "The engine takes tokens from a Keycloak on another network, which "
 			+ "TM1 couldn't reach from this one: set the network before withOAuth2, or give the Keycloak the same";
 
@@ -154,6 +169,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	private final Map<String, String> passwords = new LinkedHashMap<>();
 
 	private @Nullable KeycloakContainer keycloak;
+
+	// The TM1 server logins are passed to, and its name on the network
+	private @Nullable Tm1ServerContainer passThrough;
+
+	private String passThroughAlias = PASS_THROUGH_ALIAS;
 
 	// Read and cleared under this container's lock: test classes may use the shared
 	// engine at once
@@ -223,6 +243,11 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			// The Keycloak is the caller's, and may serve others: it isn't moved from
 			// here
 			throw new IllegalStateException(OTHER_NETWORK);
+		}
+		Tm1ServerContainer asked = passThrough;
+		if (asked != null && !Objects.equals(asked.getNetwork(), network)) {
+			// The server is the caller's, and may be in an environment: it isn't moved
+			throw new IllegalStateException(SERVER_OTHER_NETWORK);
 		}
 		super.withNetwork(network);
 		// At once, not when the engine starts: whatever starts the engine may start what
@@ -322,6 +347,9 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		if (this.keycloak == keycloak) {
 			return self();
 		}
+		if (passThrough != null) {
+			throw new IllegalStateException(ONE_WAY);
+		}
 		if (this.keycloak != null) {
 			throw new IllegalStateException("The engine already takes tokens from another Keycloak, which would "
 					+ "start beside this one under the same name: give it one");
@@ -351,6 +379,84 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 		withEnv("TM1_OAUTH2_AUDIENCE", OAUTH2_CLIENT);
 		withEnv("TM1_OAUTH2_ID_CLAIMS", "preferred_username");
 		return self();
+	}
+
+	/**
+	 * Passes logins on to a TM1 11 server ("pass-through"): TM1 v12 asks it who a login
+	 * is, so that server's users log in here with what they have there. A test logs in
+	 * with {@link Tm1Database#passThroughLogin()}. Logins through the engine's
+	 * application ({@link Tm1Database#login()}) keep working beside it.
+	 *
+	 * <ul>
+	 * <li>A user has to be in the database too: add each with {@link #withUser}.
+	 * {@code admin} always is.
+	 * <li><b>A server in Cognos (CAM) security</b>
+	 * ({@link Tm1ServerContainer#withCamSecurity}) answers a login with the user's CAMID.
+	 * The engine's users are then Cognos's test users, each made under its CAMID, and the
+	 * server's administrators are administrators here too. TM1 v12 learns no groups from
+	 * Cognos: a user has the groups {@link #withUser} gives.
+	 * <li>Not together with {@link #withOAuth2}: with both, TM1 takes tokens and refuses
+	 * the rest.
+	 * </ul>
+	 *
+	 * <p>
+	 * The server joins the engine's network, unless it has one already, which the engine
+	 * and its datastore then join. Starting the engine starts the server first. Give it
+	 * one that isn't started: it gets the name the engine reaches it by,
+	 * {@link #PASS_THROUGH_ALIAS}, so one network holds one such server.
+	 *
+	 * {@snippet class = examples.Tm1EngineExamples region = pass-through}
+	 * @param server the TM1 server that checks logins
+	 * @return this container
+	 */
+	public Tm1EngineContainer withPassThrough(Tm1ServerContainer server) {
+		return withPassThrough(server, null);
+	}
+
+	/**
+	 * As {@link #withPassThrough(Tm1ServerContainer)}, to a server that has a name on the
+	 * network already: an environment's.
+	 */
+	@SuppressWarnings("ReferenceEquality") // the very server, not one configured like it
+	Tm1EngineContainer withPassThrough(Tm1ServerContainer server, @Nullable String alias) {
+		Objects.requireNonNull(server, "server");
+		if (passThrough == server) {
+			return self();
+		}
+		if (passThrough != null) {
+			throw new IllegalStateException("The engine already passes logins to another TM1 server");
+		}
+		if (keycloak != null) {
+			throw new IllegalStateException(ONE_WAY);
+		}
+		if (server.isRunning()) {
+			// A name on the network is given when a container is created
+			throw new IllegalStateException("This TM1 server is already running, without the name the engine "
+					+ "reaches it by: give withPassThrough one that isn't started, and the engine starts it");
+		}
+		if (server.getNetwork() != null) {
+			withNetwork(server.getNetwork());
+		}
+		else {
+			server.withNetwork(getNetwork());
+		}
+		if (alias == null) {
+			server.withNetworkAliases(PASS_THROUGH_ALIAS);
+		}
+		this.passThrough = server;
+		this.passThroughAlias = alias == null ? PASS_THROUGH_ALIAS : alias;
+		dependsOn(server);
+		// The image's defaults are a TM1 11 server's: the address is all it takes
+		withEnv("TM1_PASSTHROUGH_URL", "http://" + passThroughAlias + ":" + Tm1ServerContainer.REST_PORT + "/api/v1/");
+		return self();
+	}
+
+	/**
+	 * The TM1 server logins are passed to.
+	 * @return the server, or {@code null} without {@link #withPassThrough}
+	 */
+	public @Nullable Tm1ServerContainer getPassThrough() {
+		return passThrough;
 	}
 
 	/**
@@ -546,6 +652,12 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 	 * of: TM1 shows a secret once, so an application made elsewhere is listed without.
 	 */
 	Tm1Login login(String instance, String user) {
+		if (passesToCam() && !user.equalsIgnoreCase("admin") && !user.startsWith("CAMID(")) {
+			// TM1 would make a session for the name and refuse it everywhere (403)
+			throw new IllegalArgumentException(user + " isn't a user of this engine by that name: it passes "
+					+ "logins to a TM1 server in CAM security, so its users are Cognos's, each under its CAMID. "
+					+ "Log in with passThroughLogin(\"" + user + "\"), or name the CAMID");
+		}
 		for (JsonNode found : credentials().path("instances")) {
 			if (!found.path("name").asString().equals(instance)) {
 				continue;
@@ -558,6 +670,65 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			}
 		}
 		throw new IllegalStateException("The instance " + instance + " has no application to log in through");
+	}
+
+	/**
+	 * A pass-through login: the header the TM1 server takes, for a user it knows.
+	 * @param user the user's name there, or {@code null} for the server's own login
+	 * @param password the password, or {@code null} for the one the containers know
+	 */
+	Tm1Login passThroughLogin(Tm1Database database, @Nullable String user, @Nullable String password) {
+		Tm1ServerContainer server = passThroughServer();
+		CognosContainer cognos = server.getCognos();
+		// The server's own login: in CAM security its first administrator, which the
+		// server itself only takes for its own once it's configured
+		String name = user != null ? user
+				: server.inCamSecurity() ? server.getCamAdmins().get(0) : server.getUsername();
+		String known = password;
+		if (known == null && server.inCamSecurity()) {
+			// Cognos has every test user's password
+			String asked = name;
+			CognosContainer.User found = Objects.requireNonNull(cognos, "cognos")
+				.getUsers()
+				.stream()
+				.filter(candidate -> candidate.name().equalsIgnoreCase(asked))
+				.findFirst()
+				.orElseThrow(() -> new IllegalArgumentException(asked + " isn't one of Cognos's test users, whose "
+						+ "passwords the containers know: add it with CognosContainer.withUser, or give a "
+						+ "password with passThroughLogin(user, password)"));
+			name = found.name();
+			known = found.password();
+		}
+		else if (known == null) {
+			if (!name.equalsIgnoreCase(server.getUsername())) {
+				throw new IllegalArgumentException("Only the TM1 server's own login (" + server.getUsername()
+						+ ") has a password the containers know: give this user's with "
+						+ "passThroughLogin(user, password)");
+			}
+			// As the server spells it
+			name = server.getUsername();
+			known = server.getPassword();
+		}
+		String authorization = server.inCamSecurity()
+				? CognosContainer.camAuthorization(name, known,
+						Objects.requireNonNull(server.getCamNamespace(), "namespace").id())
+				: "Basic " + Base64.getEncoder().encodeToString((name + ":" + known).getBytes(StandardCharsets.UTF_8));
+		return new Tm1Login(database, name, known, authorization);
+	}
+
+	/** A pass-through login with a header of the caller's own, such as a CAM passport. */
+	Tm1Login passThroughLoginWith(Tm1Database database, String authorization) {
+		passThroughServer();
+		return new Tm1Login(database, "", "", Objects.requireNonNull(authorization, "authorization"));
+	}
+
+	private Tm1ServerContainer passThroughServer() {
+		Tm1ServerContainer server = passThrough;
+		if (server == null) {
+			throw new IllegalStateException(
+					"This engine passes no logins on: give it a TM1 server with withPassThrough");
+		}
+		return server;
 	}
 
 	/** A login through OAuth 2.0, as a user given a password with withLogin. */
@@ -660,18 +831,71 @@ public class Tm1EngineContainer extends GenericContainer<Tm1EngineContainer> {
 			// Moved since withOAuth2: TM1 couldn't reach its issuer
 			throw new IllegalStateException(OTHER_NETWORK);
 		}
+		Tm1ServerContainer asked = passThrough;
+		if (asked != null && !Objects.equals(asked.getNetwork(), getNetwork())) {
+			throw new IllegalStateException(SERVER_OTHER_NETWORK);
+		}
+	}
+
+	/**
+	 * Whether logins are passed to a server in CAM security, whose users are Cognos's.
+	 */
+	boolean passesToCam() {
+		Tm1ServerContainer server = passThrough;
+		return server != null && server.inCamSecurity();
 	}
 
 	@Override
 	protected void configure() {
 		joinNetwork();
 		withEnv("TM1_DATABASES", String.join(",", configured()));
-		if (!users.isEmpty()) {
+		// name -> groups, as the image is given them
+		Map<String, List<String>> wanted = new LinkedHashMap<>(users);
+		Tm1ServerContainer server = passThrough;
+		if (server != null && server.usesSsl()) {
+			throw new IllegalStateException("The engine passes logins to a TM1 server with UseSSL on, and asks it "
+					+ "over plain HTTP: take TM1_CFG_UseSSL off that server");
+		}
+		if (server != null && server.inCamSecurity()) {
+			// Read now, not in withPassThrough: withCamSecurity may have come after it.
+			// The server answers a login with the user's CAMID, so the image makes the
+			// users under theirs
+			CognosContainer cognos = Objects.requireNonNull(server.getCognos(), "cognos");
+			CognosContainer.Namespace namespace = Objects.requireNonNull(server.getCamNamespace(), "namespace");
+			withEnv("TM1_CAM_NAMESPACE", namespace.id());
+			withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
+			wanted = new LinkedHashMap<>();
+			for (Map.Entry<String, List<String>> user : users.entrySet()) {
+				// As Cognos spells it: the name goes into the CAMID
+				wanted.put(cognosUser(cognos, user.getKey()), new ArrayList<>(user.getValue()));
+			}
+			// TM1 v12 learns no groups from Cognos: the server's administrators are made
+			// administrators here, after the users listed
+			for (String admin : server.getCamAdmins()) {
+				List<String> groups = wanted.computeIfAbsent(cognosUser(cognos, admin), name -> new ArrayList<>());
+				if (groups.stream().noneMatch("ADMIN"::equalsIgnoreCase)) {
+					groups.add("ADMIN");
+				}
+			}
+		}
+		if (!wanted.isEmpty()) {
 			List<String> listed = new ArrayList<>();
-			users
+			wanted
 				.forEach((name, groups) -> listed.add(groups.isEmpty() ? name : name + ":" + String.join(":", groups)));
 			withEnv("TM1_USERS", String.join(",", listed));
 		}
+	}
+
+	/** A Cognos test user's name as Cognos has it, whatever its case here. */
+	private static String cognosUser(CognosContainer cognos, String name) {
+		for (CognosContainer.User user : cognos.getUsers()) {
+			if (user.name().equalsIgnoreCase(name)) {
+				return user.name();
+			}
+		}
+		throw new IllegalStateException(name + " isn't one of Cognos's test users. The engine passes logins to a "
+				+ "TM1 server in CAM security, which logs in Cognos's users only: add the user with "
+				+ "CognosContainer.withUser, or take it off the engine");
 	}
 
 	@Override

@@ -1,0 +1,4 @@
+# error: whose users then log in to TM1 v12 with their name and password there (first, legacy)
+version: 1
+tm1: { servers: { first: {}, legacy: {} } }
+tm1Engine: { passthrough: { server: Legacy } }

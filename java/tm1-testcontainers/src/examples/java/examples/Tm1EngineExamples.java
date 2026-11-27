@@ -17,6 +17,9 @@ import io.skipcheck.tm1.testcontainers.Tm1Database;
 import io.skipcheck.tm1.testcontainers.Tm1EngineContainer;
 import io.skipcheck.tm1.testcontainers.Tm1EngineSource;
 import io.skipcheck.tm1.testcontainers.Tm1Login;
+import io.skipcheck.tm1.testcontainers.Tm1Seed;
+import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
  * Examples for {@link RequiresTm1Engine} and {@link Tm1EngineContainer}, quoted in their
@@ -73,6 +76,24 @@ final class Tm1EngineExamples {
 			// A token from Keycloak, with the analyst's password, sent to TM1 as Bearer
 			HttpRequest request = db.oauth2Login("analyst")
 				.authorizeWithToken(HttpRequest.newBuilder(URI.create(db.getRestUrl() + "Cubes?$select=Name")))
+				.build();
+			// @end
+			assertEquals(200,
+					HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).statusCode());
+		}
+	}
+
+	void passThrough(Tm1EngineSource source, Tm1Source tm1) throws Exception {
+		// @start region = pass-through
+		// Starting the engine starts the TM1 11 server first; the server is yours to
+		// close
+		try (var server = new Tm1ServerContainer(tm1).withSeed(Tm1Seed.SDATA);
+				var engine = new Tm1EngineContainer(source).withPassThrough(server)) {
+			engine.start();
+			Tm1Database db = engine.database("tm1");
+			// The sample database's admin / apple, which TM1 v12 asks the server about
+			HttpRequest request = db.passThroughLogin()
+				.authorize(HttpRequest.newBuilder(URI.create(db.getRestUrl() + "Cubes?$select=Name")))
 				.build();
 			// @end
 			assertEquals(200,

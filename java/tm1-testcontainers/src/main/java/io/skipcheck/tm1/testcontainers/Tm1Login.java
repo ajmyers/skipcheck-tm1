@@ -31,10 +31,20 @@ import org.jspecify.annotations.Nullable;
  * either let it log in for you ({@link #authorize} or {@link #cookie()}), or hand
  * {@link #getClientId()}, {@link #getClientSecret()} and {@link #getUser()} to a client
  * that logs in itself.
+ *
+ * <p>
+ * Two other kinds log a user in as themselves: an OAuth 2.0 login
+ * ({@link Tm1Database#oauth2Login}), with a token from the engine's Keycloak, and a
+ * pass-through login ({@link Tm1Database#passThroughLogin()}), with the
+ * {@code Authorization} header a TM1 11 server takes ({@link #getAuthorization()}).
+ * {@link #authorize} and {@link #cookie()} work for all three.
  */
 public final class Tm1Login {
 
 	private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
+
+	private static final String NO_TOKEN = "A pass-through login has no token: it's the header TM1 passes on "
+			+ "(getAuthorization), or the session that gives (authorize, cookie)";
 
 	private static final Pattern TOKEN = Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
 
@@ -58,7 +68,11 @@ public final class Tm1Login {
 
 	private final @Nullable Tm1Database database;
 
+	// A pass-through login: the header the TM1 server behind the engine takes
+	private final @Nullable String authorization;
+
 	Tm1Login(String authUrl, String instance, String clientId, String clientSecret, String user) {
+		this.authorization = null;
 		this.authUrl = authUrl;
 		this.instance = instance;
 		this.clientId = clientId;
@@ -82,6 +96,47 @@ public final class Tm1Login {
 		this.user = user;
 		this.keycloak = keycloak;
 		this.password = password;
+		this.authorization = null;
+	}
+
+	/** A pass-through login, with the header a TM1 server behind the engine takes. */
+	Tm1Login(Tm1Database database, String user, String password, String authorization) {
+		this.authUrl = "";
+		this.database = database;
+		this.instance = database.getInstance();
+		this.clientId = "";
+		this.clientSecret = "";
+		this.user = user;
+		this.keycloak = null;
+		this.password = password;
+		this.authorization = authorization;
+	}
+
+	/**
+	 * Whether this is a pass-through login ({@link Tm1Database#passThroughLogin()}): one
+	 * TM1 v12 checks with a TM1 11 server.
+	 * @return {@code true} for a pass-through login
+	 */
+	public boolean isPassThrough() {
+		return authorization != null;
+	}
+
+	/**
+	 * The {@code Authorization} header of a pass-through login, as a client that logs in
+	 * itself sends it on any request: {@code Basic} with the user's name and password on
+	 * the TM1 11 server, or {@code CAMNamespace} when that server is in Cognos (CAM)
+	 * security.
+	 * @return the header's value
+	 * @throws IllegalStateException for a login that isn't pass-through
+	 */
+	public String getAuthorization() {
+		String header = authorization;
+		if (header == null) {
+			throw new IllegalStateException("Only a pass-through login is a header of its own: this one logs in "
+					+ (keycloak != null ? "with a token (authorizeWithToken)"
+							: "through the application (getClientId, getClientSecret and getUser)"));
+		}
+		return header;
 	}
 
 	/**
@@ -94,8 +149,9 @@ public final class Tm1Login {
 	}
 
 	/**
-	 * The user's password at the identity provider, for an OAuth 2.0 login; empty
-	 * otherwise, as TM1 v12 keeps none.
+	 * The user's password: at the identity provider for an OAuth 2.0 login, and on the
+	 * TM1 11 server (or in Cognos) for a pass-through login. Empty otherwise, as TM1 v12
+	 * keeps none, and for a pass-through login made from a header alone.
 	 * @return the password, or empty
 	 */
 	public String getPassword() {
@@ -109,7 +165,8 @@ public final class Tm1Login {
 	 */
 	public String getTokenUrl() {
 		KeycloakContainer from = keycloak;
-		return from == null ? authUrl + "token"
+		// A pass-through login has no token: this is where TM1 gives its own
+		return from == null ? getAuthUrl() + "token"
 				: from.getUrl() + "/realms/" + Tm1EngineContainer.OAUTH2_REALM + "/protocol/openid-connect/token";
 	}
 
@@ -122,7 +179,9 @@ public final class Tm1Login {
 	}
 
 	/**
-	 * The TM1 user this logs in as.
+	 * The user this logs in as. For a pass-through login it's the name on the TM1 11
+	 * server, or in Cognos: with a server in CAM security the user's name in TM1 v12 is
+	 * its CAMID. Empty for a pass-through login made from a header alone.
 	 * @return the user's name
 	 */
 	public String getUser() {
@@ -130,7 +189,8 @@ public final class Tm1Login {
 	}
 
 	/**
-	 * The application's client ID.
+	 * The application's client ID; the Keycloak client's for an OAuth 2.0 login, and
+	 * empty for a pass-through login, which goes through no application.
 	 * @return the client ID
 	 */
 	public String getClientId() {
@@ -138,7 +198,7 @@ public final class Tm1Login {
 	}
 
 	/**
-	 * The application's client secret.
+	 * The application's client secret; empty for an OAuth 2.0 or a pass-through login.
 	 * @return the client secret
 	 */
 	public String getClientSecret() {
@@ -163,6 +223,13 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the login
 	 */
 	public synchronized String cookie() {
+		String header = authorization;
+		if (cookie == null && header != null) {
+			// TM1 asks the server behind it who this is, on the first request that
+			// carries the header, and gives a session
+			String anywhere = Objects.requireNonNull(database).getRestUrl() + "ActiveUser?$select=Name";
+			cookie = sessionCookie(send(HttpRequest.newBuilder(URI.create(anywhere)).header("Authorization", header)));
+		}
 		if (cookie == null && keycloak != null) {
 			// TM1 gives a session to the first request that carries the provider's token
 			String anywhere = Objects.requireNonNull(database).getRestUrl() + "ActiveUser?$select=Name";
@@ -187,6 +254,9 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the application's credentials
 	 */
 	public String token() {
+		if (authorization != null) {
+			throw new IllegalStateException(NO_TOKEN);
+		}
 		KeycloakContainer from = keycloak;
 		if (from != null) {
 			return from.accessToken(Tm1EngineContainer.OAUTH2_REALM, clientId, user, password);
@@ -213,6 +283,10 @@ public final class Tm1Login {
 	 * @throws IllegalStateException if TM1 refuses the login
 	 */
 	public String session(String authorization) {
+		if (this.authorization != null) {
+			throw new IllegalStateException("A pass-through login has no session to ask for: TM1 takes its "
+					+ "header on any request (getAuthorization), and cookie() keeps the session that gives");
+		}
 		if (keycloak != null) {
 			throw new IllegalStateException("An OAuth 2.0 login has no session to ask for: TM1 takes its token "
 					+ "on any request (authorizeWithToken), and cookie() keeps the session that gives");
@@ -258,6 +332,9 @@ public final class Tm1Login {
 	 * takes only at its session endpoint ({@link #session})
 	 */
 	public HttpRequest.Builder authorizeWithToken(HttpRequest.Builder request) {
+		if (authorization != null) {
+			throw new IllegalStateException(NO_TOKEN);
+		}
 		if (keycloak == null) {
 			throw new IllegalStateException("TM1 takes its own token only where a session is asked for: use "
 					+ "session(\"Bearer \" + token()), or authorize for the cookie");
@@ -269,7 +346,7 @@ public final class Tm1Login {
 	@Override
 	public String toString() {
 		// Never the secret
-		return "Tm1Login[" + user + " in " + instance + "]";
+		return "Tm1Login[" + (user.isEmpty() ? "a pass-through header" : user) + " in " + instance + "]";
 	}
 
 	private HttpResponse<String> send(HttpRequest.Builder request) {
