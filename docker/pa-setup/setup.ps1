@@ -47,13 +47,23 @@ if ($first -eq '' -or $first.StartsWith('-') -or $first -eq 'init' -or $first -e
   $ErrorActionPreference = 'Stop'
 }
 
+# The options as tm1-server's setup.ps1 spelled them, which this script replaces at
+# skipcheck.io/tm1/setup.ps1: -Bundle, -Tm1Home, -NoStart become --bundle, --tm1-home,
+# --no-start. One dash and a capital: the tool's own short options (-f, -y, -h) are left.
+$toolArgs = @($args | ForEach-Object {
+  $word = [string]$_
+  if ($word -cmatch '^-[A-Z][A-Za-z0-9]*$') {
+    '--' + ([regex]::Replace($word.Substring(1), '(?<=[a-z0-9])(?=[A-Z])', '-')).ToLowerInvariant()
+  } else { $word }
+})
+
 $dir = (Get-Location).Path
 $dockerArgs = @('run', '--rm', '-v', '//var/run/docker.sock:/var/run/docker.sock', '-v', "${dir}:/work",
   '-e', "PA_HOST_DIR=$dir", '-e', "PA_HOST_HOME=$HOME", '-e', "PA_SETUP_IMAGE=$image")
 if ($env:PA_IMAGE_TAG) { $dockerArgs += @('-e', "PA_IMAGE_TAG=$($env:PA_IMAGE_TAG)") }
 if ($env:CI) { $dockerArgs += @('-e', "CI=$($env:CI)") }
 if (-not [Console]::IsInputRedirected) { $dockerArgs += '-it' }
-& docker @dockerArgs $image @args
+& docker @dockerArgs $image @toolArgs
 # Run as a file, the tool's exit code is the script's. Piped from the web, as the one-liners
 # above run it (a script block, or iex), exit would close the user's PowerShell window: the
 # code is left in $LASTEXITCODE.

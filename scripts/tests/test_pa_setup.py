@@ -219,6 +219,47 @@ def test_setup_ps1_piped_from_the_web_leaves_the_window_open(
     assert arguments(docker)[-1] in ("urls", "ghcr.io/ajmyers/pa-setup:edge")
 
 
+@pytest.mark.skipif(
+    shutil.which("pwsh") is None and not os.environ.get("CI"),
+    reason="PowerShell isn't installed",
+)
+def test_setup_ps1_takes_the_options_as_tm1_servers_script_spelled_them(
+    docker: Path, tmp_path: Path
+) -> None:
+    # skipcheck.io/tm1/setup.ps1 serves this script now, and its one-liners were written with
+    # PowerShell's spelling: -Bundle FILE -Samples. The tool's own short options are left alone
+    setup = ["pwsh", "-NoProfile", "-File", str(SETUP / "setup.ps1")]
+    given = [
+        "-Bundle",
+        "C:\\dl\\a b.tar.gz",
+        "-Samples",
+        "-Tm1Home",
+        "-NoStart",
+        "-Sha256",
+        "-FilesDir",
+    ]
+    given += ["-y", "-f", "other.yaml", "--url", "https://x", "-BaseUrl", "up", "-Yes"]
+    assert run([*setup, *given], tmp_path, environment(docker)).returncode == 0
+    passed = arguments(docker)
+    assert passed[passed.index("ghcr.io/ajmyers/pa-setup:edge") + 1 :] == [
+        "--bundle",
+        "C:\\dl\\a b.tar.gz",
+        "--samples",
+        "--tm1-home",
+        "--no-start",
+        "--sha256",
+        "--files-dir",
+        "-y",
+        "-f",
+        "other.yaml",
+        "--url",
+        "https://x",
+        "--base-url",
+        "up",
+        "--yes",
+    ]
+
+
 def test_setup_sh_says_so_when_docker_isnt_installed(tmp_path: Path) -> None:
     # A path with nothing on it: the real docker, where there is one, must not be found and run
     empty = tmp_path / "empty"
