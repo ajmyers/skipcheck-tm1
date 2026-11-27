@@ -95,6 +95,10 @@ public abstract class GenericContainer<TSelf> : IStartable, IGenericContainer
         return Self;
     }
 
+    /// <summary>Takes an environment variable off again: for a container that sets one only in some configurations, and
+    /// is configured anew at each start.</summary>
+    private protected void RemoveEnv(string name) => env.Remove(name);
+
     /// <summary>Sets environment variables.</summary>
     public TSelf WithEnv(IReadOnlyDictionary<string, string> variables)
     {

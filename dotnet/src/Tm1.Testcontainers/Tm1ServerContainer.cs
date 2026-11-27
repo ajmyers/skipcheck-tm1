@@ -194,12 +194,15 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
         return null;
     }
 
+    /// <summary>The engine that passes logins to this server: one, as they share a network.</summary>
+    internal Tm1EngineContainer? PassThroughFor { get; set; }
+
     /// <summary>The Cognos test users made TM1 administrators by <see cref="WithCamSecurity(CognosContainer, CognosContainer.Namespace, string[])"/>.</summary>
     internal IReadOnlyList<string> CamAdmins => camAdmins;
 
     /// <summary>The <c>Authorization</c> header that logs in as <see cref="Username"/>.</summary>
     public string Authorization =>
-        Cognos is not null
+        InCamSecurity
             ? CognosContainer.CamAuthorization(Username, Password, camNamespace.Id())
             : "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes(Username + ":" + Password));
 
@@ -264,7 +267,11 @@ public class Tm1ServerContainer : GenericContainer<Tm1ServerContainer>
         {
             cognos.GetUser(name);
         }
-        WithCredentials(admin.Name, admin.Password);
+        if (InCamSecurity)
+        {
+            // A tm1s.cfg parameter may take the server out of CAM security again: it then keeps the login it has, its seed's
+            WithCredentials(admin.Name, admin.Password);
+        }
         WithEnv("TM1_CAM_URI", cognos.NetworkUrl);
         if (camNamespace == CognosContainer.Namespace.Oidc && cognos.Keycloak is null)
         {

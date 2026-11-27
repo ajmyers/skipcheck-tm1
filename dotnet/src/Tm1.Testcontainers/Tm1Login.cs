@@ -271,7 +271,9 @@ public sealed class Tm1Login
         if (!response.IsSuccessStatusCode || found is null)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            throw new InvalidOperationException($"TM1 refused the login of '{User}' to instance '{Instance}' (HTTP {(int)response.StatusCode}): {body}");
+            throw new InvalidOperationException(
+                $"TM1 refused the login of {(User.Length == 0 ? "a pass-through header" : "'" + User + "'")} to instance '{Instance}' (HTTP {(int)response.StatusCode}): {body}"
+            );
         }
         return found;
     }

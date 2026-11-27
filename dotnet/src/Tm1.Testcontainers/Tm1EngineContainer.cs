@@ -296,7 +296,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     /// <param name="server">The TM1 server that checks logins.</param>
     /// <returns>This container.</returns>
     /// <exception cref="InvalidOperationException">The engine passes logins to another server already, or takes OAuth 2.0
-    /// tokens; or the server is already running.</exception>
+    /// tokens; or the server is already running, or checks logins for another engine.</exception>
     public Tm1EngineContainer WithPassThrough(Tm1ServerContainer server) => WithPassThrough(server, null);
 
     /// <summary>As <see cref="WithPassThrough(Tm1ServerContainer)"/>, to a server that has a name on the network already:
@@ -324,6 +324,13 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
                 "This TM1 server is already running, without the name the engine reaches it by: give WithPassThrough one that isn't started, and the engine starts it"
             );
         }
+        if (server.PassThroughFor is not null)
+        {
+            // They'd share a network, where each engine's datastore answers to one name
+            throw new InvalidOperationException(
+                "This TM1 server already checks logins for another engine: an engine and the server it passes logins to share a network, which holds one engine"
+            );
+        }
         if (server.Network is not null)
         {
             WithNetwork(server.Network);
@@ -334,6 +341,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
             JoinNetwork();
             server.WithNetwork(Network);
         }
+        server.PassThroughFor = this;
         if (alias is null)
         {
             server.WithNetworkAliases(PassThroughAlias);
@@ -380,7 +388,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     public DatastoreContainer Datastore { get; }
 
     /// <summary>The gateway as seen from the host, ending in <c>/</c>, e.g. <c>http://localhost:54321/</c>.</summary>
-    public string Url => $"http://{Host}:{GetMappedPort(Port)}/";
+    public virtual string Url => $"http://{Host}:{GetMappedPort(Port)}/";
 
     /// <summary>The management API, which lists and creates instances, applications and databases,
     /// ending in <c>/</c>, e.g. <c>http://localhost:54321/manage/v1/</c>. It takes the root
@@ -623,7 +631,12 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     internal IReadOnlyList<string> Configured() => databases.Count == 0 ? [DefaultInstance + "/" + DefaultDatabase] : databases;
 
     /// <summary>Before anything starts: the datastore, which this depends on, starts ahead of <see cref="Configure"/>.</summary>
-    private protected override void BeforeDependenciesStart() => JoinNetwork();
+    private protected override void BeforeDependenciesStart()
+    {
+        JoinNetwork();
+        // And before the TM1 server, and the Cognos behind it, take minutes to start
+        UsersForTheImage();
+    }
 
     /// <summary>The datastore goes on the engine's network at once, not when the engine starts: whatever starts the
     /// engine may start what it depends on first, and the datastore must be there by then.</summary>
@@ -655,7 +668,34 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
     {
         JoinNetwork();
         WithEnv("TM1_DATABASES", string.Join(',', Configured()));
-        // name and groups, as the image is given them. Made anew each time: this runs again when a test has looked
+        var wanted = UsersForTheImage();
+        if (PassThrough is { InCamSecurity: true } inCam)
+        {
+            var @namespace = inCam.CamNamespace!.Value;
+            WithEnv("TM1_CAM_NAMESPACE", @namespace.Id());
+            WithEnv("TM1_CAM_NAMESPACE_TYPE", @namespace.Type());
+        }
+        else
+        {
+            // Read on each start: a server taken out of CAM security since the last one answers plain names again
+            RemoveEnv("TM1_CAM_NAMESPACE");
+            RemoveEnv("TM1_CAM_NAMESPACE_TYPE");
+        }
+        if (wanted.Count == 0)
+        {
+            RemoveEnv("TM1_USERS");
+        }
+        else
+        {
+            WithEnv("TM1_USERS", string.Join(',', wanted.Select(u => u.Groups.Count == 0 ? u.Name : u.Name + ":" + string.Join(':', u.Groups))));
+        }
+    }
+
+    /// <summary>The users as the image is given them, each with its groups, refusing what couldn't work: a server asked
+    /// over plain HTTP that has TLS on, and a user Cognos doesn't have behind a server in CAM security.</summary>
+    private List<(string Name, List<string> Groups)> UsersForTheImage()
+    {
+        // Made anew each time: this runs before the start, and again whenever the engine is configured
         var wanted = users.Select(u => (u.Name, Groups: u.Groups.ToList())).ToList();
         var server = PassThrough;
         if (server is { UsesSsl: true })
@@ -669,9 +709,6 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
             // Read now, not in WithPassThrough: WithCamSecurity may have come after it. The server answers a login
             // with the user's CAMID, so the image makes the users under theirs
             var cognos = server.Cognos!;
-            var @namespace = server.CamNamespace!.Value;
-            WithEnv("TM1_CAM_NAMESPACE", @namespace.Id());
-            WithEnv("TM1_CAM_NAMESPACE_TYPE", @namespace.Type());
             wanted = [];
             foreach (var (name, groups) in users)
             {
@@ -705,10 +742,7 @@ public partial class Tm1EngineContainer : GenericContainer<Tm1EngineContainer>
                 }
             }
         }
-        if (wanted.Count > 0)
-        {
-            WithEnv("TM1_USERS", string.Join(',', wanted.Select(u => u.Groups.Count == 0 ? u.Name : u.Name + ":" + string.Join(':', u.Groups))));
-        }
+        return wanted;
     }
 
     /// <summary>A Cognos test user's name as Cognos has it, whatever its case here.</summary>
