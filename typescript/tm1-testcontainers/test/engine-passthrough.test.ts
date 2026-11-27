@@ -54,7 +54,7 @@ describe("Tm1Engine pass-through", async () => {
     try {
       await engine?.stop();
     } finally {
-      // The server is the caller's to stop: the engine only started it first
+      // Whatever stopping the engine did: the server is the caller's to stop
       await server?.stop();
     }
   });
@@ -116,7 +116,7 @@ describe("Tm1Engine pass-through", async () => {
 
 /** Java's Tm1EnginePassThroughCamTest: pass-through logins to a TM1 11 server in Cognos (CAM)
  * security, against real TM1 v12, TM1 11 and Cognos. Cognos's users log in to TM1 v12 as they do
- * to TM1 11. Cognos takes minutes to start, so this has one test. */
+ * to TM1 11. Cognos takes minutes to start, so this has two tests, each with much in it. */
 describe("Tm1Engine pass-through to CAM security", () => {
   // As Java's @RequiresCognos (which needs TM1 too) with @RequiresTm1Engine
   requiresCognos("Cognos users log in to the engine", { timeout: 45 * 60_000 }, async ({ skip, cognosSource }) => {
@@ -151,6 +151,33 @@ describe("Tm1Engine pass-through to CAM security", () => {
     await expect(db.passThroughLogin("analyst", "not-it").cookie()).rejects.toThrow("HTTP 401");
     // The database's own admin still logs in through the application
     expect((await Tm1EngineRest.get(db, db.login(), "ActiveUser")).status).toBe(200);
+  });
+
+  requiresCognos("a server taken out of CAM security keeps its own users", { timeout: 45 * 60_000 }, async ({ skip, cognosSource }) => {
+    const why = await RequiresTm1Engine.skipReason();
+    if (why !== undefined) skip(why);
+    // Cognos is there, and a tm1s.cfg parameter says the server's own security: the image applies
+    // it last, so the server has its seed's users, and Basic logs in
+    await using cognos = new CognosContainer(cognosSource).withUser("admin", "adminpw", "Admins");
+    await using server = new Tm1ServerContainer(Tm1Source.discover()!)
+      .withSeed(Tm1Seed.SDATA)
+      .withCamSecurity(cognos, "admin")
+      .withEnv("TM1_CFG_IntegratedSecurityMode", "1");
+    await using engine = new Tm1EngineContainer(Tm1EngineSource.discover()!).withPassThrough(server);
+    await engine.start();
+    const db = engine.database("tm1");
+
+    // The server's own login is the sample database's, not the Cognos administrator's
+    expect(server.getUsername()).toBe("admin");
+    expect(server.getPassword()).toBe("apple");
+    expect(db.passThroughLogin().getAuthorization()).toBe(server.getAuthorization());
+    expect(db.passThroughLogin().getAuthorization()).toMatch(/^Basic /);
+    const admin = await Tm1EngineRest.get(db, db.passThroughLogin(), "ActiveUser?$select=Name,Type");
+    expect(admin.status).toBe(200);
+    // A plain name, not a CAMID: the engine was told no namespace
+    expect(admin.body).toContain('"Name":"Admin"');
+    expect(admin.body).toContain('"Type":"Admin"');
+    expect(engine.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
   });
 });
 

@@ -253,7 +253,9 @@ export class Tm1Login {
   #sessionCookie(response: { status: number; body: string; cookies: string[] }): string {
     const found = response.cookies.map((value) => value.split(";", 1)[0]!.trim()).find((value) => value.startsWith("TM1SessionId="));
     if (Math.floor(response.status / 100) !== 2 || found === undefined) {
-      throw new IllegalStateException(`TM1 refused the login of '${this.#user}' to instance '${this.#instance}' (HTTP ${response.status}): ${response.body}`);
+      throw new IllegalStateException(
+        `TM1 refused the login of ${this.#user === "" ? "a pass-through header" : "'" + this.#user + "'"} to instance '${this.#instance}' (HTTP ${response.status}): ${response.body}`,
+      );
     }
     return found;
   }

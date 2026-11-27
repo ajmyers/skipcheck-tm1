@@ -326,8 +326,19 @@ export class Tm1EngineContainer extends GenericContainer {
         "This TM1 server is already running, without the name the engine reaches it by: give withPassThrough one that isn't started, and the engine starts it",
       );
     }
+    if (server.passThroughFor !== undefined) {
+      // They'd share a network, where each engine's datastore answers to one name
+      throw new IllegalStateException(
+        "This TM1 server already checks logins for another engine: an engine and the server it passes logins to share a network, which holds one engine",
+      );
+    }
     if (server.getNetwork() !== undefined) this.withNetwork(server.getNetwork());
-    else server.withNetwork(this.getNetwork());
+    else {
+      // One of its own again, if it was taken off it
+      this.#joinNetwork();
+      server.withNetwork(this.getNetwork());
+    }
+    server.passThroughFor = this;
     if (alias === undefined) server.withNetworkAliases(Tm1EngineContainer.PASS_THROUGH_ALIAS);
     this.#passThrough = server;
     this.#passThroughAlias = alias ?? Tm1EngineContainer.PASS_THROUGH_ALIAS;
@@ -624,6 +635,8 @@ export class Tm1EngineContainer extends GenericContainer {
     // Before anything starts: what this depends on, the datastore, is started ahead of configure()
     try {
       this.#joinNetwork();
+      // And before the TM1 server, and the Cognos behind it, take minutes to start
+      this.#usersForTheImage();
     } catch (e) {
       return Promise.reject(e instanceof Error ? e : new Error(String(e)));
     }
@@ -640,7 +653,26 @@ export class Tm1EngineContainer extends GenericContainer {
   override configure(): void {
     this.#joinNetwork();
     this.withEnv("TM1_DATABASES", this.configured().join(","));
-    // name -> groups, as the image is given them
+    const wanted = this.#usersForTheImage();
+    const server = this.#passThrough;
+    if (server?.inCamSecurity()) {
+      const namespace = server.getCamNamespace()!;
+      this.withEnv("TM1_CAM_NAMESPACE", namespace.id());
+      this.withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
+    } else {
+      // Read on each start: a server taken out of CAM security since the last one answers plain
+      // names again
+      this.withoutEnv("TM1_CAM_NAMESPACE");
+      this.withoutEnv("TM1_CAM_NAMESPACE_TYPE");
+    }
+    if (wanted.size === 0) this.withoutEnv("TM1_USERS");
+    else this.withEnv("TM1_USERS", [...wanted].map(([name, groups]) => [name, ...groups].join(":")).join(","));
+  }
+
+  /** The users as the image is given them, name to groups, refusing what couldn't work: a server
+   * asked over plain HTTP that has TLS on, and a user Cognos doesn't have behind a server in CAM
+   * security. */
+  #usersForTheImage(): Map<string, string[]> {
     let wanted = new Map<string, string[]>(this.#users);
     const server = this.#passThrough;
     if (server?.usesSsl()) {
@@ -652,9 +684,6 @@ export class Tm1EngineContainer extends GenericContainer {
       // Read now, not in withPassThrough: withCamSecurity may have come after it. The server
       // answers a login with the user's CAMID, so the image makes the users under theirs
       const cognos = server.getCognos()!;
-      const namespace = server.getCamNamespace()!;
-      this.withEnv("TM1_CAM_NAMESPACE", namespace.id());
-      this.withEnv("TM1_CAM_NAMESPACE_TYPE", namespace.type());
       wanted = new Map();
       // As Cognos spells it: the name goes into the CAMID
       for (const [name, groups] of this.#users) wanted.set(cognosUser(cognos, name), [...groups]);
@@ -667,9 +696,7 @@ export class Tm1EngineContainer extends GenericContainer {
         if (!groups.some((group) => group.toLowerCase() === "admin")) groups.push("ADMIN");
       }
     }
-    if (wanted.size > 0) {
-      this.withEnv("TM1_USERS", [...wanted].map(([name, groups]) => [name, ...groups].join(":")).join(","));
-    }
+    return wanted;
   }
 
   protected override async containerIsStarted(): Promise<void> {

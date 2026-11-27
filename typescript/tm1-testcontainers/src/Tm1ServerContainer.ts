@@ -7,6 +7,7 @@ import { Messages } from "./messages.js";
 import { Network } from "./Network.js";
 import { IllegalArgumentException, IllegalStateException, Settings } from "./settings.js";
 import { Tm1AdminServerContainer } from "./Tm1AdminServerContainer.js";
+import type { Tm1EngineContainer } from "./Tm1EngineContainer.js";
 import { Tm1Seed } from "./Tm1Seed.js";
 import { Tm1Source } from "./Tm1Source.js";
 
@@ -214,6 +215,10 @@ export class Tm1ServerContainer extends GenericContainer {
     return undefined;
   }
 
+  /** The engine that passes logins to this server: one, as they share a network.
+   * @internal */
+  passThroughFor: Tm1EngineContainer | undefined;
+
   /** The Cognos test users made TM1 administrators by {@link withCamSecurity}.
    * @internal */
   getCamAdmins(): readonly string[] {
@@ -223,7 +228,7 @@ export class Tm1ServerContainer extends GenericContainer {
   /** The `Authorization` header for the container's login: `Basic` with {@link getUsername} and
    * {@link getPassword}, or, in CAM security, `CAMNamespace` for that Cognos user. */
   getAuthorization(): string {
-    if (this.#cognos) return CognosContainer.camAuthorization(this.#username, this.#password, this.#camNamespace.id());
+    if (this.inCamSecurity()) return CognosContainer.camAuthorization(this.#username, this.#password, this.#camNamespace.id());
     return "Basic " + Buffer.from(this.#username + ":" + this.#password, "utf8").toString("base64");
   }
 
@@ -267,7 +272,9 @@ export class Tm1ServerContainer extends GenericContainer {
     // Here rather than in withCamSecurity, so users added to Cognos later still count
     const admin = cognos.getUser(this.#camAdmins[0]!);
     for (const name of this.#camAdmins) cognos.getUser(name);
-    this.withCredentials(admin.name, admin.password);
+    // A tm1s.cfg parameter may take the server out of CAM security again: it then keeps the login
+    // it has, its seed's
+    if (this.inCamSecurity()) this.withCredentials(admin.name, admin.password);
     this.withEnv("TM1_CAM_URI", cognos.getNetworkUrl());
     if (this.#camNamespace === CognosContainer.Namespace.OIDC && cognos.getKeycloak() === undefined) {
       throw new IllegalStateException("CAM security through OIDC needs the Cognos to have withKeycloak");

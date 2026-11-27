@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { readdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { basename, join, resolve } from "node:path";
 import { Tm1Version } from "@skipcheck/tm1-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -1146,6 +1148,11 @@ describe("Tm1Engine wiring", () => {
     expect(() => engine.withPassThrough(new Tm1ServerContainer(TM1))).toThrow(IllegalStateException);
     expect(() => engine.withPassThrough(new Tm1ServerContainer(TM1))).toThrow("already passes logins to another TM1 server");
 
+    // A server checks logins for one engine: the two share a network, which holds one engine's
+    // datastore
+    expect(() => new Tm1EngineContainer(SOURCE).withPassThrough(server)).toThrow(IllegalStateException);
+    expect(() => new Tm1EngineContainer(SOURCE).withPassThrough(server)).toThrow("already checks logins for another engine");
+
     // Moved off the server's network, TM1 couldn't reach it
     expect(() => engine.withNetwork(Network.newNetwork())).toThrow(IllegalStateException);
     expect(() => engine.withNetwork(Network.newNetwork())).toThrow("set the network before withPassThrough");
@@ -1157,6 +1164,14 @@ describe("Tm1Engine wiring", () => {
     const joining = new Tm1EngineContainer(SOURCE).withPassThrough(placed);
     expect(joining.getNetwork()).toBe(network);
     expect(joining.getDatastore().getNetwork()).toBe(network);
+
+    // An engine taken off its network gets one of its own again, and the server joins it
+    const off = new Tm1EngineContainer(SOURCE).withNetwork(undefined);
+    const joined = new Tm1ServerContainer(TM1);
+    off.withPassThrough(joined);
+    expect(off.getNetwork()).toBeInstanceOf(Network);
+    expect(off.getNetwork()).toBe(joined.getNetwork());
+    expect(off.getNetwork()).toBe(off.getDatastore().getNetwork());
   });
 
   it("takes tokens or passes logins on, not both", () => {
@@ -1207,6 +1222,13 @@ describe("Tm1Engine wiring", () => {
     own.configure();
     expect(own.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
     expect(own.getEnvMap().get("TM1_USERS")).toBe("planner:Planners");
+    // Read on each start: a server taken out of CAM security since the last one answers plain
+    // names again, and the image isn't told a namespace any more
+    server.withEnv("TM1_CFG_IntegratedSecurityMode", "1");
+    engine.configure();
+    expect(engine.getEnvMap().has("TM1_CAM_NAMESPACE")).toBe(false);
+    expect(engine.getEnvMap().has("TM1_CAM_NAMESPACE_TYPE")).toBe(false);
+    expect(engine.getEnvMap().get("TM1_USERS")).toBe("Analyst:Analysts");
     // Without Cognos nothing changes for the users
     const plain = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1));
     plain.configure();
@@ -1214,13 +1236,25 @@ describe("Tm1Engine wiring", () => {
     expect(plain.getEnvMap().get("TM1_USERS")).toBe("planner");
   });
 
-  it("refuses a server it can't ask over plain HTTP", () => {
+  it("refuses a server it can't ask over plain HTTP", async () => {
     // The engine asks over plain HTTP, and trusts no certificate of the server's
     for (const on of ["T", "true"]) {
       const engine = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_usessl", on));
       expect(() => engine.configure()).toThrow(IllegalStateException);
       expect(() => engine.configure()).toThrow("with UseSSL on");
+      // Said before anything starts: the server would otherwise be waited for, in vain, ahead of
+      // the engine's own configuration
+      const start = vi.spyOn(engine.getPassThrough()!, "start");
+      await expect(engine.start()).rejects.toThrow(IllegalStateException);
+      await expect(engine.start()).rejects.toThrow("with UseSSL on");
+      expect(start).not.toHaveBeenCalled();
     }
+    // And so is a user Cognos doesn't have, before Cognos takes minutes to start
+    const stranger = new Tm1EngineContainer(SOURCE).withUser("planner").withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "admin"));
+    const started = vi.spyOn(stranger.getPassThrough()!, "start");
+    await expect(stranger.start()).rejects.toThrow(IllegalStateException);
+    await expect(stranger.start()).rejects.toThrow("planner isn't one of Cognos's test users");
+    expect(started).not.toHaveBeenCalled();
     const off = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withEnv("TM1_CFG_UseSSL", " f "));
     off.configure();
     // A server that's running can't be given its name on the network any more
@@ -1272,6 +1306,14 @@ describe("Tm1Engine wiring", () => {
     expect(passport.getPassword()).toBe("");
     expect(String(passport)).toBe("Tm1Login[a pass-through header in tm1]");
 
+    // A server that tm1s.cfg takes out of CAM security keeps its seed's login, as Basic, once it's
+    // configured too: the Cognos administrator's isn't one it would take
+    const ownUsers = new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA).withCamSecurity(cognos(), "admin").withEnv("TM1_CFG_IntegratedSecurityMode", "1");
+    const behind = new Tm1EngineContainer(SOURCE).withPassThrough(ownUsers).database("tm1");
+    ownUsers.configure();
+    expect(ownUsers.getAuthorization()).toBe("Basic YWRtaW46YXBwbGU=");
+    expect(behind.passThroughLogin().getAuthorization()).toBe("Basic YWRtaW46YXBwbGU=");
+
     // A server in CAM security: CAMNamespace, for any of Cognos's users, whose passwords Cognos
     // has. Its own login is its first administrator's
     const cam = new Tm1EngineContainer(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withCamSecurity(cognos(), "viewer", "admin")).database("tm1");
@@ -1289,6 +1331,48 @@ describe("Tm1Engine wiring", () => {
     const oauth2 = new Tm1EngineContainer(SOURCE).withLogin("admin", "pw").withOAuth2(new KeycloakContainer());
     expect(() => oauth2.database("tm1").oauth2Login("admin").getAuthorization()).toThrow(IllegalStateException);
     expect(() => oauth2.database("tm1").oauth2Login("admin").getAuthorization()).toThrow("Only a pass-through login is a header of its own");
+  });
+
+  it("a pass-through login gets its session with its header", async () => {
+    // A stand-in for TM1: it gives a session for one header, and refuses the rest
+    const asked: string[] = [];
+    const tm1 = createServer((request, response) => {
+      const header = request.headers.authorization;
+      asked.push(request.url + " " + header);
+      const known = header === "Basic YWRtaW46YXBwbGU=";
+      if (known) response.setHeader("Set-Cookie", "TM1SessionId=abc; Path=/; HttpOnly");
+      response.writeHead(known ? 200 : 401).end(known ? '{"Name":"Admin"}' : '{"error":{"message":"Authentication required"}}');
+    });
+    await new Promise<void>((resolve) => tm1.listen(0, "127.0.0.1", resolve));
+    try {
+      const url = "http://127.0.0.1:" + (tm1.address() as AddressInfo).port + "/";
+      const engine = new (class extends Tm1EngineContainer {
+        override getUrl(): string {
+          return url;
+        }
+      })(SOURCE).withPassThrough(new Tm1ServerContainer(TM1).withSeed(Tm1Seed.SDATA));
+      const database = engine.database("tm1");
+      const login = database.passThroughLogin();
+      // The header on a request to the database, which TM1 answers with a session; kept, so asked
+      // for once
+      expect(await login.cookie()).toBe("TM1SessionId=abc");
+      expect(await login.cookie()).toBe("TM1SessionId=abc");
+      expect(asked).toEqual(["/tm1/api/v1/Databases('tm1')/ActiveUser?$select=Name Basic YWRtaW46YXBwbGU="]);
+      expect(new Headers((await login.authorize()).headers).get("Cookie")).toBe("TM1SessionId=abc");
+      expect(login.getAuthUrl()).toBe(url + "tm1/auth/v1/");
+      expect(login.getTokenUrl()).toBe(url + "tm1/auth/v1/token");
+      // A refusal says who was refused: by name, or a header that names nobody
+      const wrong = database.passThroughLogin("admin", "wrong");
+      await expect(wrong.cookie()).rejects.toThrow(IllegalStateException);
+      await expect(wrong.cookie()).rejects.toThrow("the login of 'admin'");
+      await expect(wrong.cookie()).rejects.toThrow("HTTP 401");
+      const expired = database.passThroughLoginWith("CAMPassport expired");
+      await expect(expired.cookie()).rejects.toThrow(IllegalStateException);
+      await expect(expired.cookie()).rejects.toThrow("the login of a pass-through header");
+      await expect(expired.cookie()).rejects.toThrow("HTTP 401");
+    } finally {
+      await new Promise((resolve) => tm1.close(resolve));
+    }
   });
 
   it("its datastore is on its network before anything starts", () => {
