@@ -25,19 +25,40 @@ describe("ContentService", () => {
     expect(notes.toString()).toBe("Applications/Planning/notes.txt.blob");
     expect(notes.inBlobs()).toBe(false);
     expect(ContentPath.blobs().child("a.txt").inBlobs()).toBe(true);
+    expect(ContentPath.files().child("a.txt").inBlobs()).toBe(false);
+    expect(ContentPath.home().child("a.txt").inBlobs()).toBe(false);
+    expect(ContentPath.session().child("a.txt").inBlobs()).toBe(false);
+    expect(ContentPath.files().path().toString()).toBe("Contents('Files')");
+    expect(ContentPath.home().path().toString()).toBe("Contents('Home')");
+    expect(ContentPath.session().path().toString()).toBe("Contents('Session')");
 
     const mine = ContentPath.applications().child("mine", ContentScope.Private);
     expect(mine.path().toString()).toBe("Contents('Applications')/PrivateContents('mine')");
     expect(mine.toString()).toBe("Applications/(private) mine");
     expect(
       ContentPath.root("Applications")
+        .child("notes.txt.blob")
+        .equals(ContentPath.applications().child({ ID: "notes.txt.blob", Name: "notes.txt" })),
+    ).toBe(true);
+    expect(
+      ContentPath.applications()
         .child("Planning")
-        .equals(ContentPath.applications().child({ ID: "Planning" })),
+        .equals(ContentPath.applications().child({ Name: "Planning" })),
+    ).toBe(true);
+    expect(
+      ContentPath.applications()
+        .child("Planning")
+        .equals(ContentPath.applications().child({ ID: "", Name: "Planning" })),
     ).toBe(true);
     expect(ContentPath.applications().child({ ID: "mine" }, ContentScope.Private).equals(mine)).toBe(true);
+    expect(ContentPath.applications().child({ Name: "mine" }, ContentScope.Private).equals(mine)).toBe(true);
     expect(mine.equals(ContentPath.applications().child("mine"))).toBe(false);
     expect(ContentPath.root("O'Brien").path().toString()).toBe("Contents('O''Brien')");
-    expect(() => ContentPath.applications().child({ Name: "Planning" })).toThrow(RangeError);
+    for (const missing of [{}, { ID: "" }, { Name: "" }, { ID: "", Name: "" }]) {
+      expect(() => ContentPath.applications().child(missing)).toThrow(RangeError);
+    }
+    expect(() => ContentPath.applications().child(null as unknown as Entry)).toThrow(TypeError);
+    expect(() => ContentPath.applications().child({ Name: "x" }, null as unknown as ContentScope)).toThrow(TypeError);
     expect(() => ContentPath.root(null as unknown as string)).toThrow(TypeError);
     expect(ContentScope.navigation(ContentScope.Private)).toBe("PrivateContents");
     expect(ContentScope.navigation(ContentScope.Public)).toBe("Contents");
@@ -127,6 +148,27 @@ describe("ContentService", () => {
     expect(tm1.last.headers["accept"]).toBe("*/*");
     await client.contents.content(ContentPath.blobs().child("notes_1.txt")).toArray();
     expect(sent(tm1)).toBe("GET Contents('Blobs')/Contents('notes_1.txt')/tm1.Document/Content");
+
+    tm1.respond = () => ({ Name: "q1.csv", Size: 7 });
+    expect((await client.contents.document(ContentPath.files().child("reports").child("q1.csv"))).Size).toBe(7);
+    expect(sent(tm1)).toBe("GET Contents('Files')/Contents('reports')/Contents('q1.csv')/tm1.Document");
+
+    tm1.respond = () => FakeTm1.reply(200, utf8.encode("abc"), { "content-type": "application/octet-stream" });
+    expect(await joined(client.contents.content(ContentPath.home().child("scratch.txt")))).toBe("abc");
+    expect(sent(tm1)).toBe("GET Contents('Home')/Contents('scratch.txt')/tm1.Document/Content");
+
+    tm1.respond = () => null;
+    await client.contents.upload(ContentPath.session().child("temp.bin"), utf8.encode("ok"));
+    expect(sent(tm1)).toBe("PUT Contents('Session')/Contents('temp.bin')/tm1.Document/Content");
+
+    tm1.respond = () => ({ Size: 4 });
+    await client.contents.document(ContentPath.root("applications").child("Planning").child("notes.txt"));
+    expect(sent(tm1)).toBe("GET Contents('applications')/Contents('Planning')/Contents('notes.txt')/tm1.DocumentReference/Document");
+
+    await client.contents.document(ContentPath.root("Custom").child("data.bin"));
+    expect(sent(tm1)).toBe("GET Contents('Custom')/Contents('data.bin')/tm1.Document");
+
+    expect(() => client.contents.document(null as unknown as ContentPath)).toThrow(TypeError);
 
     tm1.respond = () => null;
     await client.contents.upload(notes, utf8.encode("hello"));
