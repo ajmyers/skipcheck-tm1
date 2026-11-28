@@ -29,6 +29,7 @@ EDM = {
     "Edm.Duration": "timedelta",
     "Edm.Guid": "UUID",
     "Edm.PrimitiveType": "Any",
+    "Edm.Untyped": "Any",
 }
 
 

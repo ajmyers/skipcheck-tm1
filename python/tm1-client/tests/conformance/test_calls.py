@@ -19,7 +19,7 @@ import pytest
 from skipcheck_tm1 import Tm1Client, Tm1Session, auth
 from skipcheck_tm1.aio import AsyncTm1Client, AsyncTm1Session
 
-from ..conftest import BASE, CONFORMANCE, FakeTm1
+from ..conftest import BASE, CONFORMANCE, FakeTm1, snapshot
 from . import codec
 from .codec import Unknown, snake
 
@@ -72,8 +72,9 @@ class Replay:
     unordered group, with the answer of the group's equal request."""
 
     def __init__(self, session: dict[str, Any], case: dict[str, Any]):
-        self.fake = FakeTm1()
-        self.fake.product_version = session["productVersion"]
+        schema = case.get("schema") or session.get("schema")
+        self.fake = FakeTm1(metadata=snapshot(schema).read_bytes() if schema else None)
+        self.fake.product_version = case.get("productVersion") or session["productVersion"]
         self.entries = [list(entry["unordered"]) if "unordered" in entry else [entry] for entry in case["exchanges"]]
         self.expected: list[dict[str, Any]] = []
         self.fake.respond = self._answer

@@ -24,8 +24,13 @@ import pytest
 
 from skipcheck_tm1 import Bind
 from skipcheck_tm1._generated import index, model
+from skipcheck_tm1.version import Tm1Capabilities
 
-from .conftest import SPEC, Api, FakeTm1, target
+from .conftest import SPEC, Api, FakeTm1, snapshot, target
+
+_V11_METADATA = snapshot("11.8.35").read_bytes()
+_V12_METADATA = snapshot("12.6.0").read_bytes()
+_V11_ENDPOINTS = Tm1Capabilities.parse(_V11_METADATA).endpoints
 
 DOC = json.loads(SPEC.read_text(encoding="utf-8"))
 TYPES = {t["qualifiedName"]: t for t in DOC["types"]}
@@ -68,6 +73,7 @@ SAMPLES: dict[str, tuple[Any, str]] = {
     "Edm.Duration": (timedelta(seconds=90), "duration'PT1M30S'"),
     "Edm.Guid": (uuid.UUID(int=1), str(uuid.UUID(int=1))),
     "Edm.PrimitiveType": ("v", "'v'"),
+    "Edm.Untyped": ("v", "'v'"),
 }
 
 _ENCODED = {"'k''1'": "'k''1'", "2026-01-02T03:04:05Z": "2026-01-02T03%3A04%3A05Z", "03:04:05": "03%3A04%3A05"}
@@ -262,6 +268,8 @@ def test_navigation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("Action") + endpoint_ids("Function"))
 def test_bound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
+    if endpoint_id not in _V11_ENDPOINTS:
+        fake.metadata = _V12_METADATA
     op = OPERATIONS[endpoint_id]
     binding = op["binding"]
     assert not binding["collection"], "no TM1 operation is bound to a collection yet: route one here"
@@ -276,6 +284,8 @@ def test_bound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
 
 @pytest.mark.parametrize("endpoint_id", endpoint_ids("ActionImport") + endpoint_ids("FunctionImport"))
 def test_unbound_operation(endpoint_id: str, api: Api, fake: FakeTm1) -> None:
+    if endpoint_id not in _V11_ENDPOINTS:
+        fake.metadata = _V12_METADATA
     e = next(x for x in DOC["endpoints"] if x["id"] == endpoint_id)
     op = UNBOUND[e["operation"]]
     cls_name, method = index.OPERATIONS[endpoint_id]

@@ -85,4 +85,4 @@ def test_counts_every_kind_of_endpoint(spec: dict[str, Any]) -> None:
         "Navigation ViewTitle/Subset",
     } <= endpoints
     # The same count as the Java client's CoverageGateTest
-    assert len(endpoints) == 242
+    assert len(endpoints) == 256

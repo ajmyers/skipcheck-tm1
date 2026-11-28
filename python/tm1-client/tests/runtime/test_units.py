@@ -49,7 +49,7 @@ from skipcheck_tm1.model import Tm1Operations
 from skipcheck_tm1.odata import Alias, ODataLiterals, Raw
 from skipcheck_tm1.version import Tm1Capabilities
 
-from ..conftest import SNAPSHOT
+from ..conftest import SNAPSHOTS
 
 # Tm1ErrorsTest
 
@@ -826,12 +826,12 @@ def test_needs_exactly_one_of_a_binding_and_an_import() -> None:
 def test_has_one_descriptor_per_operation_endpoint_of_the_coverage_gate(spec: dict[str, object]) -> None:
     operations = {e["id"] for e in spec["endpoints"] if e["kind"] in ("Action", "Function", "ActionImport", "FunctionImport")}  # type: ignore[index]
     assert sorted(op.endpoint() for op in Tm1Operations.ALL) == sorted(operations)
-    assert len({op.endpoint() for op in Tm1Operations.ALL}) == len(Tm1Operations.ALL) == 105
+    assert len({op.endpoint() for op in Tm1Operations.ALL}) == len(Tm1Operations.ALL) == 112
 
 
 def test_every_capability_is_one_the_snapshot_has() -> None:
-    snapshot = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
-    assert [op.endpoint() for op in Tm1Operations.ALL if not snapshot.supports(op.capability())] == []
+    snapshots = [Tm1Capabilities.parse(path.read_bytes()) for path in SNAPSHOTS]
+    assert [op.endpoint() for op in Tm1Operations.ALL if not any(s.supports(op.capability()) for s in snapshots)] == []
 
 
 def test_carries_revisions_parameters_and_return_types() -> None:
@@ -839,7 +839,10 @@ def test_carries_revisions_parameters_and_return_types() -> None:
     mdx = Tm1Operations.EXECUTE_MDX
     assert mdx.kind is Tm1Operation.Kind.ACTION
     assert mdx.import_name == "ExecuteMDX"
-    assert mdx.parameters == (Tm1Operation.Parameter("MDX", "Edm.String", False),)
+    assert mdx.parameters == (
+        Tm1Operation.Parameter("MDX", "Edm.String", False),
+        Tm1Operation.Parameter("Context", "Edm.Untyped", True),
+    )
     assert mdx.return_type == "tm1.Cellset"
     assert mdx.added_in == "10.2.2.1"
     assert any(op.deprecated() for op in Tm1Operations.ALL)

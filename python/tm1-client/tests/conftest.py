@@ -22,8 +22,14 @@ REPO = Path(__file__).resolve().parents[3]
 SPEC = REPO / "spec" / "tm1-api.json"
 CONFORMANCE = REPO / "spec" / "conformance"
 PAYLOADS = REPO / "java" / "tm1-client" / "src" / "test" / "resources" / "payloads"
-SNAPSHOT = REPO / "java" / "tm1-client" / "src" / "model" / "metadata" / "tm1-schema-11.8.35.xml"
+SNAPSHOT_DIR = REPO / "java" / "tm1-client" / "src" / "model" / "metadata"
+SNAPSHOT = SNAPSHOT_DIR / "tm1-schema-11.8.35.xml"
+SNAPSHOTS = (SNAPSHOT_DIR / "tm1-schema-11.8.35.xml", SNAPSHOT_DIR / "tm1-schema-12.6.0.xml")
 BASE = "http://tm1:8010/api/v1/"
+
+
+def snapshot(schema: str = "11.8.35") -> Path:
+    return SNAPSHOT_DIR / f"tm1-schema-{schema}.xml"
 
 
 @pytest.fixture(scope="session")

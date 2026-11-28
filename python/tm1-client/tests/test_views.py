@@ -17,7 +17,7 @@ from skipcheck_tm1 import _protocol as p
 from skipcheck_tm1._generated import model as m
 from skipcheck_tm1.version import Tm1Capabilities, Tm1Capability, Tm1Version
 
-from .conftest import BASE, SNAPSHOT, Api, FakeTm1, target
+from .conftest import BASE, SNAPSHOT, SNAPSHOTS, Api, FakeTm1, target
 
 # Views
 
@@ -180,12 +180,13 @@ def test_async_monitor_messages() -> None:
 
 
 def test_spec_lists_the_endpoints_the_coverage_gate_counts(spec: dict[str, Any]) -> None:
-    """Python reads $metadata into the same 242 endpoint IDs as the Java client's Endpoints, and
-    the spec is of the snapshot's schema (Java's ApiSpecInventoryTest)."""
-    caps = Tm1Capabilities.parse(SNAPSHOT.read_bytes())
-    assert caps.schema_version == "11.8.35"
-    assert caps.endpoints == {e["id"] for e in spec["endpoints"]}
-    assert spec["source"]["schemaVersion"] == caps.schema_version
+    """Python reads $metadata into the same 256 merged endpoint IDs as the Java client's
+    Endpoints, and the spec is of the latest merged snapshot's schema (Java's ApiSpecInventoryTest)."""
+    parsed = [Tm1Capabilities.parse(path.read_bytes()) for path in SNAPSHOTS]
+    merged_endpoints = set().union(*(c.endpoints for c in parsed))
+    assert parsed[-1].schema_version == "12.6.0"
+    assert merged_endpoints == {e["id"] for e in spec["endpoints"]}
+    assert spec["source"]["schemaVersion"] == parsed[-1].schema_version
 
 
 OLD_SERVER = b"""<?xml version="1.0" encoding="utf-8"?>

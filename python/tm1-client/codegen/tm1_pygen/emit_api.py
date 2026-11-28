@@ -201,7 +201,8 @@ def _entity_class(spec: Spec, t: dict[str, Any], index: _Index) -> list[str]:
             what = "the entity"
         out.append("")
         out.append("    @property")
-        out.append(f"    @endpoint({endpoint_id!r})")
+        if endpoint_id in spec.endpoint_by_id:
+            out.append(f"    @endpoint({endpoint_id!r})")
         out.append(f"    def {name}(self) -> {rtype}:")
         out.extend(
             docstring(
@@ -299,7 +300,8 @@ def _root(spec: Spec, index: _Index) -> list[str]:
         forbid = _forbid(spec, endpoint_id)
         out.append("")
         out.append("    @property")
-        out.append(f"    @endpoint({endpoint_id!r})")
+        if endpoint_id in spec.endpoint_by_id:
+            out.append(f"    @endpoint({endpoint_id!r})")
         out.append(f"    def {name}(self) -> {rtype}:")
         out.extend(docstring(_endpoint_doc(spec, endpoint_id, f"``{s['name']}``: the entity set.", s), "        "))
         out.append(f"        return {rtype}(self._session, ODataPath.of({s['name']!r}){', ' + forbid if forbid else ''})")
@@ -311,7 +313,8 @@ def _root(spec: Spec, index: _Index) -> list[str]:
         rtype = names.entity_class(t["name"])
         out.append("")
         out.append("    @property")
-        out.append(f"    @endpoint({endpoint_id!r})")
+        if endpoint_id in spec.endpoint_by_id:
+            out.append(f"    @endpoint({endpoint_id!r})")
         out.append(f"    def {name}(self) -> {rtype}:")
         out.extend(docstring(_endpoint_doc(spec, endpoint_id, f"``{s['name']}``: the singleton.", s), "        "))
         out.append(f"        return {rtype}(self._session, ODataPath.of({s['name']!r}), {{'delete': 'a singleton can\\'t be deleted'}})")
