@@ -703,11 +703,24 @@ export class Tm1SessionBuilder {
   }
 
   /** The session. Nothing is sent to TM1 until the first request. @throws Error if the base URL or
-   * credentials aren't set */
+   * credentials aren't set, or if application authentication is combined with {@link impersonate} or
+   * a non-TM1 12 dialect */
   build(): Tm1Session {
     const root = this.root;
     if (root === undefined) throw new Error("baseUrl is required");
     if (!this.authenticatorValue) throw new Error("credentials are required: call basicAuth or authenticator");
+    const appUser = this.authenticatorValue.applicationUser();
+    if (appUser !== undefined) {
+      checkApplicationUser(appUser);
+      if (this.impersonated !== undefined) {
+        throw new Error(
+          "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.application(clientId, clientSecret, user) instead",
+        );
+      }
+      if (this.dialectValue.authSessionUrl(root) === undefined) {
+        throw new Error("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)");
+      }
+    }
     const connection = new Connection(
       root,
       this.dialectValue,
@@ -723,6 +736,15 @@ export class Tm1SessionBuilder {
     );
     return new Tm1Session(connection, undefined, undefined, undefined, undefined);
   }
+}
+
+/** @internal */
+export function checkApplicationUser(user: string): string {
+  if (typeof user !== "string") throw new TypeError("application user must be a string");
+  if (!user.trim()) throw new RangeError("application user must not be blank");
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f-\x9f]/.test(user)) throw new RangeError("application user must not contain control characters");
+  return user;
 }
 
 /** @internal */

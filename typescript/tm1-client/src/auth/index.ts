@@ -16,10 +16,11 @@ export type Tm1Supplier = (signal?: AbortSignal) => string | Promise<string>;
  *
  * A `Tm1SessionPool` keeps one session for each set of a user's own credentials, and tells them
  * apart with {@link equals}. The authenticators here that hold their credentials ({@link basic},
- * {@link camNamespace}, {@link camPassport} given a passport, {@link cognosLogon}) are equal when the
- * credentials are. One that asks a supplier ({@link camPassport} given a supplier,
- * {@link cognosIdToken}) is only equal to itself, so keep it and pass the same one each time; so is
- * your own, unless it defines `equals`. */
+ * {@link camNamespace}, {@link camPassport} given a passport, {@link cognosLogon}, {@link bearer}
+ * given a token, {@link application}) are equal when the credentials are. One that asks a supplier
+ * ({@link camPassport} given a supplier, {@link cognosIdToken}, {@link bearer} given a supplier) is
+ * only equal to itself, so keep it and pass the same one each time; so is your own, unless it
+ * defines `equals`. */
 export abstract class Tm1Authenticator {
   /** The header to log in with; asked for at each login. A session waits for it no longer than its
    * login timeout, and aborts `signal` when it gives up. */
@@ -27,6 +28,13 @@ export abstract class Tm1Authenticator {
 
   /** Who logs in, without secrets, for logs and errors. */
   abstract describe(): string;
+
+  /** The TM1 user name for TM1 12 application (service-to-service) authentication, when logging
+   * in through `/<instance>/auth/v1/session`. Undefined for authenticators that send
+   * `Authorization` directly to the database's `ActiveSession`. */
+  applicationUser(): string | undefined {
+    return undefined;
+  }
 
   /** The description only: never the credentials. */
   toString(): string {
@@ -98,6 +106,26 @@ export abstract class Tm1Authenticator {
       fetch,
     ]);
   }
+
+  /** Bearer token authentication, for TM1 12 with OAuth2/OIDC: `Bearer <token>`. Two of these are
+   * equal when their tokens are. */
+  static bearer(token: string): Tm1Authenticator;
+  /** Bearer token authentication with a token supplied on every login, for TM1 12 with
+   * OAuth2/OIDC: `Bearer <token>`. Equal only to itself. */
+  static bearer(token: Tm1Supplier): Tm1Authenticator;
+  static bearer(token: string | Tm1Supplier): Tm1Authenticator {
+    if (typeof token === "string") return new Fixed("Bearer " + checkToken(token), "Bearer");
+    if (typeof token !== "function") throw new TypeError("token is required");
+    return new BearerSupplier(token);
+  }
+
+  /** TM1 12 (Planning Analytics Engine) service-to-service application authentication. Logs in
+   * via `POST /<instance>/auth/v1/session` with HTTP Basic `clientId:clientSecret` and a JSON body
+   * naming `user`, then resolves the session on the target database. Requires `Tm1Dialect.v12` and
+   * cannot be combined with `TM1-Impersonate`. */
+  static application(clientId: string, clientSecret: string, user: string): Tm1Authenticator {
+    return new Application(clientId, clientSecret, user);
+  }
 }
 
 /** Credentials that don't change: Basic, CAMNamespace and a passport the application holds. The
@@ -157,6 +185,89 @@ class Passport extends Tm1Authenticator {
 
   describe(): string {
     return this.description;
+  }
+}
+
+function hasControlChars(value: string): boolean {
+  // eslint-disable-next-line no-control-regex
+  return /[\x00-\x1f\x7f-\x9f]/.test(value);
+}
+
+function checkToken(token: unknown): string {
+  if (typeof token !== "string") throw new TypeError("token is required");
+  if (!token.trim()) throw new RangeError("bearer token must not be blank");
+  for (let i = 0; i < token.length; i++) {
+    const c = token.charCodeAt(i);
+    if (c <= 0x20 || c >= 0x7f) throw new RangeError("bearer token must contain only printable ASCII characters without whitespace");
+  }
+  return token;
+}
+
+function checkNonBlank(value: unknown, name: string): string {
+  if (typeof value !== "string") throw new TypeError(name + " is required");
+  if (!value.trim()) throw new RangeError(name + " must not be blank");
+  return value;
+}
+
+/** A bearer token from a supplier, asked at each login. Equal only to itself. */
+class BearerSupplier extends Tm1Authenticator {
+  readonly #token: Tm1Supplier;
+
+  constructor(token: Tm1Supplier) {
+    super();
+    this.#token = token;
+  }
+
+  async authorization(signal?: AbortSignal): Promise<string> {
+    return "Bearer " + checkToken(await this.#token(signal));
+  }
+
+  describe(): string {
+    return "Bearer";
+  }
+}
+
+/** TM1 12 application (service-to-service) credentials. Secrets are private fields so neither
+ * `JSON.stringify` nor `console.log` shows them. */
+class Application extends Tm1Authenticator {
+  readonly #clientId: string;
+  readonly #clientSecret: string;
+  readonly #user: string;
+  readonly #headerValue: string;
+  private readonly description: string;
+
+  constructor(clientId: string, clientSecret: string, user: string) {
+    super();
+    const cid = checkNonBlank(clientId, "clientId");
+    if (cid.includes(":")) throw new RangeError("clientId must not contain ':'");
+    if (hasControlChars(cid)) throw new RangeError("clientId must not contain control characters");
+    const secret = checkNonBlank(clientSecret, "clientSecret");
+    const usr = checkNonBlank(user, "user");
+    if (hasControlChars(usr)) throw new RangeError("user must not contain control characters");
+    this.#clientId = cid;
+    this.#clientSecret = secret;
+    this.#user = usr;
+    this.#headerValue = "Basic " + base64(`${cid}:${secret}`);
+    this.description = `Application ${cid} as ${usr}`;
+  }
+
+  authorization(): Promise<string> {
+    return Promise.resolve(this.#headerValue);
+  }
+
+  override applicationUser(): string {
+    return this.#user;
+  }
+
+  describe(): string {
+    return this.description;
+  }
+
+  override equals(other: unknown): boolean {
+    return (
+      this === other ||
+      (other instanceof Application && other.#clientId === this.#clientId && other.#clientSecret === this.#clientSecret && other.#user === this.#user)
+    );
   }
 }
 

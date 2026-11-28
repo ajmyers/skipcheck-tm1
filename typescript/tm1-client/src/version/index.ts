@@ -548,6 +548,14 @@ export abstract class Tm1Dialect {
     return `${url.protocol}//${url.host}${path}/ActiveSession/tm1.Close`;
   }
 
+  /** The URL a session posts to in order to log in with application (service-to-service)
+   * credentials, or undefined if this deployment doesn't have one. TM1 12 uses
+   * `/<instance>/auth/v1/session`. */
+  authSessionUrl(serviceRoot: string): string | undefined {
+    parseAbsoluteUrl(serviceRoot, "serviceRoot", "Not a service root: " + serviceRoot);
+    return undefined;
+  }
+
   /** Whether `other` is the same dialect. */
   equals(other: unknown): boolean {
     return other === this;
@@ -601,6 +609,17 @@ class V12Dialect extends Tm1Dialect {
   }
 
   override closeUrl(serviceRoot: string): string {
+    const { origin, instanceRoot } = this.parseInstanceRoot(serviceRoot);
+    return `${origin}${instanceRoot}/ActiveSession/tm1s.Close`;
+  }
+
+  override authSessionUrl(serviceRoot: string): string {
+    const { origin, instanceRoot } = this.parseInstanceRoot(serviceRoot);
+    const prefix = instanceRoot.slice(0, instanceRoot.length - "/api/v1".length);
+    return `${origin}${prefix}/auth/v1/session`;
+  }
+
+  private parseInstanceRoot(serviceRoot: string): { origin: string; instanceRoot: string } {
     const url = parseHttpUrl(serviceRoot, "serviceRoot", "Not a TM1 12 service root: " + serviceRoot);
     const path = url.pathname.replace(/\/+$/, "");
     const lastSlash = path.lastIndexOf("/");
@@ -610,9 +629,15 @@ class V12Dialect extends Tm1Dialect {
     const instanceRoot = path.slice(0, lastSlash);
     const lastSegment = path.slice(lastSlash + 1);
     if (!instanceRoot.endsWith("/api/v1") || !lastSegment.startsWith("Databases(") || !lastSegment.endsWith(")")) {
-      throw new RangeError("A TM1 12 database service root must end with /api/v1/Databases('<db>')/: " + serviceRoot);
+      throw new RangeError("A TM1 12 database service root must end with /<instance>/api/v1/Databases('<db>')/: " + serviceRoot);
     }
-    return `${url.protocol}//${url.host}${instanceRoot}/ActiveSession/tm1s.Close`;
+    const instancePrefix = instanceRoot.slice(0, instanceRoot.length - "/api/v1".length);
+    const prefixSlash = instancePrefix.lastIndexOf("/");
+    const instanceSegment = prefixSlash < 0 ? "" : instancePrefix.slice(prefixSlash + 1);
+    if (!instanceSegment || instanceSegment === "." || instanceSegment === ".." || !INSTANCE_SEGMENT.test(instanceSegment)) {
+      throw new RangeError("A TM1 12 database service root must include a valid instance segment before /api/v1: " + serviceRoot);
+    }
+    return { origin: `${url.protocol}//${url.host}`, instanceRoot };
   }
 
   override equals(other: unknown): boolean {

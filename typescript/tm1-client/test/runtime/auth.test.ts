@@ -84,16 +84,65 @@ describe("Tm1Authenticator", () => {
     expect(mine.equals(own()), "unless it defines equals").toBe(false);
   });
 
+  it("writes Bearer credentials", async () => {
+    const bearer = Tm1Authenticator.bearer("eyJ.token.sig");
+    expect(await bearer.authorization()).toBe("Bearer eyJ.token.sig");
+    expect(bearer.describe()).toBe("Bearer");
+    expect(bearer.applicationUser()).toBeUndefined();
+    expect(bearer.equals(Tm1Authenticator.bearer("eyJ.token.sig"))).toBe(true);
+    expect(bearer.equals(Tm1Authenticator.bearer("other-token"))).toBe(false);
+    expect(() => Tm1Authenticator.bearer("  ")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.bearer("bad\r\ntoken")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.bearer("Bearer eyJ.token")).toThrow(RangeError);
+  });
+
+  it("asks for a fresh bearer token on every login", async () => {
+    let issued = 0;
+    const bearer = Tm1Authenticator.bearer(() => "t" + ++issued);
+    expect(await bearer.authorization()).toBe("Bearer t1");
+    expect(await bearer.authorization()).toBe("Bearer t2");
+    expect(bearer.describe()).toBe("Bearer");
+    expect(bearer.equals(Tm1Authenticator.bearer(() => "t1"))).toBe(false);
+    await expect(Tm1Authenticator.bearer(() => "  ").authorization()).rejects.toThrow(RangeError);
+    await expect(Tm1Authenticator.bearer(() => "bad\ntoken").authorization()).rejects.toThrow(RangeError);
+  });
+
+  it("writes application credentials", async () => {
+    const app = Tm1Authenticator.application("svc-client", "s3cr3t", "analyst");
+    expect(await app.authorization()).toBe("Basic " + base64("svc-client:s3cr3t"));
+    expect(app.applicationUser()).toBe("analyst");
+    expect(app.describe()).toBe("Application svc-client as analyst");
+    expect(app.equals(Tm1Authenticator.application("svc-client", "s3cr3t", "analyst"))).toBe(true);
+    expect(app.equals(Tm1Authenticator.application("svc-client", "s3cr3t", "other"))).toBe(false);
+    expect(app.equals(Tm1Authenticator.application("svc-client", "other", "analyst"))).toBe(false);
+    expect(app.equals(Tm1Authenticator.basic("svc-client", "s3cr3t"))).toBe(false);
+    expect(() => Tm1Authenticator.application(" ", "s3cr3t", "analyst")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.application("bad:id", "s3cr3t", "analyst")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.application("bad\nid", "s3cr3t", "analyst")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.application("svc-client", " ", "analyst")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.application("svc-client", "s3cr3t", " ")).toThrow(RangeError);
+    expect(() => Tm1Authenticator.application("svc-client", "s3cr3t", "bad\nuser")).toThrow(RangeError);
+  });
+
   it("never shows credentials in toString", () => {
     expect(Tm1Authenticator.basic("admin", "apple").toString()).not.toContain("apple");
     expect(Tm1Authenticator.basic("admin", "apple").toString()).not.toContain(base64("admin:apple"));
     expect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP").toString()).not.toContain("secret");
     expect(Tm1Authenticator.camPassport(() => Promise.resolve("passport-value")).toString()).not.toContain("passport-value");
+    expect(Tm1Authenticator.bearer("secret-jwt").toString()).not.toContain("secret-jwt");
+    expect(Tm1Authenticator.bearer(() => Promise.resolve("secret-jwt")).toString()).not.toContain("secret-jwt");
+    const app = Tm1Authenticator.application("svc-client", "s3cr3t", "analyst");
+    expect(app.toString()).not.toContain("s3cr3t");
+    expect(app.toString()).not.toContain(base64("svc-client:s3cr3t"));
     for (const shown of [
       JSON.stringify(Tm1Authenticator.basic("admin", "apple")),
       inspect(Tm1Authenticator.basic("admin", "apple"), { showHidden: true, depth: 5 }),
     ]) {
       expect(shown).not.toContain(base64("admin:apple"));
+    }
+    for (const shown of [JSON.stringify(app), inspect(app, { showHidden: true, depth: 5 })]) {
+      expect(shown).not.toContain("s3cr3t");
+      expect(shown).not.toContain(base64("svc-client:s3cr3t"));
     }
     expect(inspect(Tm1Authenticator.camNamespace("alice", "secret", "LDAP"), { showHidden: true })).not.toContain(base64("alice:secret:LDAP"));
   });
