@@ -2,20 +2,39 @@
 
 package io.skipcheck.tm1.client.session;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
+import org.reactivestreams.Publisher;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferFactory;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.reactive.AbstractClientHttpRequest;
+import org.springframework.http.codec.HttpMessageWriter;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserter;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
@@ -122,6 +141,91 @@ final class FakeTm1 implements ExchangeFunction {
 
 	static String authorization(ClientRequest request) {
 		return request.headers().getFirst(HttpHeaders.AUTHORIZATION);
+	}
+
+	/** Captures the request's body as UTF-8 text. */
+	static String bodyText(ClientRequest request) {
+		AtomicReference<String> captured = new AtomicReference<>("");
+		AbstractClientHttpRequest sink = new AbstractClientHttpRequest() {
+			@Override
+			public HttpMethod getMethod() {
+				return request.method();
+			}
+
+			@Override
+			public URI getURI() {
+				return request.url();
+			}
+
+			@Override
+			public DataBufferFactory bufferFactory() {
+				return DefaultDataBufferFactory.sharedInstance;
+			}
+
+			@Override
+			@SuppressWarnings("TypeParameterUnusedInFormals")
+			public <T> T getNativeRequest() {
+				throw new UnsupportedOperationException();
+			}
+
+			@Override
+			protected void applyHeaders() {
+			}
+
+			@Override
+			protected void applyCookies() {
+			}
+
+			@Override
+			protected HttpHeaders initReadOnlyHeaders() {
+				return HttpHeaders.readOnlyHttpHeaders(new HttpHeaders());
+			}
+
+			@Override
+			public MultiValueMap<String, HttpCookie> getCookies() {
+				return new LinkedMultiValueMap<>();
+			}
+
+			@Override
+			public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
+				return DataBufferUtils.join(Flux.from(body)).doOnNext(buffer -> {
+					try {
+						captured.set(buffer.toString(StandardCharsets.UTF_8));
+					}
+					finally {
+						DataBufferUtils.release(buffer);
+					}
+				}).then();
+			}
+
+			@Override
+			public Mono<Void> writeAndFlushWith(Publisher<? extends Publisher<? extends DataBuffer>> body) {
+				return writeWith(Flux.from(body).flatMap(Flux::from));
+			}
+
+			@Override
+			public Mono<Void> setComplete() {
+				return Mono.empty();
+			}
+		};
+		BodyInserter.Context context = new BodyInserter.Context() {
+			@Override
+			public List<HttpMessageWriter<?>> messageWriters() {
+				return ExchangeStrategies.withDefaults().messageWriters();
+			}
+
+			@Override
+			public Optional<ServerHttpRequest> serverRequest() {
+				return Optional.empty();
+			}
+
+			@Override
+			public Map<String, Object> hints() {
+				return Map.of();
+			}
+		};
+		request.body().insert(sink, context).block();
+		return captured.get();
 	}
 
 	static ClientResponse json(int status, String body, String... setCookies) {

@@ -651,7 +651,11 @@ public final class Tm1Session {
 		/**
 		 * The session. Nothing is sent to TM1 until the first request.
 		 * @return a new session
-		 * @throws IllegalStateException if the base URL or credentials aren't set
+		 * @throws IllegalStateException if the base URL or credentials aren't set, or if
+		 * application authentication is combined with {@link #impersonate} or a non-TM1
+		 * 12 dialect
+		 * @throws IllegalArgumentException if an application authenticator supplies an
+		 * invalid user name
 		 */
 		public Tm1Session build() {
 			if (baseUrl == null) {
@@ -659,6 +663,18 @@ public final class Tm1Session {
 			}
 			if (authenticator == null) {
 				throw new IllegalStateException("credentials are required: call basicAuth or authenticator");
+			}
+			String appUser = authenticator.applicationUser().orElse(null);
+			if (appUser != null) {
+				Connection.checkApplicationUser(appUser);
+				if (impersonate != null) {
+					throw new IllegalStateException(
+							"TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.application(clientId, clientSecret, user) instead");
+				}
+				if (dialect.authSessionUrl(baseUrl).isEmpty()) {
+					throw new IllegalStateException(
+							"TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)");
+				}
 			}
 			ClientHttpConnector http = connector != null ? connector : nettyConnector(timeouts);
 			WebClient web = (webClient != null ? webClient : WebClient.builder()).clientConnector(http)

@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client.version;
 
 import java.net.URI;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * How to reach a kind of TM1 deployment: structural differences such as the REST API's
@@ -101,6 +102,23 @@ public interface Tm1Dialect {
 		URI uri = V12Dialect.parseAbsoluteUri(serviceRoot, "serviceRoot", "Not a service root: " + serviceRoot);
 		String path = V12Dialect.stripTrailingSlashes(uri.getRawPath());
 		return uri.getScheme() + "://" + uri.getRawAuthority() + path + "/ActiveSession/tm1.Close";
+	}
+
+	/**
+	 * The URL a session posts to in order to log in with application (service-to-service)
+	 * credentials, if this deployment supports it.
+	 *
+	 * <p>
+	 * TM1 11 has no separate auth service and returns empty. TM1 12 (Planning Analytics
+	 * Engine) exchanges application credentials at {@code /<instance>/auth/v1/session}.
+	 * @param serviceRoot the database REST API's service root
+	 * @return the full auth session URL, or empty if this dialect doesn't have one
+	 * @throws IllegalArgumentException if {@code serviceRoot} isn't a valid service root
+	 * for this dialect
+	 */
+	default Optional<String> authSessionUrl(String serviceRoot) {
+		V12Dialect.parseAbsoluteUri(serviceRoot, "serviceRoot", "Not a service root: " + serviceRoot);
+		return Optional.empty();
 	}
 
 }

@@ -4,6 +4,7 @@ package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
@@ -23,6 +24,7 @@ import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.test.scheduler.VirtualTimeScheduler;
@@ -245,6 +247,46 @@ class Tm1SessionPoolTest {
 			.isNotEqualTo(Tm1Identity.withCredentials("alice", Tm1Authenticator.basic("alice", "a")));
 		assertThat(Tm1Identity.withCredentials("carol", Tm1Authenticator.basic("carol", "secret")).toString())
 			.doesNotContain("secret");
+	}
+
+	@Test
+	void poolsPerUserApplicationSessions() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		String authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+		FakeTm1 v12 = new FakeTm1()
+			.onEach(authUrl, r -> Mono.just(FakeTm1.status(201, "TM1SessionId=u1; Path=/; HttpOnly")),
+					r -> Mono.just(FakeTm1.status(201, "TM1SessionId=u2; Path=/; HttpOnly")))
+			.on("GET " + dbRoot + "ActiveSession?$select=ID", r -> Mono.just(FakeTm1.json(200, "{\"ID\":1}")))
+			.on("GET " + dbRoot + "Server", r -> Mono.just(FakeTm1.json(200, "{}")))
+			.on("POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close", r -> Mono.just(FakeTm1.status(204)));
+
+		Tm1SessionPool v12Pool = Tm1SessionPool
+			.builder(Tm1Session.builder()
+				.dialect(Tm1Dialect.v12("sales"))
+				.address("http://tm1.test")
+				.authenticator(Tm1Authenticator.application("svc", "secret", "default-user"))
+				.webClient(WebClient.builder().exchangeFunction(v12)))
+			.scheduler(time)
+			.build();
+		try {
+			Tm1Session alice = v12Pool
+				.session(Tm1Identity.withCredentials("alice", Tm1Authenticator.application("svc", "secret", "alice")));
+			assertThat(v12Pool
+				.session(Tm1Identity.withCredentials("ALICE", Tm1Authenticator.application("svc", "secret", "alice"))))
+				.isSameAs(alice);
+			Tm1Session bob = v12Pool
+				.session(Tm1Identity.withCredentials("bob", Tm1Authenticator.application("svc", "secret", "bob")));
+			assertThat(bob).isNotSameAs(alice);
+			assertThatIllegalStateException().isThrownBy(() -> v12Pool.session(Tm1Identity.impersonating("charlie")));
+
+			alice.execute(SERVER).block();
+			bob.execute(SERVER).block();
+			assertThat(v12.requests(authUrl)).extracting(FakeTm1::bodyText)
+				.containsExactly("{\"User\":\"alice\"}", "{\"User\":\"bob\"}");
+		}
+		finally {
+			v12Pool.close().block(Duration.ofSeconds(5));
+		}
 	}
 
 	private Tm1SessionPool pool(UnaryOperator<Tm1SessionPool.Builder> settings) {

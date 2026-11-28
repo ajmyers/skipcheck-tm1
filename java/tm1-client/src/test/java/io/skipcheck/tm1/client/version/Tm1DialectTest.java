@@ -102,7 +102,28 @@ class Tm1DialectTest {
 			.isThrownBy(() -> Tm1Dialect.v12("sales").closeUrl("http://engine:4444/tm1/api/v1/"));
 		assertThatIllegalArgumentException()
 			.isThrownBy(() -> Tm1Dialect.v12("sales").closeUrl("http://engine:4444/api/v1/"));
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> Tm1Dialect.v12("sales").closeUrl("http://engine:4444/api/v1/Databases('sales')/"));
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> Tm1Dialect.v12("sales").closeUrl("http://engine:4444//api/v1/Databases('sales')/"));
 		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Dialect.V11.closeUrl("not a url"));
+	}
+
+	@Test
+	void findsTheTm112AuthSessionUrl() {
+		Tm1Dialect sales = Tm1Dialect.v12("sales");
+		assertThat(Tm1Dialect.V11.authSessionUrl("http://tm1:8010/api/v1/")).isEmpty();
+		assertThatIllegalArgumentException().isThrownBy(() -> Tm1Dialect.V11.authSessionUrl("not a url"));
+		assertThat(sales.authSessionUrl("http://engine:4444/tm1/api/v1/Databases('sales')/"))
+			.contains("http://engine:4444/tm1/auth/v1/session");
+		assertThat(Tm1Dialect.v12("prod", "O'Neil Sales")
+			.authSessionUrl("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')"))
+			.contains("https://proxy/pa/prod/auth/v1/session");
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> sales.authSessionUrl("http://engine:4444/api/v1/Databases('sales')/"));
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> sales.authSessionUrl("http://engine:4444//api/v1/Databases('sales')/"));
+		assertThatIllegalArgumentException().isThrownBy(() -> sales.authSessionUrl("http://engine:4444/tm1/api/v1/"));
 	}
 
 }

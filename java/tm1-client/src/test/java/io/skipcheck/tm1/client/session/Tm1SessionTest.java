@@ -3,12 +3,16 @@
 package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -26,7 +30,9 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.error.Tm1ApiException;
 import io.skipcheck.tm1.client.error.Tm1AuthenticationException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
+import io.skipcheck.tm1.client.error.Tm1ForbiddenException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
+import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 import io.skipcheck.tm1.client.error.Tm1TransportException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
@@ -366,6 +372,185 @@ class Tm1SessionTest {
 				assertThat(a.error().message()).isEqualTo("Unable to validate authorization header");
 			}))
 			.verify();
+	}
+
+	@Test
+	void logsInWithBearerTokenAndRefreshesOnExpiry() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		String login = "GET " + dbRoot + "ActiveSession?$select=ID";
+		String server = "GET " + dbRoot + "Server?$select=Name";
+		AtomicInteger issued = new AtomicInteger();
+		FakeTm1 v12 = new FakeTm1()
+			.onEach(login, r -> Mono.just(FakeTm1.json(200, "{\"ID\":10}", "TM1SessionId=s10; Path=/; HttpOnly")),
+					r -> Mono.just(FakeTm1.json(200, "{\"ID\":11}", "TM1SessionId=s11; Path=/; HttpOnly")))
+			.onEach(server, r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")),
+					r -> Mono.just(FakeTm1.status(401, "TM1SessionId=s10; Path=/; Max-Age=0")),
+					r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.bearer(() -> Mono.fromSupplier(() -> "jwt-" + issued.incrementAndGet())))
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+
+		List<ClientRequest> logins = v12.requests(login);
+		assertThat(logins).hasSize(2);
+		assertThat(FakeTm1.authorization(logins.get(0))).isEqualTo("Bearer jwt-1");
+		assertThat(FakeTm1.authorization(logins.get(1))).isEqualTo("Bearer jwt-2");
+		assertThat(FakeTm1.cookie(logins.get(1))).as("expired Max-Age=0 cookie is not sent back").isNull();
+		List<ClientRequest> reads = v12.requests(server);
+		assertThat(reads).hasSize(3);
+		assertThat(FakeTm1.cookie(reads.get(0))).isEqualTo("s10");
+		assertThat(FakeTm1.authorization(reads.get(0))).isNull();
+		assertThat(FakeTm1.cookie(reads.get(2))).isEqualTo("s11");
+	}
+
+	@Test
+	void logsInWithApplicationCredentialsAndSetsSessionContext() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		String authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+		String activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+		String serverUrl = "GET " + dbRoot + "Server?$select=Name";
+		String closeUrl = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+		FakeTm1 v12 = new FakeTm1()
+			.on(authUrl, r -> Mono.just(FakeTm1.status(201, "TM1SessionId=app1; Path=/; HttpOnly")))
+			.on(activeUrl, r -> Mono.just(FakeTm1.json(200, "{\"ID\":42}")))
+			.on(serverUrl, r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")))
+			.on(closeUrl, r -> Mono.just(FakeTm1.status(204, "TM1SessionId=app1; Path=/; Max-Age=0")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+			.sessionContext("reporting-service")
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER))
+			.assertNext(n -> assertThat(n.path("Name").asString()).isEqualTo("sales"))
+			.verifyComplete();
+		StepVerifier.create(session.sessionId()).expectNext(42L).verifyComplete();
+		StepVerifier.create(session.close()).verifyComplete();
+
+		ClientRequest authReq = v12.requests(authUrl).get(0);
+		assertThat(FakeTm1.authorization(authReq))
+			.isEqualTo("Basic " + Base64.getEncoder().encodeToString("my-app:s3cr3t".getBytes(StandardCharsets.UTF_8)));
+		assertThat(authReq.headers().getFirst(Connection.SESSION_CONTEXT)).isNull();
+		assertThat(FakeTm1.bodyText(authReq)).isEqualTo("{\"User\":\"analyst\"}");
+
+		ClientRequest activeReq = v12.requests(activeUrl).get(0);
+		assertThat(FakeTm1.cookie(activeReq)).isEqualTo("app1");
+		assertThat(FakeTm1.authorization(activeReq)).isNull();
+		assertThat(activeReq.headers().getFirst(Connection.SESSION_CONTEXT)).isEqualTo("reporting-service");
+
+		assertThat(v12.requests(closeUrl)).hasSize(1);
+		assertThat(FakeTm1.cookie(v12.requests(closeUrl).get(0))).isEqualTo("app1");
+	}
+
+	@Test
+	void failsFastWhenApplicationUserIsForbiddenInDatabase() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		FakeTm1 v12 = new FakeTm1()
+			.on("POST http://tm1.test/tm1/auth/v1/session",
+					r -> Mono.just(FakeTm1.status(201, "TM1SessionId=app2; Path=/; HttpOnly")))
+			.on("GET " + dbRoot + "ActiveSession?$select=ID",
+					r -> Mono.just(FakeTm1.json(403, "{\"error\":{\"code\":\"\",\"message\":\"Forbidden\"}}")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "ghost"))
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER)).expectError(Tm1ForbiddenException.class).verify();
+		assertThat(v12.requests("GET " + dbRoot + "Server?$select=Name")).isEmpty();
+	}
+
+	@Test
+	void reportsRefusedApplicationCredentials() {
+		FakeTm1 v12 = new FakeTm1().on("POST http://tm1.test/tm1/auth/v1/session", r -> Mono.just(
+				FakeTm1.json(401, "{\"error\":\"invalid_client\",\"error_details\":\"Invalid client credentials\"}")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "wrong", "analyst"))
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1AuthenticationException.class, a -> {
+				assertThat(a.kind()).isEqualTo(Tm1ErrorKind.CREDENTIAL_REJECTED);
+				assertThat(a.error()).isNotNull();
+				assertThat(a.error().code()).isEqualTo("invalid_client");
+				assertThat(a.error().message()).isEqualTo("Invalid client credentials");
+			}))
+			.verify();
+	}
+
+	@Test
+	void refusesApplicationAuthWithoutTm112DialectOrWithImpersonate() {
+		assertThatIllegalStateException().isThrownBy(() -> Tm1Session.builder()
+			.address("http://tm1.test:8010")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+			.build());
+		assertThatIllegalStateException().isThrownBy(() -> Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+			.impersonate("someone-else")
+			.build());
+	}
+
+	@Test
+	void relogsInWithApplicationCredentialsAfterMaxAgeZero401() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		String authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+		String activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+		String serverUrl = "GET " + dbRoot + "Server?$select=Name";
+		FakeTm1 v12 = new FakeTm1()
+			.onEach(authUrl, r -> Mono.just(FakeTm1.status(201, "TM1SessionId=a1; Path=/; HttpOnly")),
+					r -> Mono.just(FakeTm1.status(201, "TM1SessionId=a2; Path=/; HttpOnly")))
+			.onEach(activeUrl, r -> Mono.just(FakeTm1.json(200, "{\"ID\":1}")),
+					r -> Mono.just(FakeTm1.json(200, "{\"ID\":2}")))
+			.onEach(serverUrl, r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")),
+					r -> Mono.just(FakeTm1.status(401, "TM1SessionId=a1; Path=/; Max-Age=0")),
+					r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+
+		assertThat(v12.requests(authUrl)).hasSize(2);
+		assertThat(FakeTm1.cookie(v12.requests(authUrl).get(1))).isNull();
+		assertThat(v12.requests(activeUrl)).hasSize(2);
+		assertThat(FakeTm1.cookie(v12.requests(activeUrl).get(1))).isEqualTo("a2");
+		assertThat(FakeTm1.cookie(v12.requests(serverUrl).get(2))).isEqualTo("a2");
+		StepVerifier.create(session.sessionId()).expectNext(2L).verifyComplete();
+	}
+
+	@Test
+	void reportsProtocolErrorWhenApplicationLoginSetsNoCookie() {
+		FakeTm1 v12 = new FakeTm1().on("POST http://tm1.test/tm1/auth/v1/session", r -> Mono.just(FakeTm1.status(201)));
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER)).expectError(Tm1ProtocolException.class).verify();
 	}
 
 	/** A body Jackson can't write: reading its property fails. */

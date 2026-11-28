@@ -5,6 +5,7 @@ package io.skipcheck.tm1.client.version;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -82,6 +83,19 @@ final class V12Dialect implements Tm1Dialect {
 
 	@Override
 	public String closeUrl(String serviceRoot) {
+		InstanceRoot root = parseInstanceRoot(serviceRoot);
+		return root.origin() + root.instanceApiPath() + "/ActiveSession/tm1s.Close";
+	}
+
+	@Override
+	public Optional<String> authSessionUrl(String serviceRoot) {
+		InstanceRoot root = parseInstanceRoot(serviceRoot);
+		String instancePrefix = root.instanceApiPath()
+			.substring(0, root.instanceApiPath().length() - "/api/v1".length());
+		return Optional.of(root.origin() + instancePrefix + "/auth/v1/session");
+	}
+
+	private static InstanceRoot parseInstanceRoot(String serviceRoot) {
 		URI uri = parseHttpUri(serviceRoot, "serviceRoot", "Not a TM1 12 service root: " + serviceRoot);
 		String path = stripTrailingSlashes(uri.getRawPath());
 		int lastSlash = path.lastIndexOf('/');
@@ -93,9 +107,22 @@ final class V12Dialect implements Tm1Dialect {
 		String lastSegment = path.substring(lastSlash + 1);
 		if (!instanceRoot.endsWith("/api/v1") || !lastSegment.startsWith("Databases(") || !lastSegment.endsWith(")")) {
 			throw new IllegalArgumentException(
-					"A TM1 12 database service root must end with /api/v1/Databases('<db>')/: " + serviceRoot);
+					"A TM1 12 database service root must end with /<instance>/api/v1/Databases('<db>')/: "
+							+ serviceRoot);
 		}
-		return uri.getScheme() + "://" + uri.getRawAuthority() + instanceRoot + "/ActiveSession/tm1s.Close";
+		String instancePrefix = instanceRoot.substring(0, instanceRoot.length() - "/api/v1".length());
+		int prefixSlash = instancePrefix.lastIndexOf('/');
+		String instanceSegment = prefixSlash < 0 ? "" : instancePrefix.substring(prefixSlash + 1);
+		if (instanceSegment.isEmpty() || instanceSegment.equals(".") || instanceSegment.equals("..")
+				|| !INSTANCE_SEGMENT.matcher(instanceSegment).matches()) {
+			throw new IllegalArgumentException(
+					"A TM1 12 database service root must include a valid instance segment before /api/v1: "
+							+ serviceRoot);
+		}
+		return new InstanceRoot(uri.getScheme() + "://" + uri.getRawAuthority(), instanceRoot);
+	}
+
+	private record InstanceRoot(String origin, String instanceApiPath) {
 	}
 
 	@Override

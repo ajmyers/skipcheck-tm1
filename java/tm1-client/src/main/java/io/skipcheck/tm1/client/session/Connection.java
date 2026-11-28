@@ -95,7 +95,11 @@ final class Connection {
 
 	private final URI closeUri;
 
+	private final @Nullable URI authSessionUri;
+
 	private final Tm1Authenticator authenticator;
+
+	private final @Nullable String applicationUser;
 
 	private final @Nullable String sessionContext;
 
@@ -142,7 +146,20 @@ final class Connection {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
 		this.closeUri = URI.create(Objects.requireNonNull(dialect, "dialect").closeUrl(root));
+		this.authSessionUri = dialect.authSessionUrl(root).map(URI::create).orElse(null);
 		this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
+		this.applicationUser = authenticator.applicationUser().orElse(null);
+		if (this.applicationUser != null) {
+			checkApplicationUser(this.applicationUser);
+			if (impersonate != null) {
+				throw new IllegalStateException(
+						"TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.application(clientId, clientSecret, user) instead");
+			}
+			if (this.authSessionUri == null) {
+				throw new IllegalStateException(
+						"TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)");
+			}
+		}
 		this.sessionContext = sessionContext;
 		this.impersonate = impersonate;
 		this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
@@ -151,6 +168,18 @@ final class Connection {
 		this.classifier = Objects.requireNonNull(classifier, "classifier");
 		this.mapper = Objects.requireNonNull(mapper, "mapper");
 		this.observations = Objects.requireNonNull(observations, "observations");
+	}
+
+	static String checkApplicationUser(String user) {
+		if (user.isBlank()) {
+			throw new IllegalArgumentException("application user must not be blank");
+		}
+		for (int i = 0; i < user.length(); i++) {
+			if (Character.isISOControl(user.charAt(i))) {
+				throw new IllegalArgumentException("application user must not contain control characters");
+			}
+		}
+		return user;
 	}
 
 	String root() {
@@ -668,7 +697,8 @@ final class Connection {
 	// Login and close
 
 	private Mono<LoggedIn> login(@Nullable String seedCookie, String reason) {
-		URI uri = uri(LOGIN_PATH);
+		URI targetUri = applicationUser != null && authSessionUri != null ? authSessionUri : uri(LOGIN_PATH);
+		String targetMethod = applicationUser != null ? "POST" : "GET";
 		// The authenticator's own failures (say, a passport it couldn't get) reach the
 		// caller unchanged; only the login request's are mapped. It gets the login's
 		// timeout too: it may ask another server (Cognos, for a passport), and one that
@@ -677,15 +707,73 @@ final class Connection {
 			.switchIfEmpty(Mono.error(() -> new IllegalStateException(
 					"The authenticator " + authenticator.describe() + " supplied no credentials")))
 			.timeout(timeouts.login(),
-					Mono.error(() -> new Tm1TransportException(Tm1TransportException.Phase.CONNECT, true, "GET",
-							uri.toString(),
+					Mono.error(() -> new Tm1TransportException(Tm1TransportException.Phase.CONNECT, true, targetMethod,
+							targetUri.toString(),
 							new TimeoutException("The authenticator " + authenticator.describe()
 									+ " supplied no credentials within " + timeouts.login()))))
-			.flatMap(authorization -> sendLogin(uri, authorization, seedCookie));
+			.flatMap(authorization -> applicationUser != null && authSessionUri != null
+					? sendApplicationLogin(authSessionUri, authorization, applicationUser)
+					: sendLogin(targetUri, authorization, seedCookie));
 		return observe("tm1.session.login", "tm1 login", reason, login)
 			.doOnNext(session -> log.info("Logged in to TM1 at {} as {} (session {}, {})", root,
 					authenticator.describe(), session.sessionId(), reason))
 			.doOnError(e -> log.debug("Login to TM1 at {} failed", root, e));
+	}
+
+	private Mono<LoggedIn> sendApplicationLogin(URI authUri, String authorization, String user) {
+		return Mono.defer(() -> web.post().uri(authUri).headers(h -> {
+			odataHeaders(h, Tm1Request.Response.SINGLE);
+			h.set(HttpHeaders.AUTHORIZATION, authorization);
+		})
+			.httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.login()))
+			.contentType(MediaType.APPLICATION_JSON)
+			.bodyValue(json(Map.of("User", user)))
+			.exchangeToMono(response -> {
+				int status = response.statusCode().value();
+				if (status == 401) {
+					return bytes(response).flatMap(body -> Mono.error(Tm1ApiException.of(401,
+							Tm1ErrorKind.CREDENTIAL_REJECTED, parseError(body), "POST", authUri.toString())));
+				}
+				if (status >= 400) {
+					return error(response, "POST", authUri);
+				}
+				String cookie = cookie(response);
+				return response.releaseBody().then(Mono.defer(() -> {
+					if (cookie == null) {
+						return Mono.error(new Tm1ProtocolException(
+								"TM1 accepted the application login but set no " + COOKIE + " cookie", null, "POST",
+								authUri.toString(), null));
+					}
+					return Mono.just(cookie);
+				}));
+			}))
+			.onErrorMap(e -> Transport.map(e, "POST", authUri.toString(), true))
+			.flatMap(this::activateApplicationSession);
+	}
+
+	private Mono<LoggedIn> activateApplicationSession(String cookie) {
+		URI activeUri = uri(LOGIN_PATH);
+		return Mono.defer(() -> web.get().uri(activeUri).headers(h -> {
+			odataHeaders(h, Tm1Request.Response.SINGLE);
+			if (sessionContext != null) {
+				h.set(SESSION_CONTEXT, HeaderText.utf8(sessionContext));
+			}
+		})
+			.cookie(COOKIE, cookie)
+			.httpRequest(r -> responseTimeout(r.getNativeRequest(), timeouts.login()))
+			.exchangeToMono(response -> {
+				int status = response.statusCode().value();
+				if (status == 401) {
+					return bytes(response).flatMap(body -> Mono.error(Tm1ApiException.of(401,
+							Tm1ErrorKind.CREDENTIAL_REJECTED, parseError(body), "GET", activeUri.toString())));
+				}
+				if (status >= 400) {
+					return error(response, "GET", activeUri);
+				}
+				String refreshed = cookie(response);
+				String effective = refreshed != null ? refreshed : cookie;
+				return bytes(response).map(body -> loggedIn(effective, body, activeUri));
+			})).onErrorMap(e -> Transport.map(e, "GET", activeUri.toString(), true));
 	}
 
 	private Mono<LoggedIn> sendLogin(URI uri, String authorization, @Nullable String seedCookie) {
