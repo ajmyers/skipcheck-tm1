@@ -20,7 +20,7 @@ namespace Skipcheck.Tm1.Client.Session;
 /// <summary>A session with one TM1 server, and views of it, as the Java client's <c>Tm1Session</c>.
 /// A view shares the login and connections, and changes how requests are sent:
 /// <see cref="WithSandbox"/> (TM1's <c>!sandbox</c>), <see cref="WithChangeSet"/>
-/// (<c>!ChangeSet</c>), <see cref="WithAsync"/> (OData's <c>Prefer: respond-async</c>, polled
+/// (<c>!ChangeSet</c>), <see cref="WithAsync(TimeSpan)"/> (OData's <c>Prefer: respond-async</c>, polled
 /// until done; cancelling deletes the monitor, which stops the work on TM1) and <see cref="Batch"/>
 /// (JSON <c>$batch</c>). Views are derived rather than set, so one caller's sandbox can't leak into
 /// another's requests.</summary>
@@ -30,14 +30,16 @@ public sealed class Tm1Session : IAsyncDisposable
     private readonly string? _sandbox;
     private readonly string? _changeSet;
     private readonly TimeSpan? _async;
+    private readonly TimeSpan? _asyncWait;
     private readonly BatchQueue? _batch;
 
-    internal Tm1Session(Connection connection, string? sandbox, string? changeSet, TimeSpan? async, BatchQueue? batch)
+    internal Tm1Session(Connection connection, string? sandbox, string? changeSet, TimeSpan? async, BatchQueue? batch, TimeSpan? asyncWait = null)
     {
         _connection = connection;
         _sandbox = sandbox;
         _changeSet = changeSet;
         _async = async;
+        _asyncWait = asyncWait;
         _batch = batch;
     }
 
@@ -70,6 +72,9 @@ public sealed class Tm1Session : IAsyncDisposable
     /// <summary>How often this view polls an async request's monitor, or null.</summary>
     public TimeSpan? Async() => _async;
 
+    /// <summary>How long this view asks TM1 to wait before returning 202 (<c>Prefer: wait=&lt;N&gt;</c>), or null.</summary>
+    public TimeSpan? AsyncWait() => _asyncWait;
+
     /// <summary>Whether <see cref="CloseAsync"/> has been called.</summary>
     public bool IsClosed() => _connection.IsClosed;
 
@@ -93,12 +98,12 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("sandbox name is blank");
         }
-        return new(_connection, name, _changeSet, _async, _batch);
+        return new(_connection, name, _changeSet, _async, _batch, _asyncWait);
     }
 
     /// <summary>A view of this session whose requests run outside any sandbox, in base data; this
     /// session if it has no sandbox.</summary>
-    public Tm1Session WithoutSandbox() => _sandbox is null ? this : new(_connection, null, _changeSet, _async, _batch);
+    public Tm1Session WithoutSandbox() => _sandbox is null ? this : new(_connection, null, _changeSet, _async, _batch, _asyncWait);
 
     /// <summary>A view of this session whose writes are recorded in change set
     /// <paramref name="id"/> (from <c>BeginChangeSet</c>): each request gets TM1's
@@ -112,20 +117,21 @@ public sealed class Tm1Session : IAsyncDisposable
         {
             throw new ArgumentException("change set ID is blank");
         }
-        return new(_connection, _sandbox, id, _async, _batch);
+        return new(_connection, _sandbox, id, _async, _batch, _asyncWait);
     }
 
     /// <summary>A view of this session whose writes go into no change set; this session if it has
     /// none.</summary>
-    public Tm1Session WithoutChangeSet() => _changeSet is null ? this : new(_connection, _sandbox, null, _async, _batch);
+    public Tm1Session WithoutChangeSet() => _changeSet is null ? this : new(_connection, _sandbox, null, _async, _batch, _asyncWait);
 
     /// <summary>A view of this session whose requests TM1 runs asynchronously (OData's <c>Prefer:
     /// respond-async</c>): each returns at once with a monitor, which the client polls every
     /// <paramref name="every"/> until the result is there, so a long process or chore never holds a
     /// request open for its whole run. Methods return what they always do. Cancelling before the
     /// result deletes the monitor, which stops the work on TM1: a process run ends as
-    /// <c>TM1UserException: Cancel</c>. Raw byte requests (document content) aren't sent async. TM1
-    /// (11.8) sends no <c>Retry-After</c>, so <paramref name="every"/> is the only pace.</summary>
+    /// <c>TM1UserException: Cancel</c>. On TM1 12, completed monitors return the body directly with
+    /// an <c>Asyncresult</c> header and are deleted on a best-effort basis once read. Raw byte
+    /// requests (document content) aren't sent async.</summary>
     /// <exception cref="ArgumentException"><paramref name="every"/> isn't positive.</exception>
     public Tm1Session WithAsync(TimeSpan every)
     {
@@ -136,9 +142,32 @@ public sealed class Tm1Session : IAsyncDisposable
         return new(_connection, _sandbox, _changeSet, every, _batch);
     }
 
+    /// <summary>A view of this session whose requests TM1 runs asynchronously with OData's
+    /// <c>Prefer: respond-async, wait=&lt;N&gt;</c>. If the work finishes within <paramref name="wait"/>,
+    /// TM1 answers with the final result directly without polling; otherwise it answers 202 with a
+    /// monitor polled every <paramref name="every"/>. TM1 11 ignores <c>wait</c> and answers 202 at
+    /// once, which degrades silently.</summary>
+    /// <exception cref="ArgumentException"><paramref name="every"/> isn't positive, or <paramref name="wait"/> isn't non-negative whole seconds.</exception>
+    public Tm1Session WithAsync(TimeSpan every, TimeSpan wait)
+    {
+        if (every <= TimeSpan.Zero)
+        {
+            throw new ArgumentException("The poll interval must be positive: " + every);
+        }
+        if (wait < TimeSpan.Zero)
+        {
+            throw new ArgumentException("The async wait duration must not be negative: " + wait);
+        }
+        if (wait.Ticks % TimeSpan.TicksPerSecond != 0)
+        {
+            throw new ArgumentException("The async wait duration must be whole seconds: " + wait);
+        }
+        return new(_connection, _sandbox, _changeSet, every, _batch, wait);
+    }
+
     /// <summary>A view of this session whose requests run synchronously, as usual; this session if
     /// it isn't async.</summary>
-    public Tm1Session WithoutAsync() => _async is null ? this : new(_connection, _sandbox, _changeSet, null, _batch);
+    public Tm1Session WithoutAsync() => _async is null && _asyncWait is null ? this : new(_connection, _sandbox, _changeSet, null, _batch);
 
     /// <summary>Starts a JSON <c>$batch</c>: its <see cref="Tm1SessionBatch.Session"/> is a view of
     /// this one whose requests are queued, and <c>RunAsync</c> sends them.</summary>
@@ -195,7 +224,7 @@ public sealed class Tm1Session : IAsyncDisposable
             return (T)(await _batch.Add(this, request, r => Read(request, r)).ConfigureAwait(false))!;
         }
         request = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
-        var reply = await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false);
+        var reply = await SendAsync(request, Target(request.RelativeUri()), _async, _asyncWait, cancellationToken).ConfigureAwait(false);
         return Read(request, reply);
     }
 
@@ -226,7 +255,7 @@ public sealed class Tm1Session : IAsyncDisposable
             {
                 running = _connection.Running();
                 request = await PrepareAsync(request, cancellationToken).ConfigureAwait(false);
-                page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, cancellationToken).ConfigureAwait(false));
+                page = ReadPage(request, await SendAsync(request, Target(request.RelativeUri()), _async, _asyncWait, cancellationToken).ConfigureAwait(false));
             }
             while (true)
             {
@@ -242,7 +271,7 @@ public sealed class Tm1Session : IAsyncDisposable
                 // request, whatever the view: the rest of the collection isn't part of the async result or
                 // the batch
                 request = request with { Query = ODataQuery.None() };
-                page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, cancellationToken).ConfigureAwait(false));
+                page = ReadPage(request, await SendAsync(request, _connection.Url(page.NextLink), null, null, cancellationToken).ConfigureAwait(false));
             }
         }
         finally
@@ -342,14 +371,14 @@ public sealed class Tm1Session : IAsyncDisposable
 
     /// <summary>Sends <paramref name="request"/> to <paramref name="url"/>: asynchronously, polling
     /// every <paramref name="async"/>, if that's given.</summary>
-    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, TimeSpan? async, CancellationToken ct)
+    private async Task<Reply> SendAsync<T>(Tm1Request<T> request, string url, TimeSpan? async, TimeSpan? wait, CancellationToken ct)
     {
         var (content, contentType) = request.Encode();
         Reply reply;
         // Raw bytes (document content) aren't sent async
         if (async is { } every && request.Response != Tm1Response.Bytes && request.Body is not byte[])
         {
-            reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, ct)
+            reply = await SendRespondAsync(request.Method, url, content, contentType, request.Headers, request.Accept, request.Timeout, every, wait, ct)
                 .ConfigureAwait(false);
         }
         else
@@ -370,12 +399,13 @@ public sealed class Tm1Session : IAsyncDisposable
         string accept,
         TimeSpan? timeout,
         TimeSpan every,
+        TimeSpan? wait,
         CancellationToken ct
     )
     {
         // Running until the result is read, between the polls too
         using var running = _connection.Running();
-        var withPrefer = new Dictionary<string, string>(headers) { ["Prefer"] = "respond-async" };
+        var withPrefer = Connection.MergePrefer(headers, wait);
         var reply = await _connection.SendAsync(method, url, content, contentType, withPrefer, accept, timeout, ct).ConfigureAwait(false);
         if (reply.Status != 202)
         {
@@ -401,7 +431,21 @@ public sealed class Tm1Session : IAsyncDisposable
                 if (polled.Status != 202)
                 {
                     finished = true;
-                    return Connection.AsyncResult(polled.Body);
+                    var (result, shouldDelete) = Connection.AsyncReply(polled);
+                    if (shouldDelete)
+                    {
+                        try
+                        {
+                            await _connection
+                                .SendAsync("DELETE", monitor, null, null, new Dictionary<string, string>(), Connection.Json, null, CancellationToken.None)
+                                .ConfigureAwait(false);
+                        }
+                        catch (Exception)
+                        {
+                            // Best-effort cleanup of completed TM1 12 monitor
+                        }
+                    }
+                    return result;
                 }
             }
         }
@@ -416,7 +460,7 @@ public sealed class Tm1Session : IAsyncDisposable
                         .SendAsync("DELETE", monitor, null, null, new Dictionary<string, string>(), Connection.Json, null, CancellationToken.None)
                         .ConfigureAwait(false);
                 }
-                catch (Tm1Exception)
+                catch (Exception)
                 {
                     // The work may already be gone
                 }

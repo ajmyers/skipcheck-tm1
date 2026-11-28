@@ -745,6 +745,115 @@ internal sealed class Connection
         }
     }
 
+    /// <summary>The response an async monitor holds once done: TM1 11 sends an
+    /// <c>application/http</c> message and drops the monitor once read, while TM1 12 returns the
+    /// raw body directly with an <c>Asyncresult</c> status header and keeps the monitor cached
+    /// until explicitly deleted (<c>ShouldDeleteMonitor</c> is <c>true</c>).</summary>
+    internal static (Reply Result, bool ShouldDeleteMonitor) AsyncReply(Reply polled)
+    {
+        var isApplicationHttp = false;
+        if (polled.Headers.TryGetValue("content-type", out var contentType))
+        {
+            var semi = contentType.IndexOf(';');
+            var mediaType = (semi < 0 ? contentType : contentType[..semi]).Trim();
+            isApplicationHttp = mediaType.Equals("application/http", StringComparison.OrdinalIgnoreCase);
+        }
+        if (!isApplicationHttp && polled.Headers.TryGetValue("asyncresult", out var header))
+        {
+            var trimmed = header.Trim();
+            if (trimmed.Length != 3 || trimmed[0] is < '1' or > '5' || trimmed[1] is < '0' or > '9' || trimmed[2] is < '0' or > '9')
+            {
+                throw new Tm1ProtocolException("TM1's async monitor sent an invalid Asyncresult status: " + header, null, "GET", "_async", null);
+            }
+            var code = int.Parse(trimmed, System.Globalization.CultureInfo.InvariantCulture);
+            return (new Reply(code, polled.Headers, polled.Body), true);
+        }
+        return (AsyncResult(polled.Body), false);
+    }
+
+    internal static Dictionary<string, string> MergePrefer(IReadOnlyDictionary<string, string> headers, TimeSpan? wait)
+    {
+        var merged = new Dictionary<string, string>();
+        var kept = new List<string>();
+        foreach (var (name, value) in headers)
+        {
+            if (name.Equals("Prefer", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var raw in SplitPreferTokens(value))
+                {
+                    var semi = raw.IndexOf(';');
+                    var main = (semi < 0 ? raw : raw[..semi]).Trim();
+                    var eq = main.IndexOf('=');
+                    var tokenName = (eq < 0 ? main : main[..eq]).Trim();
+                    if (
+                        tokenName.Length > 0
+                        && !tokenName.Equals("respond-async", StringComparison.OrdinalIgnoreCase)
+                        && !tokenName.Equals("wait", StringComparison.OrdinalIgnoreCase)
+                    )
+                    {
+                        kept.Add(raw);
+                    }
+                }
+            }
+            else
+            {
+                merged[name] = value;
+            }
+        }
+        kept.Add("respond-async");
+        if (wait is { } w)
+        {
+            kept.Add(FormattableString.Invariant($"wait={w.Ticks / TimeSpan.TicksPerSecond}"));
+        }
+        merged["Prefer"] = string.Join(", ", kept);
+        return merged;
+    }
+
+    private static List<string> SplitPreferTokens(string header)
+    {
+        var tokens = new List<string>();
+        var current = new StringBuilder();
+        var inQuotes = false;
+        var escaped = false;
+        foreach (var c in header)
+        {
+            if (escaped)
+            {
+                current.Append(c);
+                escaped = false;
+            }
+            else if (c == '\\' && inQuotes)
+            {
+                current.Append(c);
+                escaped = true;
+            }
+            else if (c == '"')
+            {
+                current.Append(c);
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                var token = current.ToString().Trim();
+                if (token.Length > 0)
+                {
+                    tokens.Add(token);
+                }
+                current.Clear();
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        var last = current.ToString().Trim();
+        if (last.Length > 0)
+        {
+            tokens.Add(last);
+        }
+        return tokens;
+    }
+
     /// <summary>The response an async monitor holds once done: an <c>application/http</c> message,
     /// whose body TM1 gzips when the request accepted gzip.</summary>
     internal static Reply AsyncResult(byte[] message)

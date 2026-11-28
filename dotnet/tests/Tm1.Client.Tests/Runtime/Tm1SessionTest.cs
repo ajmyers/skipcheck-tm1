@@ -1267,6 +1267,195 @@ public class Tm1SessionAsyncTest
         var message = head.Concat(zipped.ToArray()).ToArray();
         Assert.Equal("{\"Name\":\"tm1\"}", System.Text.Encoding.UTF8.GetString(Connection.AsyncResult(message).Body));
     }
+
+    private static HttpResponseMessage DoneV12(string asyncResult, string? jsonBody = null)
+    {
+        var response = jsonBody is null ? ScriptedTm1.Status(200) : ScriptedTm1.Json(200, jsonBody);
+        response.Headers.TryAddWithoutValidation("Asyncresult", asyncResult);
+        return response;
+    }
+
+    [Fact]
+    public async Task ReadsTm112AsyncResultHeaderAndDeletesMonitor()
+    {
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
+            .OnEach(Monitor, _ => ScriptedTm1.Status(202), _ => DoneV12(" 201 ", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"))
+            .On("DELETE _async('a1')", _ => ScriptedTm1.Status(204));
+
+        var result = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", result.GetProperty("ProcessExecuteStatusCode").GetString());
+        Assert.Equal(2, tm1.Requests(Monitor).Count);
+        Assert.Single(tm1.Requests("DELETE _async('a1')"));
+    }
+
+    [Fact]
+    public async Task ReadsTm112AsyncNoContentResult()
+    {
+        var runNoContent = Tm1Request.Post(ODataPath.Of("Processes").Key("p").Action("tm1.Execute"), null);
+        var tm1 = new ScriptedTm1()
+            .On("POST Processes('p')/tm1.Execute", _ => Accepted())
+            .On(Monitor, _ => DoneV12("204"))
+            .On("DELETE _async('a1')", _ => ScriptedTm1.Status(204));
+
+        await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(runNoContent);
+        Assert.Single(tm1.Requests("DELETE _async('a1')"));
+    }
+
+    [Fact]
+    public async Task RaisesTm112AsyncErrorFromAsyncresultHeader()
+    {
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
+            .On(Monitor, _ => DoneV12("400", "{\"error\":{\"code\":\"501\",\"message\":\"Bad MDX\"}}"))
+            .On("DELETE _async('a1')", _ => ScriptedTm1.Status(204));
+
+        var e = await Assert.ThrowsAsync<Tm1BadRequestException>(() => tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request));
+        Assert.NotNull(e.Error);
+        Assert.Equal("501", e.Error!.Code);
+        Assert.Equal("Bad MDX", e.Error.Message);
+        Assert.Single(tm1.Requests("DELETE _async('a1')"));
+    }
+
+    [Fact]
+    public async Task IgnoresCleanupFailureAfterReadingTm112AsyncResult()
+    {
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
+            .On(Monitor, _ => DoneV12("201", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"))
+            .OnEach("DELETE _async('a1')", _ => ScriptedTm1.Status(500), _ => throw new HttpRequestException("connection reset"));
+
+        var session = tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10));
+        var r1 = await session.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r1.GetProperty("ProcessExecuteStatusCode").GetString());
+        var r2 = await session.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r2.GetProperty("ProcessExecuteStatusCode").GetString());
+        Assert.Equal(2, tm1.Requests("DELETE _async('a1')").Count);
+    }
+
+    [Fact]
+    public async Task RejectsInvalidAsyncresultHeader()
+    {
+        foreach (var bad in new[] { "", "   ", "not-a-status", "+200", "-200", "99", "600", "0200", "99999999999999999999" })
+        {
+            var tm1 = new ScriptedTm1().On(Run, _ => Accepted()).On(Monitor, _ => DoneV12(bad, "{}"));
+            await Assert.ThrowsAsync<Tm1ProtocolException>(() => tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10)).ExecuteAsync(Request));
+            Assert.Empty(tm1.Requests("DELETE _async('a1')"));
+        }
+    }
+
+    [Fact]
+    public async Task SendsPreferWaitAndHandlesImmediateOrDeferredCompletion()
+    {
+        HttpResponseMessage AcceptedWithApplied(string applied)
+        {
+            var r = Accepted();
+            r.Headers.TryAddWithoutValidation("Preference-Applied", applied);
+            return r;
+        }
+
+        var tm1 = new ScriptedTm1()
+            .OnEach(
+                Run,
+                _ => ScriptedTm1.Json(201, "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"),
+                _ => ScriptedTm1.Json(201, "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"),
+                _ => AcceptedWithApplied("respond-async, wait=2"),
+                _ => AcceptedWithApplied("respond-async")
+            )
+            .OnEach(
+                Monitor,
+                _ => DoneV12("201", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}"),
+                _ => Done("201 Created", "{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}")
+            )
+            .On("DELETE _async('a1')", _ => ScriptedTm1.Status(204));
+
+        var @base = tm1.Session();
+        Assert.Throws<ArgumentException>(() => @base.WithAsync(TimeSpan.Zero, TimeSpan.FromSeconds(1)));
+        Assert.Throws<ArgumentException>(() => @base.WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(-1)));
+        Assert.Throws<ArgumentException>(() => @base.WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(500)));
+        Assert.Throws<ArgumentException>(() => @base.WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(1500)));
+
+        var zeroWait = @base.WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.Zero);
+        Assert.Equal(TimeSpan.Zero, zeroWait.AsyncWait());
+        Assert.Equal(TimeSpan.Zero, zeroWait.WithSandbox("sb").AsyncWait());
+        Assert.Equal(TimeSpan.Zero, zeroWait.WithSandbox("sb").WithoutSandbox().AsyncWait());
+        Assert.Equal(TimeSpan.Zero, zeroWait.WithChangeSet("cs1").AsyncWait());
+        Assert.Equal(TimeSpan.Zero, zeroWait.WithChangeSet("cs1").WithoutChangeSet().AsyncWait());
+        Assert.Null(zeroWait.Batch().Session.AsyncWait());
+        Assert.Null(zeroWait.WithAsync(TimeSpan.FromMilliseconds(10)).AsyncWait());
+        Assert.Null(zeroWait.WithoutAsync().AsyncWait());
+
+        var waited = Tm1Client.Of(@base).WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(2)).Session;
+        Assert.Equal(TimeSpan.FromSeconds(2), waited.AsyncWait());
+
+        // wait=0 on the wire
+        var r0 = await zeroWait.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r0.GetProperty("ProcessExecuteStatusCode").GetString());
+        // Immediate completion within wait: zero polls
+        var r1 = await waited.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r1.GetProperty("ProcessExecuteStatusCode").GetString());
+        // Deferred completion on TM1 12 (Preference-Applied includes wait=2)
+        var r2 = await waited.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r2.GetProperty("ProcessExecuteStatusCode").GetString());
+        // Graceful degradation on TM1 11 (Preference-Applied omits wait=)
+        var r3 = await waited.ExecuteAsync(Request);
+        Assert.Equal("CompletedSuccessfully", r3.GetProperty("ProcessExecuteStatusCode").GetString());
+
+        Assert.Equal(
+            ["respond-async, wait=0", "respond-async, wait=2", "respond-async, wait=2", "respond-async, wait=2"],
+            tm1.Requests(Run).Select(r => r.Header("Prefer")!).ToList()
+        );
+        Assert.Equal(2, tm1.Requests(Monitor).Count);
+        Assert.Single(tm1.Requests("DELETE _async('a1')"));
+    }
+
+    [Fact]
+    public async Task StreamsTm112AsyncCollectionWithWaitAndFollowsNextLink()
+    {
+        var tm1 = new ScriptedTm1()
+            .On("GET Cubes", _ =>
+            {
+                var r = ScriptedTm1.Status(202);
+                r.Headers.TryAddWithoutValidation("Location", "_async('a1')");
+                r.Headers.TryAddWithoutValidation("Preference-Applied", "respond-async, wait=2");
+                return r;
+            })
+            .On(Monitor, _ => DoneV12("200", "{\"value\":[{\"Name\":\"a\"}],\"@odata.nextLink\":\"Cubes?$skiptoken=2\"}"))
+            .On("DELETE _async('a1')", _ => ScriptedTm1.Status(204))
+            .On("GET Cubes?$skiptoken=2", _ => ScriptedTm1.Json(200, "{\"value\":[{\"Name\":\"b\"}]}"));
+
+        var names = await tm1.Session()
+            .WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(2))
+            .StreamAsync(Tm1Request.List<JsonElement>(ODataPath.Of("Cubes")))
+            .Select(cube => cube.GetProperty("Name").GetString())
+            .ToListAsync();
+
+        Assert.Equal(["a", "b"], names);
+        Assert.Equal("respond-async, wait=2", Assert.Single(tm1.Requests("GET Cubes")).Header("Prefer"));
+        Assert.Null(Assert.Single(tm1.Requests("GET Cubes?$skiptoken=2")).Header("Prefer"));
+        Assert.Single(tm1.Requests("DELETE _async('a1')"));
+    }
+
+    [Fact]
+    public async Task MergesPreferHeaderAndRespectsApplicationHttpContentType()
+    {
+        var message = "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n\r\n{\"ProcessExecuteStatusCode\":\"CompletedSuccessfully\"}";
+        var tm1 = new ScriptedTm1()
+            .On(Run, _ => Accepted())
+            .On(Monitor, _ =>
+            {
+                var r = ScriptedTm1.Text(message);
+                r.Content.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/http; msgtype=response");
+                r.Headers.TryAddWithoutValidation("Asyncresult", "201");
+                return r;
+            });
+
+        var withExisting = Request.WithHeader("prefer", "odata.maxpagesize=50, wait=9");
+        var result = await tm1.Session().WithAsync(TimeSpan.FromMilliseconds(10), TimeSpan.FromSeconds(2)).ExecuteAsync(withExisting);
+        Assert.Equal("CompletedSuccessfully", result.GetProperty("ProcessExecuteStatusCode").GetString());
+        Assert.Equal("odata.maxpagesize=50, respond-async, wait=2", Assert.Single(tm1.Requests(Run)).Header("Prefer"));
+        Assert.Empty(tm1.Requests("DELETE _async('a1')"));
+    }
 }
 
 /// <summary>The Java client's <c>Tm1SessionCapabilitiesTest</c>: the version and <c>$metadata</c>,
