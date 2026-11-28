@@ -18,8 +18,9 @@ import java.util.stream.Stream;
  *
  * @param version the {@code edmx:Edmx} {@code Version}, e.g. {@code 4.0}
  * @param schemas the schemas, in document order
+ * @param references the {@code edmx:Reference} elements, in document order
  */
-public record CsdlDocument(String version, List<CsdlSchema> schemas) {
+public record CsdlDocument(String version, List<CsdlSchema> schemas, List<CsdlReference> references) {
 
 	/** The term holding the service's schema version. */
 	public static final String SCHEMA_VERSION_TERM = "Core.SchemaVersion";
@@ -28,11 +29,22 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 	public CsdlDocument {
 		Objects.requireNonNull(version, "version");
 		schemas = List.copyOf(schemas);
+		references = List.copyOf(references);
+	}
+
+	/**
+	 * Creates a document with no {@code edmx:Reference} elements.
+	 * @param version the {@code edmx:Edmx} {@code Version}, e.g. {@code 4.0}
+	 * @param schemas the schemas, in document order
+	 */
+	public CsdlDocument(String version, List<CsdlSchema> schemas) {
+		this(version, schemas, List.of());
 	}
 
 	/**
 	 * Rewrites a qualified name to use its schema's namespace rather than its alias:
-	 * {@code tm1.Cube} becomes {@code ibm.tm1.api.v1.Cube}. Names in other namespaces,
+	 * {@code tm1.Cube} becomes {@code ibm.tm1.api.v1.Cube}. Also resolves aliases from
+	 * {@code edmx:Reference}/{@code edmx:Include} elements. Names in other namespaces,
 	 * such as {@code Edm.String}, are returned unchanged.
 	 * @param qualifiedName a name qualified by namespace or alias
 	 * @return the name qualified by namespace
@@ -47,6 +59,13 @@ public record CsdlDocument(String version, List<CsdlSchema> schemas) {
 		for (CsdlSchema schema : schemas) {
 			if (prefix.equals(schema.alias())) {
 				return schema.namespace() + qualifiedName.substring(dot);
+			}
+		}
+		for (CsdlReference reference : references) {
+			for (CsdlReference.Include include : reference.includes()) {
+				if (prefix.equals(include.alias())) {
+					return include.namespace() + qualifiedName.substring(dot);
+				}
 			}
 		}
 		return qualifiedName;

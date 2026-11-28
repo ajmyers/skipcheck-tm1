@@ -78,13 +78,21 @@ public final class CsdlParser {
 					"Not a CSDL document: the root element is " + root.getTagName() + ", not edmx:Edmx");
 		}
 		try {
+			List<CsdlReference> references = new ArrayList<>();
+			for (Element ref : children(root, "Reference")) {
+				List<CsdlReference.Include> includes = new ArrayList<>();
+				for (Element inc : children(ref, "Include")) {
+					includes.add(new CsdlReference.Include(required(inc, "Namespace"), optionalAttr(inc, "Alias")));
+				}
+				references.add(new CsdlReference(required(ref, "Uri"), includes));
+			}
 			List<CsdlSchema> schemas = new ArrayList<>();
 			for (Element dataServices : children(root, "DataServices")) {
 				for (Element schema : children(dataServices, "Schema")) {
 					schemas.add(schema(schema));
 				}
 			}
-			return new CsdlDocument(attr(root, "Version", "4.0"), schemas);
+			return new CsdlDocument(attr(root, "Version", "4.0"), schemas, references);
 		}
 		catch (IllegalArgumentException e) {
 			// What the model's own types refuse, such as a bound operation with no
