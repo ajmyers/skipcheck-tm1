@@ -14,6 +14,7 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.session.Tm1SessionClosedException;
 import io.skipcheck.tm1.client.session.Tm1SessionPool;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 
 class Tm1AutoConfigurationTest {
 
@@ -68,6 +69,151 @@ class Tm1AutoConfigurationTest {
 	}
 
 	@Test
+	void connectsToTm1V12WithApplicationCredentials() {
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=admin", "tm1.client-id=app-1", "tm1.client-secret=s3cr3t", "tm1.pool.enabled=true")
+			.run(context -> {
+				Tm1ConnectionDetails details = context.getBean(Tm1ConnectionDetails.class);
+				assertThat(details.getDialect()).isEqualTo(Tm1Dialect.v12("tm1", "planning"));
+				assertThat(details.getServiceRoot()).isEqualTo("http://tm1:4444/tm1/api/v1/Databases('planning')/");
+				assertThat(details.getAuthenticator().describe()).isEqualTo("Application app-1 as admin");
+				assertThat(context.getBean(Tm1Session.class).serviceRoot())
+					.isEqualTo("http://tm1:4444/tm1/api/v1/Databases('planning')/");
+				assertThat(context.getBean(Tm1SessionPool.class).session().serviceRoot())
+					.isEqualTo("http://tm1:4444/tm1/api/v1/Databases('planning')/");
+			});
+	}
+
+	@Test
+	void connectsToTm1V12WithBaseUrlAndBearerToken() {
+		runner
+			.withPropertyValues("tm1.base-url=https://proxy/tm1/api/v1/Databases('planning')/", "tm1.instance=tm1",
+					"tm1.database=planning", "tm1.bearer-token=eyJ.test.token")
+			.run(context -> {
+				Tm1ConnectionDetails details = context.getBean(Tm1ConnectionDetails.class);
+				assertThat(details.getDialect()).isEqualTo(Tm1Dialect.v12("tm1", "planning"));
+				assertThat(details.getServiceRoot()).isEqualTo("https://proxy/tm1/api/v1/Databases('planning')/");
+				assertThat(details.getAuthenticator().describe()).isEqualTo("Bearer");
+				assertThat(context.getBean(Tm1Session.class).serviceRoot())
+					.isEqualTo("https://proxy/tm1/api/v1/Databases('planning')/");
+			});
+	}
+
+	@Test
+	void connectsToTm1V12WithBasicPassThrough() {
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=analyst", "tm1.password=pw")
+			.run(context -> {
+				Tm1ConnectionDetails details = context.getBean(Tm1ConnectionDetails.class);
+				assertThat(details.getDialect()).isEqualTo(Tm1Dialect.v12("tm1", "planning"));
+				assertThat(details.getServiceRoot()).isEqualTo("http://tm1:4444/tm1/api/v1/Databases('planning')/");
+				assertThat(details.getAuthenticator().describe()).isEqualTo("Basic analyst");
+			});
+	}
+
+	@Test
+	void explainsPartialV12DialectOrConflictingAuthProperties() {
+		runner.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.user=admin")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set both tm1.instance and tm1.database"));
+
+		runner.withPropertyValues("tm1.address=http://tm1:4444", "tm1.database=planning", "tm1.user=admin")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set both tm1.instance and tm1.database"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=admin", "tm1.client-id=app-1")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set both tm1.client-id and tm1.client-secret"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=admin", "tm1.client-secret=s3cr3t")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set both tm1.client-id and tm1.client-secret"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.client-id=app-1", "tm1.client-secret=s3cr3t")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set tm1.user"));
+
+		runner
+			.withPropertyValues("tm1.base-url=http://tm1:4444/tm1/api/v1/Databases('tm1')/", "tm1.user=admin",
+					"tm1.client-id=app-1", "tm1.client-secret=s3cr3t")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("Set tm1.instance and tm1.database"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.bearer-token=tok", "tm1.client-id=app-1", "tm1.client-secret=s3cr3t")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("tm1.bearer-token"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.bearer-token=tok", "tm1.namespace=LDAP")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("tm1.bearer-token"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.bearer-token=tok", "tm1.user=admin")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("tm1.bearer-token"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=admin", "tm1.password=pw", "tm1.client-id=app-1", "tm1.client-secret=s3cr3t")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("tm1.password"));
+
+		runner
+			.withPropertyValues("tm1.address=http://tm1:4444", "tm1.instance=tm1", "tm1.database=planning",
+					"tm1.user=admin", "tm1.client-id=app-1", "tm1.client-secret=s3cr3t", "tm1.namespace=LDAP")
+			.run(context -> assertThat(context).hasFailed()
+				.getFailure()
+				.rootCause()
+				.hasMessageContaining("tm1.namespace"));
+	}
+
+	@Test
+	void treatsBlankOptionalPropertiesAsUnset() {
+		runner
+			.withPropertyValues("tm1.address=http://tm1:8010", "tm1.user=admin", "tm1.password=", "tm1.instance=",
+					"tm1.database=", "tm1.bearer-token=", "tm1.client-id=", "tm1.client-secret=")
+			.run(context -> {
+				Tm1ConnectionDetails details = context.getBean(Tm1ConnectionDetails.class);
+				assertThat(details.getDialect()).isEqualTo(Tm1Dialect.V11);
+				assertThat(details.getServiceRoot()).isEqualTo("http://tm1:8010/api/v1/");
+				assertThat(details.getAuthenticator().describe()).isEqualTo("Basic admin");
+			});
+	}
+
+	@Test
 	void explainsAMissingUser() {
 		runner.withPropertyValues("tm1.address=http://tm1:8010")
 			.run(context -> assertThat(context).hasFailed()
@@ -97,6 +243,7 @@ class Tm1AutoConfigurationTest {
 			}
 		}).run(context -> {
 			assertThat(context).doesNotHaveBean(PropertiesTm1ConnectionDetails.class);
+			assertThat(context.getBean(Tm1ConnectionDetails.class).getDialect()).isEqualTo(Tm1Dialect.V11);
 			assertThat(context.getBean(Tm1Session.class).serviceRoot()).isEqualTo("http://elsewhere:9000/api/v1/");
 		});
 	}

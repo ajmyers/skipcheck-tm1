@@ -21,6 +21,7 @@ import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.session.Tm1SessionClosedException;
 import io.skipcheck.tm1.client.session.Tm1SessionPool;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 
 /**
  * TM1 servers by name: {@code tm1.servers.<name>}, and {@code tm1.*} as the one named
@@ -132,6 +133,33 @@ class Tm1ServersTest {
 			.withUserConfiguration(DefaultServer.class)
 			.run(context -> assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
 				.isEqualTo("http://tm1:8010/api/v1/"));
+	}
+
+	@Test
+	void configuresV12ServersFromEnvironmentVariables() {
+		Map<String, Object> variables = Map.of("TM1_ADDRESS", "http://engine:4444", "TM1_INSTANCE", "tm1",
+				"TM1_DATABASE", "planning", "TM1_USER", "admin", "TM1_CLIENT_ID", "app-1", "TM1_CLIENT_SECRET",
+				"secret", "TM1_SERVERS_CLOUD_ADDRESS", "https://cloud.example", "TM1_SERVERS_CLOUD_INSTANCE", "prod",
+				"TM1_SERVERS_CLOUD_DATABASE", "finance", "TM1_SERVERS_CLOUD_BEARER_TOKEN", "jwt-token");
+		runner
+			.withInitializer(context -> context.getEnvironment()
+				.getPropertySources()
+				.addFirst(new SystemEnvironmentPropertySource(
+						StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, variables)))
+			.withUserConfiguration(DefaultServer.class)
+			.run(context -> {
+				Tm1ConnectionDetails def = context.getBean("defaultTm1ConnectionDetails", Tm1ConnectionDetails.class);
+				assertThat(def.getDialect()).isEqualTo(Tm1Dialect.v12("tm1", "planning"));
+				assertThat(def.getAuthenticator().describe()).isEqualTo("Application app-1 as admin");
+				assertThat(context.getBean(DefaultServer.class).plain.session().serviceRoot())
+					.isEqualTo("http://engine:4444/tm1/api/v1/Databases('planning')/");
+
+				Tm1ConnectionDetails cloud = context.getBean("cloudTm1ConnectionDetails", Tm1ConnectionDetails.class);
+				assertThat(cloud.getDialect()).isEqualTo(Tm1Dialect.v12("prod", "finance"));
+				assertThat(cloud.getAuthenticator().describe()).isEqualTo("Bearer");
+				assertThat(context.getBean("cloudTm1Client", Tm1Client.class).session().serviceRoot())
+					.isEqualTo("https://cloud.example/prod/api/v1/Databases('finance')/");
+			});
 	}
 
 	@Test

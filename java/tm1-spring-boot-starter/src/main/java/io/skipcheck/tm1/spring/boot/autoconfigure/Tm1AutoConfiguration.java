@@ -100,6 +100,7 @@ public final class Tm1AutoConfiguration {
 			ObjectProvider<ObservationRegistry> observations) {
 		Tm1Timeouts timeouts = timeouts(properties.timeouts());
 		Tm1Session.Builder settings = Tm1Session.builder()
+			.dialect(connection.getDialect())
 			.baseUrl(connection.getServiceRoot())
 			.authenticator(connection.getAuthenticator())
 			.timeouts(timeouts)

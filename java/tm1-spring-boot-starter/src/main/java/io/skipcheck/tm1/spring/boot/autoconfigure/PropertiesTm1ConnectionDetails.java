@@ -28,13 +28,33 @@ final class PropertiesTm1ConnectionDetails implements Tm1ConnectionDetails {
 		this.prefix = prefix;
 	}
 
+	private static @Nullable String nonBlank(@Nullable String value) {
+		return value == null || value.isBlank() ? null : value;
+	}
+
+	@Override
+	public Tm1Dialect getDialect() {
+		String instance = nonBlank(properties.instance());
+		String database = nonBlank(properties.database());
+		if (instance == null && database == null) {
+			return Tm1Dialect.V11;
+		}
+		if (instance == null || database == null) {
+			throw new IllegalStateException(
+					"Set both " + prefix + ".instance and " + prefix + ".database to connect with the TM1 12 dialect");
+		}
+		return Tm1Dialect.v12(instance, database);
+	}
+
 	@Override
 	public String getServiceRoot() {
-		if (properties.baseUrl() != null) {
-			return properties.baseUrl();
+		String baseUrl = nonBlank(properties.baseUrl());
+		if (baseUrl != null) {
+			return baseUrl;
 		}
-		if (properties.address() != null) {
-			return Tm1Dialect.V11.serviceRoot(properties.address());
+		String address = nonBlank(properties.address());
+		if (address != null) {
+			return getDialect().serviceRoot(address);
 		}
 		throw new IllegalStateException(
 				"Set " + prefix + ".address (such as http://tm1:8010) or " + prefix + ".base-url to connect to TM1");
@@ -42,14 +62,56 @@ final class PropertiesTm1ConnectionDetails implements Tm1ConnectionDetails {
 
 	@Override
 	public Tm1Authenticator getAuthenticator() {
-		String user = properties.user();
+		String bearerToken = nonBlank(properties.bearerToken());
+		String clientId = nonBlank(properties.clientId());
+		String clientSecret = nonBlank(properties.clientSecret());
+		String namespace = nonBlank(properties.namespace());
+		String cognosUrl = nonBlank(properties.cognosUrl());
+		String user = nonBlank(properties.user());
+		boolean hasPassword = properties.password() != null && !properties.password().isEmpty();
+		if (bearerToken != null) {
+			if (clientId != null || clientSecret != null) {
+				throw new IllegalStateException("Set either " + prefix + ".bearer-token or " + prefix + ".client-id / "
+						+ prefix + ".client-secret, not both");
+			}
+			if (namespace != null || cognosUrl != null) {
+				throw new IllegalStateException(
+						"Set either " + prefix + ".bearer-token or " + prefix + ".namespace (CAM), not both");
+			}
+			if (user != null || hasPassword) {
+				throw new IllegalStateException("Set either " + prefix + ".bearer-token or " + prefix + ".user / "
+						+ prefix + ".password, not both");
+			}
+			return Tm1Authenticator.bearer(bearerToken);
+		}
+		if (clientId != null || clientSecret != null) {
+			if (clientId == null || clientSecret == null) {
+				throw new IllegalStateException("Set both " + prefix + ".client-id and " + prefix
+						+ ".client-secret for TM1 12 application authentication");
+			}
+			if (namespace != null || cognosUrl != null) {
+				throw new IllegalStateException("Set either " + prefix + ".client-id / " + prefix + ".client-secret or "
+						+ prefix + ".namespace (CAM), not both");
+			}
+			if (hasPassword) {
+				throw new IllegalStateException("Do not set " + prefix + ".password with TM1 12 application "
+						+ "authentication (" + prefix + ".client-id / " + prefix + ".client-secret)");
+			}
+			if (nonBlank(properties.instance()) == null || nonBlank(properties.database()) == null) {
+				throw new IllegalStateException("Set " + prefix + ".instance and " + prefix
+						+ ".database when using TM1 12 application authentication (" + prefix + ".client-id)");
+			}
+			if (user == null) {
+				throw new IllegalStateException("Set " + prefix + ".user to log in to TM1");
+			}
+			return Tm1Authenticator.application(clientId, clientSecret, user);
+		}
 		if (user == null) {
 			throw new IllegalStateException("Set " + prefix + ".user to log in to TM1");
 		}
-		String namespace = properties.namespace();
 		String password = properties.password() == null ? "" : properties.password();
-		if (namespace != null && properties.cognosUrl() != null) {
-			return Tm1Authenticator.cognosLogon(properties.cognosUrl(), namespace, user, password);
+		if (namespace != null && cognosUrl != null) {
+			return Tm1Authenticator.cognosLogon(cognosUrl, namespace, user, password);
 		}
 		if (namespace != null) {
 			return Tm1Authenticator.camNamespace(user, password, namespace);
@@ -59,7 +121,7 @@ final class PropertiesTm1ConnectionDetails implements Tm1ConnectionDetails {
 
 	@Override
 	public @Nullable SslBundle getSslBundle() {
-		String name = properties.ssl().bundle();
+		String name = nonBlank(properties.ssl().bundle());
 		if (name == null) {
 			return null;
 		}
