@@ -28,14 +28,38 @@ public class ContentServiceTests
         Assert.Equal("Applications/Planning/notes.txt.blob", notes.ToString());
         Assert.False(notes.InBlobs());
         Assert.True(ContentPath.Blobs().Child("a.txt").InBlobs());
+        Assert.False(ContentPath.Files().Child("a.txt").InBlobs());
+        Assert.False(ContentPath.Home().Child("a.txt").InBlobs());
+        Assert.False(ContentPath.Session().Child("a.txt").InBlobs());
+        Assert.Equal("Contents('Files')", ContentPath.Files().Path().ToString());
+        Assert.Equal("Contents('Home')", ContentPath.Home().Path().ToString());
+        Assert.Equal("Contents('Session')", ContentPath.Session().Path().ToString());
 
         var mine = ContentPath.Applications().Child("mine", ContentScope.Private);
         Assert.Equal("Contents('Applications')/PrivateContents('mine')", mine.Path().ToString());
         Assert.Equal("Applications/(private) mine", mine.ToString());
-        Assert.Equal(ContentPath.Root("Applications").Child("Planning"), ContentPath.Applications().Child(new Folder { Id = "Planning" }));
+        Assert.Equal(
+            ContentPath.Root("Applications").Child("notes.txt.blob"),
+            ContentPath.Applications().Child(new Folder { Id = "notes.txt.blob", Name = "notes.txt" })
+        );
+        Assert.Equal(ContentPath.Applications().Child("Planning"), ContentPath.Applications().Child(new Folder { Name = "Planning" }));
+        Assert.Equal(ContentPath.Applications().Child("Planning"), ContentPath.Applications().Child(new Folder { Id = "", Name = "Planning" }));
+        Assert.Equal(mine, ContentPath.Applications().Child(new Folder { Name = "mine" }, ContentScope.Private));
         Assert.Equal(ContentPath.Applications().Child("Planning").GetHashCode(), ContentPath.Applications().Child("Planning").GetHashCode());
         Assert.NotEqual(mine, ContentPath.Applications().Child("mine"));
-        Assert.Throws<ArgumentException>(() => ContentPath.Applications().Child(new Folder { Name = "Planning" }));
+        foreach (
+            var missing in new[]
+            {
+                new Folder(),
+                new Folder { Id = "" },
+                new Folder { Name = "" },
+                new Folder { Id = "", Name = "" },
+            }
+        )
+        {
+            Assert.Throws<ArgumentException>(() => ContentPath.Applications().Child(missing));
+        }
+        Assert.Throws<ArgumentNullException>(() => ContentPath.Applications().Child((Entry)null!));
         Assert.Equal("PrivateContents", ContentScope.Private.Navigation());
     }
 
@@ -118,6 +142,27 @@ public class ContentServiceTests
         Assert.Equal("GET Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')/tm1.DocumentReference/Document/Content", Sent);
         await tm1.Contents.ContentAsync(ContentPath.Blobs().Child("notes_1.txt"));
         Assert.Equal("GET Contents('Blobs')/Contents('notes_1.txt')/tm1.Document/Content", Sent);
+
+        _tm1.Respond = _ => new { Name = "q1.csv", Size = 7 };
+        Assert.Equal(7, (await tm1.Contents.DocumentAsync(ContentPath.Files().Child("reports").Child("q1.csv"))).Size);
+        Assert.Equal("GET Contents('Files')/Contents('reports')/Contents('q1.csv')/tm1.Document", Sent);
+
+        _tm1.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Encoding.UTF8.GetBytes("abc")) };
+        Assert.Equal("abc", Encoding.UTF8.GetString(await tm1.Contents.ContentAsync(ContentPath.Home().Child("scratch.txt"))));
+        Assert.Equal("GET Contents('Home')/Contents('scratch.txt')/tm1.Document/Content", Sent);
+
+        _tm1.Respond = _ => null;
+        await tm1.Contents.UploadAsync(ContentPath.Session().Child("temp.bin"), Encoding.UTF8.GetBytes("ok"));
+        Assert.Equal("PUT Contents('Session')/Contents('temp.bin')/tm1.Document/Content", Sent);
+
+        _tm1.Respond = _ => new { Size = 4 };
+        await tm1.Contents.DocumentAsync(ContentPath.Root("applications").Child("Planning").Child("notes.txt"));
+        Assert.Equal("GET Contents('applications')/Contents('Planning')/Contents('notes.txt')/tm1.DocumentReference/Document", Sent);
+
+        await tm1.Contents.DocumentAsync(ContentPath.Root("Custom").Child("data.bin"));
+        Assert.Equal("GET Contents('Custom')/Contents('data.bin')/tm1.Document", Sent);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => tm1.Contents.DocumentAsync(null!));
 
         _tm1.Respond = _ => null;
         await tm1.Contents.UploadAsync(notes, Encoding.UTF8.GetBytes("hello"));

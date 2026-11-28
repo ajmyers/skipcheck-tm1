@@ -8,7 +8,7 @@ import type { Tm1CallOptions } from "../../session/session.js";
 import { Tm1Stream } from "../../stream.js";
 import { required } from "../../util.js";
 import { Tm1Service, type Tm1Endpoints } from "../service.js";
-import type { ContentPath } from "./ContentPath.js";
+import { isDirectDocumentRoot, type ContentPath } from "./ContentPath.js";
 import { ContentScope } from "./ContentScope.js";
 
 /** A document's content to upload, in any form Node and browsers have: bytes, a `Blob` (a browser's
@@ -70,7 +70,8 @@ export class ContentService extends Tm1Service {
     upload: ["Navigation DocumentReference/Document"],
   } as const satisfies Tm1Endpoints<ContentService>;
 
-  /** `GET Contents`, streamed: the root folders, `Applications` and `Blobs`. */
+  /** `GET Contents`, streamed: the root folders (`Applications` and `Blobs` on TM1 11;
+   * `Applications`, `Files`, `Home`, and `Session` on TM1 12). */
   roots(query?: ODataQuery | null, options?: Tm1CallOptions): Tm1Stream<Entry> {
     return this.session.stream(Tm1Request.list(ODataPath.of("Contents"), query, Entry), options);
   }
@@ -90,8 +91,10 @@ export class ContentService extends Tm1Service {
 
   /** Makes an entry in a folder, public or private: a `FolderCreate`, `DocumentCreate`, `LinkCreate`
    * or a reference, such as a `CubeReferenceCreate` with `bindCube(ODataPath.of("Cubes").key("Sales"))`.
-   * A document made outside `Blobs` comes back as a `DocumentReference`, with an empty document
-   * behind it; {@link upload} gives it content. Returns the entry as made, with the `ID` to find it by. */
+   * A document made under `Applications` comes back as a `DocumentReference`, with an empty document
+   * behind it; a document made under a direct-document root (`Blobs`, `Files`, `Home`, or `Session`)
+   * comes back as a `Document`. {@link upload} gives it content. Returns the entry as made, with the
+   * `ID` (TM1 11) or `Name` (TM1 12) to find it by. */
   create(folder: ContentPath, scope: ContentScope, entry: EntryCreate, options?: Tm1CallOptions): Promise<Entry> {
     return this.session.execute(Tm1Request.post(pathOf(folder, "folder").nav(ContentScope.navigation(scope)), required(entry, "entry"), Entry), options);
   }
@@ -123,13 +126,15 @@ export class ContentService extends Tm1Service {
     return this.relocate(Tm1Operations.EntryMove, entry, target, scope, name, options);
   }
 
-  /** `Document`: the document a reference refers to, in `Blobs`, with its `Size` and `LastUpdated`. */
+  /** `Document`: the document itself (under `Blobs`, `Files`, `Home`, or `Session`), or the
+   * document a reference in `Applications` refers to, with its `Size` and `LastUpdated`. */
   document(reference: ContentPath, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Document> {
     return this.session.execute(Tm1Request.get(documentPath(reference, "reference"), query, Document), options);
   }
 
-  /** A document's `Content`, as chunks of bytes. The path is a document reference, or a document
-   * in `Blobs`. Nothing is sent until it's iterated; each iteration sends it again. */
+  /** A document's `Content`, as chunks of bytes. The path is a document reference in
+   * `Applications`, or a direct document under `Blobs`, `Files`, `Home`, or `Session`. Nothing is
+   * sent until it's iterated; each iteration sends it again. */
   content(document: ContentPath, options?: Tm1CallOptions): Tm1Stream<Uint8Array> {
     const request = Tm1Request.bytes(documentPath(document, "document").nav("Content"));
     const session = this.session;
@@ -139,10 +144,10 @@ export class ContentService extends Tm1Service {
     });
   }
 
-  /** Replaces a document's `Content`. The path is a document reference, or a document in `Blobs`.
-   * TM1 (11.8) refuses a chunked upload, so the content is gathered and sent with its length: it's
-   * held in memory whole while it's sent (and so can be sent again if the session has to log in
-   * again). */
+  /** Replaces a document's `Content`. The path is a document reference in `Applications`, or a
+   * direct document under `Blobs`, `Files`, `Home`, or `Session`. TM1 (11.8) refuses a chunked
+   * upload, so the content is gathered and sent with its length: it's held in memory whole while
+   * it's sent (and so can be sent again if the session has to log in again). */
   async upload(document: ContentPath, content: ContentSource, options?: Tm1CallOptions): Promise<void> {
     const path = documentPath(document, "document").nav("Content");
     const bytes = await gather(required(content, "content"));
@@ -170,7 +175,7 @@ function pathOf(entry: ContentPath, name: string): ODataPath {
 
 function documentPath(entry: ContentPath, name: string): ODataPath {
   const path = pathOf(entry, name);
-  return entry.inBlobs() ? path.cast("tm1.Document") : path.cast("tm1.DocumentReference").nav("Document");
+  return isDirectDocumentRoot(entry) ? path.cast("tm1.Document") : path.cast("tm1.DocumentReference").nav("Document");
 }
 
 async function gather(content: ContentSource): Promise<Uint8Array> {

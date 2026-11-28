@@ -297,6 +297,26 @@
 		{
 			"id" : "ContentServiceTest#aPathIsRequired#3",
 			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				null,
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [ ],
+			"error" : {
+				"exception" : "NullPointerException",
+				"category" : "argument"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#aPathIsRequired#4",
+			"service" : "contents",
 			"method" : "copy",
 			"params" : [
 				"entry",
@@ -1113,6 +1133,319 @@
 				"kind" : "NOT_FOUND",
 				"status" : 404,
 				"code" : "278"
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsReadsAndUploadsDocumentsInTm112DirectRoots#1",
+			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "files",
+									"args" : [ ]
+								},
+								"reports",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"q1.csv",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : {
+						"select" : [
+							"Name",
+							"Size"
+						]
+					}
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Files')/Contents('reports')/Contents('q1.csv')/tm1.Document?$select=Name,Size",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Name" : "q1.csv",
+							"Size" : 7
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Document",
+				"json" : {
+					"Name" : "q1.csv",
+					"Size" : 7
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsReadsAndUploadsDocumentsInTm112DirectRoots#2",
+			"service" : "contents",
+			"method" : "content",
+			"params" : [
+				"document"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "home",
+							"args" : [ ]
+						},
+						"scratch.txt",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Home')/Contents('scratch.txt')/tm1.Document/Content",
+						"headers" : {
+							"accept" : "*/*",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/octet-stream"
+						},
+						"bytes" : "YSxiCjEsMg=="
+					}
+				}
+			],
+			"result" : {
+				"$bytes" : "YSxiCjEsMg=="
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsReadsAndUploadsDocumentsInTm112DirectRoots#3",
+			"service" : "contents",
+			"method" : "upload",
+			"params" : [
+				"document",
+				"content"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "session",
+							"args" : [ ]
+						},
+						"temp.bin",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$bytes" : "b2s="
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "PUT",
+						"target" : "Contents('Session')/Contents('temp.bin')/tm1.Document/Content",
+						"headers" : {
+							"accept" : "application/json",
+							"content-type" : "application/octet-stream",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						},
+						"bytes" : "b2s="
+					},
+					"response" : {
+						"status" : 204,
+						"headers" : { }
+					}
+				}
+			],
+			"result" : null
+		},
+		{
+			"id" : "ContentServiceTest#findsReadsAndUploadsDocumentsInTm112DirectRoots#4",
+			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "child",
+							"args" : [
+								{
+									"$type" : "ContentPath",
+									"factory" : "root",
+									"args" : [
+										"applications"
+									]
+								},
+								"Planning",
+								{
+									"$enum" : "ContentScope",
+									"name" : "PUBLIC",
+									"json" : "PUBLIC"
+								}
+							]
+						},
+						"notes.txt",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('applications')/Contents('Planning')/Contents('notes.txt')/tm1.DocumentReference/Document",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Size" : 4
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Document",
+				"json" : {
+					"Size" : 4
+				}
+			}
+		},
+		{
+			"id" : "ContentServiceTest#findsReadsAndUploadsDocumentsInTm112DirectRoots#5",
+			"service" : "contents",
+			"method" : "document",
+			"params" : [
+				"reference",
+				"query"
+			],
+			"args" : [
+				{
+					"$type" : "ContentPath",
+					"factory" : "child",
+					"args" : [
+						{
+							"$type" : "ContentPath",
+							"factory" : "root",
+							"args" : [
+								"Custom"
+							]
+						},
+						"data.bin",
+						{
+							"$enum" : "ContentScope",
+							"name" : "PUBLIC",
+							"json" : "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query" : { }
+				}
+			],
+			"exchanges" : [
+				{
+					"request" : {
+						"method" : "GET",
+						"target" : "Contents('Custom')/Contents('data.bin')/tm1.Document",
+						"headers" : {
+							"accept" : "application/json",
+							"odata-maxversion" : "4.0",
+							"odata-version" : "4.0"
+						}
+					},
+					"response" : {
+						"status" : 200,
+						"headers" : {
+							"content-type" : "application/json"
+						},
+						"json" : {
+							"Size" : 5
+						}
+					}
+				}
+			],
+			"result" : {
+				"$model" : "Document",
+				"json" : {
+					"Size" : 5
+				}
 			}
 		},
 		{

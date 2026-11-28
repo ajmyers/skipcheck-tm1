@@ -61,7 +61,8 @@ public sealed class ContentService : Tm1Service
     public ContentService(Tm1Session session)
         : base(session) { }
 
-    /// <summary><c>GET Contents</c>, streamed: the root folders, <c>Applications</c> and <c>Blobs</c>.</summary>
+    /// <summary><c>GET Contents</c>, streamed: the root folders (<c>Applications</c> and <c>Blobs</c>
+    /// on TM1 11; <c>Applications</c>, <c>Files</c>, <c>Home</c>, and <c>Session</c> on TM1 12).</summary>
     [Tm1Endpoint("EntitySet Contents")]
     public IAsyncEnumerable<Entry> RootsAsync(ODataQuery? query = null, CancellationToken cancellationToken = default) =>
         Session.StreamAsync(Tm1Request.List<Entry>(ODataPath.Of("Contents"), query), cancellationToken);
@@ -92,9 +93,11 @@ public sealed class ContentService : Tm1Service
 
     /// <summary>Makes an entry in a folder: a <c>FolderCreate</c>, <c>DocumentCreate</c>, <c>LinkCreate</c>
     /// or a reference, such as a <c>CubeReferenceCreate</c> with
-    /// <c>BindCube(ODataPath.Of("Cubes").Key("Sales"))</c>. A document made outside <c>Blobs</c> comes
-    /// back as a <c>DocumentReference</c>, with an empty document behind it; <see cref="UploadAsync"/>
-    /// gives it content. Returns the entry as made, with the <c>ID</c> to find it by.</summary>
+    /// <c>BindCube(ODataPath.Of("Cubes").Key("Sales"))</c>. A document made under <c>Applications</c> comes
+    /// back as a <c>DocumentReference</c>, with an empty document behind it; a document made under a
+    /// direct-document root (<c>Blobs</c>, <c>Files</c>, <c>Home</c>, or <c>Session</c>) comes back as a
+    /// <c>Document</c>. <see cref="UploadAsync"/> gives it content. Returns the entry as made, with the
+    /// <c>ID</c> (TM1 11) or <c>Name</c> (TM1 12) to find it by.</summary>
     [Tm1Endpoint("Navigation Folder/Contents")]
     [Tm1Endpoint("Navigation Folder/PrivateContents")]
     public Task<Entry> CreateAsync(ContentPath folder, ContentScope scope, EntryCreate entry, CancellationToken cancellationToken = default) =>
@@ -144,20 +147,23 @@ public sealed class ContentService : Tm1Service
         CancellationToken cancellationToken = default
     ) => Relocate(Tm1Operations.EntryMove, entry, target, scope, name, cancellationToken);
 
-    /// <summary><c>Document</c>: the document a reference refers to, in <c>Blobs</c>, with its
+    /// <summary><c>Document</c>: the document itself (under <c>Blobs</c>, <c>Files</c>, <c>Home</c>,
+    /// or <c>Session</c>), or the document a reference in <c>Applications</c> refers to, with its
     /// <c>Size</c> and <c>LastUpdated</c>.</summary>
     [Tm1Endpoint("Navigation DocumentReference/Document")]
     public Task<Document> DocumentAsync(ContentPath reference, ODataQuery? query = null, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Get<Document>(DocumentPath(Require(reference, nameof(reference))), query), cancellationToken);
 
-    /// <summary>A document's <c>Content</c>, read whole. The path is a document reference, or a
-    /// document in <c>Blobs</c>.</summary>
+    /// <summary>A document's <c>Content</c>, read whole. The path is a document reference in
+    /// <c>Applications</c>, or a direct document under <c>Blobs</c>, <c>Files</c>, <c>Home</c>, or
+    /// <c>Session</c>.</summary>
     [Tm1Endpoint("Navigation DocumentReference/Document")]
     public Task<byte[]> ContentAsync(ContentPath document, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(Tm1Request.Bytes(DocumentPath(Require(document, nameof(document))).Nav("Content")), cancellationToken);
 
-    /// <summary>Replaces a document's <c>Content</c>. The path is a document reference, or a document in
-    /// <c>Blobs</c>. TM1 (11.8) refuses a chunked upload, so the content is sent whole, with its length.</summary>
+    /// <summary>Replaces a document's <c>Content</c>. The path is a document reference in
+    /// <c>Applications</c>, or a direct document under <c>Blobs</c>, <c>Files</c>, <c>Home</c>, or
+    /// <c>Session</c>. TM1 (11.8) refuses a chunked upload, so the content is sent whole, with its length.</summary>
     [Tm1Endpoint("Navigation DocumentReference/Document")]
     public Task UploadAsync(ContentPath document, byte[] content, CancellationToken cancellationToken = default) =>
         Session.ExecuteAsync(
@@ -166,7 +172,7 @@ public sealed class ContentService : Tm1Service
         );
 
     private static ODataPath DocumentPath(ContentPath entry) =>
-        entry.InBlobs() ? entry.Path().Cast("tm1.Document") : entry.Path().Cast("tm1.DocumentReference").Nav("Document");
+        entry.IsDirectDocumentRoot() ? entry.Path().Cast("tm1.Document") : entry.Path().Cast("tm1.DocumentReference").Nav("Document");
 
     private Task<Entry> Relocate(
         Tm1Operation operation,

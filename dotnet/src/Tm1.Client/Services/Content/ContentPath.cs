@@ -9,18 +9,19 @@ using Skipcheck.Tm1.Client.OData;
 
 namespace Skipcheck.Tm1.Client.Services;
 
-/// <summary>Where an entry is in the contents tree: a root folder, then each folder's child by ID.
+/// <summary>Where an entry is in the contents tree: a root folder, then each folder's child by key.
 /// <code>
-/// // Children by ID, which for most entries is the name plus a suffix for the kind
+/// // Children by key (ID on TM1 11, Name on TM1 12)
 /// var notes = ContentPath.Applications().Child("Planning").Child("notes.txt.blob");
 /// // Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')
 /// </code>
-/// <para>Children are found by their <c>ID</c>, not their <c>Name</c>, though <c>$metadata</c> keys
+/// <para>On TM1 11.8, children are found by their <c>ID</c>, not their <c>Name</c>, though <c>$metadata</c> keys
 /// entries by <c>Name</c>: TM1 (11.8) gives most entries an ID of the name plus a suffix for its kind,
 /// such as <c>notes.txt.blob</c> for a document, <c>ibm.extr</c> for a link and
-/// <c>}ClientGroups.cube</c> for a cube reference. A folder's ID is its name. The ID is in the entry
-/// TM1 returns when it's made. <c>$metadata</c> deprecates <c>Entry.ID</c> in schema 11.5.0, but TM1
-/// 11.8 still keys by it. Paths are immutable.</para>
+/// <c>}ClientGroups.cube</c> for a cube reference. A folder's ID is its name. <c>$metadata</c>
+/// deprecates <c>Entry.ID</c> in schema 11.5.0, and TM1 12 omits <c>ID</c> altogether and keys
+/// entries by <c>Name</c>. <see cref="Child(Entry)"/> uses <c>ID</c> when present and falls back
+/// to <c>Name</c>. Paths are immutable.</para>
 /// </summary>
 public sealed class ContentPath : IEquatable<ContentPath>
 {
@@ -40,22 +41,35 @@ public sealed class ContentPath : IEquatable<ContentPath>
     /// <summary>The <c>Blobs</c> folder, holding the documents behind the document references in applications.</summary>
     public static ContentPath Blobs() => Root("Blobs");
 
+    /// <summary>The <c>Files</c> folder, holding direct documents on TM1 12.</summary>
+    public static ContentPath Files() => Root("Files");
+
+    /// <summary>The <c>Home</c> folder, holding the current user's direct documents on TM1 12.</summary>
+    public static ContentPath Home() => Root("Home");
+
+    /// <summary>The <c>Session</c> folder, holding session-scoped direct documents on TM1 12.</summary>
+    public static ContentPath Session() => Root("Session");
+
     /// <summary>A public child of this folder: <c>…/Contents('id')</c>.</summary>
     public ContentPath Child(string id) => Child(id, ContentScope.Public);
 
     /// <summary>A public child of this folder, as TM1 returned it, such as from
-    /// <c>ContentService.CreateAsync</c>: found by its <c>ID</c>, which <c>$metadata</c> deprecates but
-    /// TM1 (11.8) still keys entries by, so callers needn't read it.</summary>
-    /// <exception cref="ArgumentException">The entry has no ID (it was selected away).</exception>
+    /// <c>ContentService.CreateAsync</c>: found by its <c>ID</c> when present (TM1 11), falling
+    /// back to its <c>Name</c> when <c>ID</c> is absent (TM1 12).</summary>
+    /// <exception cref="ArgumentException">The entry has neither an ID nor a Name.</exception>
     public ContentPath Child(Entry entry) => Child(entry, ContentScope.Public);
 
     /// <summary>A child of this folder as TM1 returned it, public or private: see <see cref="Child(Entry)"/>.</summary>
-    /// <exception cref="ArgumentException">The entry has no ID.</exception>
+    /// <exception cref="ArgumentException">The entry has neither an ID nor a Name.</exception>
     public ContentPath Child(Entry entry, ContentScope scope)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        var id = entry.Id ?? throw new ArgumentException("The entry has no ID to find it by: " + entry.Name, nameof(entry));
-        return Child(id, scope);
+        var key = !string.IsNullOrEmpty(entry.Id) ? entry.Id : entry.Name;
+        if (string.IsNullOrEmpty(key))
+        {
+            throw new ArgumentException("The entry has neither an ID nor a Name to find it by: " + entry, nameof(entry));
+        }
+        return Child(key, scope);
     }
 
     /// <summary>A child of this folder, public or private.</summary>
@@ -63,6 +77,10 @@ public sealed class ContentPath : IEquatable<ContentPath>
 
     /// <summary>Whether this is in the <c>Blobs</c> folder, where documents themselves are.</summary>
     public bool InBlobs() => _steps[0].Id == "Blobs";
+
+    /// <summary>Whether this path is under a root holding <c>Document</c> entities directly
+    /// (every root other than <c>Applications</c>, where documents are <c>DocumentReference</c>s).</summary>
+    internal bool IsDirectDocumentRoot() => !_steps[0].Id.Equals("Applications", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The OData path to the entry, such as <c>Contents('Applications')/Contents('Planning')</c>.</summary>
     public ODataPath Path()

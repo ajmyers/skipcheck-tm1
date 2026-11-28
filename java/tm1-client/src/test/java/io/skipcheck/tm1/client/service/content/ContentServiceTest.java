@@ -65,8 +65,9 @@ class ContentServiceTest {
 	}
 
 	/**
-	 * A path as the factories that make it: {@code applications()}, {@code blobs()} or
-	 * {@code root(id)}, then {@code child(id, scope)} on it for each step.
+	 * A path as the factories that make it: {@code applications()}, {@code blobs()},
+	 * {@code files()}, {@code home()}, {@code session()}, or {@code root(id)}, then
+	 * {@code child(id, scope)} on it for each step.
 	 */
 	static JsonNode encode(Object value) {
 		try {
@@ -83,6 +84,9 @@ class ContentServiceTest {
 					node = switch (id) {
 						case "Applications" -> ConformanceCodec.factory("ContentPath", "applications");
 						case "Blobs" -> ConformanceCodec.factory("ContentPath", "blobs");
+						case "Files" -> ConformanceCodec.factory("ContentPath", "files");
+						case "Home" -> ConformanceCodec.factory("ContentPath", "home");
+						case "Session" -> ConformanceCodec.factory("ContentPath", "session");
 						default -> ConformanceCodec.factory("ContentPath", "root", id);
 					};
 				}
@@ -111,6 +115,9 @@ class ContentServiceTest {
 	void buildsPathsByIdInEachScope() {
 		assertThat(ContentPath.applications().path()).hasToString("Contents('Applications')");
 		assertThat(ContentPath.blobs().path()).hasToString("Contents('Blobs')");
+		assertThat(ContentPath.files().path()).hasToString("Contents('Files')");
+		assertThat(ContentPath.home().path()).hasToString("Contents('Home')");
+		assertThat(ContentPath.session().path()).hasToString("Contents('Session')");
 		assertThat(ContentPath.root("Other").path()).hasToString("Contents('Other')");
 		ContentPath mine = PLANNING.child("mine", ContentScope.PRIVATE).child("x.blob");
 		assertThat(mine.path())
@@ -120,6 +127,9 @@ class ContentServiceTest {
 			.hasToString("Contents('Applications')/Contents('Planning')/Contents('Joe''s')");
 		assertThat(NOTES.inBlobs()).isFalse();
 		assertThat(ContentPath.blobs().child("a.txt").inBlobs()).isTrue();
+		assertThat(ContentPath.files().child("a.txt").inBlobs()).isFalse();
+		assertThat(ContentPath.home().child("a.txt").inBlobs()).isFalse();
+		assertThat(ContentPath.session().child("a.txt").inBlobs()).isFalse();
 		assertThat(PLANNING.child("x"))
 			.isEqualTo(ContentPath.root("Applications").child("Planning").child("x", ContentScope.PUBLIC))
 			.hasSameHashCodeAs(ContentPath.root("Applications").child("Planning").child("x", ContentScope.PUBLIC))
@@ -134,8 +144,21 @@ class ContentServiceTest {
 		assertThat(PLANNING.child(made)).isEqualTo(NOTES);
 		assertThat(PLANNING.child(made, ContentScope.PRIVATE))
 			.isEqualTo(PLANNING.child("notes.txt.blob", ContentScope.PRIVATE));
-		Entry selectedAway = new DocumentReference(null, null, "notes.txt", null, null, null, null);
-		assertThatThrownBy(() -> PLANNING.child(selectedAway)).isInstanceOf(IllegalArgumentException.class);
+		// TM1 12 omits ID and keys entries by Name
+		Entry v12Entry = new DocumentReference(null, null, "notes.txt", null, null, null, null);
+		assertThat(PLANNING.child(v12Entry)).isEqualTo(PLANNING.child("notes.txt"));
+		assertThat(PLANNING.child(v12Entry, ContentScope.PRIVATE))
+			.isEqualTo(PLANNING.child("notes.txt", ContentScope.PRIVATE));
+		Entry emptyIdEntry = new DocumentReference(null, "", "notes.txt", null, null, null, null);
+		assertThat(PLANNING.child(emptyIdEntry)).isEqualTo(PLANNING.child("notes.txt"));
+		for (Entry missing : List.of(new DocumentReference(null, null, null, null, null, null, null),
+				new DocumentReference(null, "", null, null, null, null, null),
+				new DocumentReference(null, null, "", null, null, null, null),
+				new DocumentReference(null, "", "", null, null, null, null))) {
+			assertThatThrownBy(() -> PLANNING.child(missing)).isInstanceOf(IllegalArgumentException.class);
+		}
+		assertThatThrownBy(() -> PLANNING.child((Entry) null)).isInstanceOf(NullPointerException.class);
+		assertThatThrownBy(() -> PLANNING.child(made, null)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> PLANNING.child((String) null)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> PLANNING.child("x", null)).isInstanceOf(NullPointerException.class);
 		assertThatThrownBy(() -> ContentPath.root(null)).isInstanceOf(NullPointerException.class);
@@ -238,6 +261,8 @@ class ContentServiceTest {
 		assertThat(conformance.fail("contents", "contents", null, ContentScope.PUBLIC, ODataQuery.none()))
 			.isInstanceOf(NullPointerException.class);
 		assertThat(conformance.fail("contents", "get", null, ODataQuery.none()))
+			.isInstanceOf(NullPointerException.class);
+		assertThat(conformance.fail("contents", "document", null, ODataQuery.none()))
 			.isInstanceOf(NullPointerException.class);
 		assertThat(conformance.fail("contents", "copy", NOTES, null, ContentScope.PUBLIC, null))
 			.isInstanceOf(NullPointerException.class);
@@ -427,6 +452,37 @@ class ContentServiceTest {
 		tm1().status(204);
 		conformance.call("contents", "upload", ContentPath.blobs().child("notes_1.txt"), bytes("x"));
 		assertThat(tm1().last().key()).isEqualTo("PUT Contents('Blobs')/Contents('notes_1.txt')/tm1.Document/Content");
+	}
+
+	@Test
+	void findsReadsAndUploadsDocumentsInTm112DirectRoots() {
+		ContentPath fileDoc = ContentPath.files().child("reports").child("q1.csv");
+		tm1().json("{\"Name\":\"q1.csv\",\"Size\":7}");
+		Document doc = conformance.call("contents", "document", fileDoc, ODataQuery.none().select("Name", "Size"));
+		assertThat(doc.size()).isEqualTo(7);
+		assertThat(tm1().last().target())
+			.isEqualTo("Contents('Files')/Contents('reports')/Contents('q1.csv')/tm1.Document?$select=Name,Size");
+
+		tm1().bytes("a,b\n1,2".getBytes(StandardCharsets.UTF_8));
+		byte[] fileContent = conformance.call("contents", "content", ContentPath.home().child("scratch.txt"));
+		assertThat(new String(fileContent, StandardCharsets.UTF_8)).isEqualTo("a,b\n1,2");
+		assertThat(tm1().last().key()).isEqualTo("GET Contents('Home')/Contents('scratch.txt')/tm1.Document/Content");
+
+		tm1().status(204);
+		conformance.call("contents", "upload", ContentPath.session().child("temp.bin"), bytes("ok"));
+		assertThat(tm1().last().key()).isEqualTo("PUT Contents('Session')/Contents('temp.bin')/tm1.Document/Content");
+
+		// Case-insensitive Applications still routes through DocumentReference; other
+		// custom roots route directly to Document
+		tm1().json("{\"Size\":4}");
+		conformance.call("contents", "document", ContentPath.root("applications").child("Planning").child("notes.txt"),
+				ODataQuery.none());
+		assertThat(tm1().last().target()).isEqualTo(
+				"Contents('applications')/Contents('Planning')/Contents('notes.txt')/tm1.DocumentReference/Document");
+
+		tm1().json("{\"Size\":5}");
+		conformance.call("contents", "document", ContentPath.root("Custom").child("data.bin"), ODataQuery.none());
+		assertThat(tm1().last().target()).isEqualTo("Contents('Custom')/Contents('data.bin')/tm1.Document");
 	}
 
 }

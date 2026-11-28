@@ -10,18 +10,19 @@ import io.skipcheck.tm1.client.model.Entry;
 import io.skipcheck.tm1.client.odata.ODataPath;
 
 /**
- * Where an entry is in the contents tree: a root folder, then each folder's child by ID.
+ * Where an entry is in the contents tree: a root folder, then each folder's child by key.
  *
  * {@snippet class = examples.ContentServiceExamples region = path}
  *
  * <p>
- * Children are found by their {@code ID}, not their {@code Name}, though
+ * On TM1 11.8, children are found by their {@code ID}, not their {@code Name}, though
  * {@code $metadata} keys entries by {@code Name}: TM1 (11.8) gives most entries an ID of
  * the name plus a suffix for its kind, such as {@code notes.txt.blob} for a document,
  * {@code ibm.extr} for a link and <code>&#125;ClientGroups.cube</code> for a cube
- * reference. A folder's ID is its name. The ID is in the entry TM1 returns when it's
- * made. {@code $metadata} deprecates {@code Entry.ID} in schema 11.5.0, but TM1 11.8
- * still keys by it. Paths are immutable.
+ * reference. A folder's ID is its name. {@code $metadata} deprecates {@code Entry.ID} in
+ * schema 11.5.0, and TM1 12 omits {@code ID} altogether and keys entries by {@code Name}.
+ * {@link #child(Entry)} uses {@code ID} when present and falls back to {@code Name}.
+ * Paths are immutable.
  */
 public final class ContentPath {
 
@@ -58,8 +59,32 @@ public final class ContentPath {
 	}
 
 	/**
+	 * The {@code Files} folder, holding direct documents on TM1 12.
+	 * @return the path
+	 */
+	public static ContentPath files() {
+		return root("Files");
+	}
+
+	/**
+	 * The {@code Home} folder, holding the current user's direct documents on TM1 12.
+	 * @return the path
+	 */
+	public static ContentPath home() {
+		return root("Home");
+	}
+
+	/**
+	 * The {@code Session} folder, holding session-scoped direct documents on TM1 12.
+	 * @return the path
+	 */
+	public static ContentPath session() {
+		return root("Session");
+	}
+
+	/**
 	 * A public child of this folder: {@code …/Contents('id')}.
-	 * @param id the child's ID
+	 * @param id the child's key ({@code ID} on TM1 11, {@code Name} on TM1 12)
 	 * @return the child's path
 	 */
 	public ContentPath child(String id) {
@@ -68,11 +93,11 @@ public final class ContentPath {
 
 	/**
 	 * A public child of this folder, as TM1 returned it, such as from
-	 * {@code ContentService.create}: found by its {@code ID}, which {@code $metadata}
-	 * deprecates but TM1 (11.8) still keys entries by, so callers needn't read it.
+	 * {@code ContentService.create}: found by its {@code ID} when present (TM1 11),
+	 * falling back to its {@code Name} when {@code ID} is absent (TM1 12).
 	 * @param entry the entry
 	 * @return the child's path
-	 * @throws IllegalArgumentException if the entry has no ID (it was selected away)
+	 * @throws IllegalArgumentException if the entry has neither an ID nor a Name
 	 */
 	public ContentPath child(Entry entry) {
 		return child(entry, ContentScope.PUBLIC);
@@ -84,20 +109,23 @@ public final class ContentPath {
 	 * @param entry the entry
 	 * @param scope which of the folder's collections holds it
 	 * @return the child's path
-	 * @throws IllegalArgumentException if the entry has no ID
+	 * @throws IllegalArgumentException if the entry has neither an ID nor a Name
 	 */
-	@SuppressWarnings("deprecation") // ID is deprecated in $metadata, yet it's TM1's key
+	@SuppressWarnings("deprecation") // ID is deprecated in $metadata, yet TM1 11 keys by
+										// it
 	public ContentPath child(Entry entry, ContentScope scope) {
+		Objects.requireNonNull(entry, "entry");
 		String id = entry.id();
-		if (id == null) {
-			throw new IllegalArgumentException("The entry has no ID to find it by: " + entry);
+		String key = id != null && !id.isEmpty() ? id : entry.name();
+		if (key == null || key.isEmpty()) {
+			throw new IllegalArgumentException("The entry has neither an ID nor a Name to find it by: " + entry);
 		}
-		return child(id, scope);
+		return child(key, scope);
 	}
 
 	/**
 	 * A child of this folder, public or private.
-	 * @param id the child's ID
+	 * @param id the child's key ({@code ID} on TM1 11, {@code Name} on TM1 12)
 	 * @param scope which of the folder's collections holds it
 	 * @return the child's path
 	 */
@@ -113,6 +141,15 @@ public final class ContentPath {
 	 */
 	public boolean inBlobs() {
 		return steps.get(0).id().equals("Blobs");
+	}
+
+	/**
+	 * Whether this path is under a root that holds {@code Document} entities directly
+	 * ({@code Blobs}, {@code Files}, {@code Home}, {@code Session}, or any root other
+	 * than {@code Applications}, where documents are {@code DocumentReference}s).
+	 */
+	boolean isDirectDocumentRoot() {
+		return !steps.get(0).id().equalsIgnoreCase("Applications");
 	}
 
 	/**
