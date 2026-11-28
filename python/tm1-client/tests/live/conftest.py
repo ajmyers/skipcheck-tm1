@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from skipcheck_tm1 import Tm1Client, Tm1Session, Tm1Version
+from skipcheck_tm1 import Tm1Client, Tm1Dialect, Tm1Session, Tm1Version
 
 if TYPE_CHECKING:
     from .raw_tm1 import RawTm1
@@ -37,27 +37,37 @@ _RUNNING = os.environ.get("TM1_URL")
 _ALREADY_RUNNING = " Or set TM1_URL for a server that's already running."
 
 try:
-    from skipcheck_tm1_testcontainers import RequiresTm1, Tm1ServerContainer, Tm1Source, docker_available
+    from skipcheck_tm1_testcontainers import RequiresTm1, Tm1EngineContainer, Tm1EngineSource, Tm1ServerContainer, Tm1Source, docker_available
+    from skipcheck_tm1_testcontainers.engine import NO_SOURCE_MESSAGE as ENGINE_NO_SOURCE_MESSAGE
     from skipcheck_tm1_testcontainers.plugin import NO_DOCKER_MESSAGE
 except ImportError:  # tm1-testcontainers isn't installed: only TM1_URL
     _SOURCE = None
+    _ENGINE_SOURCE = None
     CONFIGURED = bool(_RUNNING)
     REASON = "Install tm1-testcontainers (pip install -e python/tm1-testcontainers) to start TM1 in Docker." + _ALREADY_RUNNING
 else:
     _SOURCE = Tm1Source.discover()  # raises if a source is set but wrong, as Java's does
-    CONFIGURED = bool(_RUNNING) or (_SOURCE is not None and docker_available())
+    _ENGINE_SOURCE = None if _SOURCE is not None else Tm1EngineSource.discover()
+    CONFIGURED = bool(_RUNNING) or ((_SOURCE is not None or _ENGINE_SOURCE is not None) and docker_available())
     """Whether there's a TM1 to test against: the tests skip without one."""
-    REASON = RequiresTm1.NO_SOURCE_MESSAGE + _ALREADY_RUNNING if _SOURCE is None else NO_DOCKER_MESSAGE
+    REASON = (
+        f"{RequiresTm1.NO_SOURCE_MESSAGE} {ENGINE_NO_SOURCE_MESSAGE}{_ALREADY_RUNNING}" if _SOURCE is None and _ENGINE_SOURCE is None else NO_DOCKER_MESSAGE
+    )
+
+IS_ENGINE: bool = not _RUNNING and _SOURCE is None and _ENGINE_SOURCE is not None
+"""Whether the live tests are running against a TM1 v12 engine container."""
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 INSTALL: str | None = None
 """Whether the TM1 the tests run against can write to its own install, as Java's
-ServerAssumptions.Install names it: "readOnly" for an installed folder (TM1_HOME_DIR, which
-tm1-testcontainers mounts read-only), "writable" for any other source, and None for a server the
-suite didn't start (TM1_URL)."""
+ServerAssumptions.Install names it: "readOnly" for an installed folder (TM1_HOME_DIR or
+TM1_ENGINE_HOME_DIR, which tm1-testcontainers mounts read-only), "writable" for any other source,
+and None for a server the suite didn't start (TM1_URL)."""
 if not _RUNNING and _SOURCE is not None:
     INSTALL = "readOnly" if isinstance(_SOURCE, Tm1Source.InstallDir) else "writable"
+elif not _RUNNING and _ENGINE_SOURCE is not None:
+    INSTALL = "readOnly" if isinstance(_ENGINE_SOURCE, Tm1EngineSource.InstallDir) else "writable"
 
 
 def target() -> tuple[str, str, str]:
@@ -65,8 +75,11 @@ def target() -> tuple[str, str, str]:
     (one for the run, removed at its end by tm1-testcontainers' pytest plugin)."""
     if _RUNNING:
         return _RUNNING, os.environ.get("TM1_USER", "admin"), os.environ.get("TM1_PASSWORD", "apple")
-    if not CONFIGURED or _SOURCE is None:
+    if not CONFIGURED or (_SOURCE is None and _ENGINE_SOURCE is None):
         pytest.skip(REASON)
+    if IS_ENGINE:
+        db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+        return db.rest_url, db.login().user, ""
     container = Tm1ServerContainer.shared()
     return container.rest_url, container.username, container.password
 
@@ -74,6 +87,14 @@ def target() -> tuple[str, str, str]:
 def _builder(builder: Any) -> Any:
     from skipcheck_tm1 import auth
 
+    if IS_ENGINE:
+        db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+        login = db.login()
+        return (
+            builder.base_url(db.rest_url)
+            .dialect(Tm1Dialect.v12(db.instance, db.name))
+            .authenticator(auth.application(login.client_id, login.client_secret, login.user))
+        )
     url, user, password = target()
     namespace = os.environ.get("TM1_NAMESPACE") if _RUNNING else None
     builder = builder.base_url(url).verify(os.environ.get("TM1_VERIFY", "true").lower() != "false")
@@ -105,13 +126,29 @@ ADMIN = os.environ.get("TM1_USER", "admin")
 """The user the tests log in as."""
 
 
+def authenticator(user: str, password: str) -> Any:
+    """An authenticator for a named user: application auth on TM1 v12, Basic on TM1 11."""
+    from skipcheck_tm1 import auth
+
+    if IS_ENGINE:
+        db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+        login = db.login(user)
+        return auth.application(login.client_id, login.client_secret, login.user)
+    return auth.basic(user, password)
+
+
 def other_client(**settings: Any) -> Tm1Client:
     """Another client of the configured TM1: as the admin, or as ``user``/``password``."""
     from skipcheck_tm1 import auth
 
     builder = _builder(Tm1Client.builder())
     if "user" in settings:
-        builder = builder.authenticator(auth.basic(settings["user"], settings["password"]))
+        if IS_ENGINE:
+            db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+            login = db.login(settings["user"])
+            builder = builder.authenticator(auth.application(login.client_id, login.client_secret, login.user))
+        else:
+            builder = builder.authenticator(auth.basic(settings["user"], settings["password"]))
     if "session_context" in settings:
         builder = builder.session_context(settings["session_context"])
     return builder.build()
@@ -123,6 +160,8 @@ def started_version() -> Tm1Version | None:
     if _RUNNING:
         return None
     target()
+    if IS_ENGINE:
+        return Tm1EngineContainer.shared().tm1_version
     return Tm1ServerContainer.shared().tm1_version
 
 

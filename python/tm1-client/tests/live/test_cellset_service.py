@@ -25,6 +25,7 @@ from .support import (
     dimension,
     drop,
     element,
+    is_v12,
 )
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
@@ -58,22 +59,23 @@ def gone(tm1: Tm1Client, id: str) -> bool:
 
 
 def test_runs_mdx_and_reads_the_cellset_piece_by_piece(tm1: Tm1Client, cellset_cube: Any) -> None:
+    v12 = is_v12(tm1)
     cube, region, _, mdx = cellset_cube
     cellsets = tm1.cellsets
     cellset = cellsets.execute(mdx, ODataQuery.none().expand("Axes").expand("Cells", lambda c: c.select("Ordinal", "Value")))
     id = cellset.id
     assert id
-    assert len(cellset.axes) == 3, "columns, rows and the slicer TM1 adds"
+    assert len(cellset.axes) == (2 if v12 else 3), "columns and rows" if v12 else "columns, rows and the slicer TM1 adds"
     assert len(cellset.cells) == 8
     try:
         assert cellsets.list() == [], "TM1 lists none, though each reads by ID"
         assert cellsets.get(id).id == id
-        assert [a.cardinality for a in cellsets.axes(id)] == [2, 4, 1]
+        assert [a.cardinality for a in cellsets.axes(id)] == ([2, 4] if v12 else [2, 4, 1])
         assert [h.name for h in cellsets.hierarchies(id, 1)] == [region]
         assert len(cellsets.tuples(id, 1)) == 4
         assert [m.name for m in cellsets.tuple_members(id, 1, 2)] == ["E"]
         assert [float(c.value) for c in cellsets.cells(id, select=["Ordinal", "Value"])] == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-        assert [m.name for m in cellsets.cell_members(id, 5)] == ["Base", "E", "Count"], "Sandboxes' Base first"
+        assert [m.name for m in cellsets.cell_members(id, 5)] == (["E", "Count"] if v12 else ["Base", "E", "Count"])
         assert cellsets.cube(id).name == cube
         assert [c.ordinal for c in cellsets.partition(id, 2, 4, select="Ordinal")] == [2, 4], "a rectangle"
         assert [c.ordinal for c in cellsets.partition(id, 2, 5, select="Ordinal")] == [2, 3, 4, 5], "whole rows"

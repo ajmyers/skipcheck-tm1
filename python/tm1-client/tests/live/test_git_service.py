@@ -22,8 +22,8 @@ from skipcheck_tm1 import Tm1BadRequestError, Tm1Client, Tm1Error, Tm1NotFoundEr
 from skipcheck_tm1._sync.services.git import GitCommitDetails, GitCredentials
 from skipcheck_tm1.model import DimensionCreate, ElementCreate, GitPushPlan, HierarchyCreate
 
-from .conftest import _RUNNING, CONFIGURED, REASON
-from .support import STALE_FIRST_PULL_FROM, is_at_least
+from .conftest import _RUNNING, CONFIGURED, IS_ENGINE, REASON
+from .support import STALE_FIRST_PULL_FROM, is_at_least, is_v12
 
 GIVEN = (os.environ.get("TM1_GIT_URL") or "").strip() or None
 
@@ -72,9 +72,9 @@ class GitDaemon:
         from testcontainers.core.container import DockerContainer
         from testcontainers.core.waiting_utils import wait_for_logs
 
-        from skipcheck_tm1_testcontainers import Tm1ServerContainer
+        from skipcheck_tm1_testcontainers import Tm1EngineContainer, Tm1ServerContainer
 
-        tm1 = Tm1ServerContainer.shared()
+        tm1 = Tm1EngineContainer.shared() if IS_ENGINE else Tm1ServerContainer.shared()
         container = DockerContainer("alpine:3.21").with_kwargs(network_mode=f"container:{tm1.container_id}")
         container.with_command(["sh", "-c", _SEED])
         container.start()
@@ -163,10 +163,10 @@ def test_pushes_the_model_and_pulls_it_back(tm1: Tm1Client, remote: GitDaemon) -
 
         if remote.local:
             remote.commit_copy_of(dimension, copy)
-            # The first pull after the remote moves: from 11.8.034 the commit TM1 had, then the new
-            # one; before, the new one at once
+            # The first pull after the remote moves: on TM1 11.8.034+ the commit TM1 had, then the
+            # new one; before 11.8.034 and on TM1 v12, the new one at once
             pull = tm1.git.pull("main", none, None, True)
-            if is_at_least(tm1, STALE_FIRST_PULL_FROM):
+            if is_at_least(tm1, STALE_FIRST_PULL_FROM) and not is_v12(tm1):
                 assert pull.commit.summary == "Add a dimension", "the commit TM1 had"
                 pull = tm1.git.pull("main", none, None, True)
             assert pull.commit.summary == f"Copy {dimension}"

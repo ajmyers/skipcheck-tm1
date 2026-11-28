@@ -13,10 +13,13 @@ import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1ApiError, Tm1ErrorKind, Tm1Request, Tm1Session
 
-from .conftest import CONFIGURED, REASON, session
+from .conftest import CONFIGURED, IS_ENGINE, REASON, session
 from .raw_tm1 import RawTm1
 
-pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
+pytestmark = [
+    pytest.mark.skipif(not CONFIGURED, reason=REASON),
+    pytest.mark.skipif(IS_ENGINE, reason="TM1 v12 does not support TM1-Impersonate; pass the user to application auth"),
+]
 
 ACTIVE_USER = Tm1Request.get(ODataPath.of("ActiveUser"), ODataQuery.none().select("Name"), dict)
 

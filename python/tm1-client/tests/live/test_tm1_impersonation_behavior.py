@@ -14,10 +14,13 @@ from urllib.parse import quote
 import httpx2
 import pytest
 
-from .conftest import CONFIGURED, REASON
+from .conftest import CONFIGURED, IS_ENGINE, REASON
 from .raw_tm1 import RawTm1
 
-pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
+pytestmark = [
+    pytest.mark.skipif(not CONFIGURED, reason=REASON),
+    pytest.mark.skipif(IS_ENGINE, reason="TM1 v12 does not support TM1-Impersonate"),
+]
 
 ACTIVE_USER = "ActiveUser?$select=Name"
 

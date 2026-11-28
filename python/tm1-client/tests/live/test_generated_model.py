@@ -28,7 +28,7 @@ from skipcheck_tm1.model import (
 )
 
 from .conftest import CONFIGURED, REASON, session, started_version
-from .support import own_snapshot
+from .support import TM1_12, own_snapshot
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -38,7 +38,12 @@ def test_reads_the_server_and_streams_dimensions_into_generated_types() -> None:
         server = s.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Server))
         version = started_version()
         if version is not None:
-            assert server.product_version == str(version)
+            if version >= TM1_12:
+                assert server.name
+                selected = s.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("ProductVersion"), Server))
+                assert selected.product_version == str(version)
+            else:
+                assert server.product_version == str(version)
         assert server.etag is None, "TM1 sends no ETag for the Server singleton"
 
         dimensions = list(s.stream(Tm1Request.list(ODataPath.of("Dimensions"), ODataQuery.none().expand("Hierarchies"), Dimension)))
@@ -102,7 +107,11 @@ def test_creates_a_dimension_and_a_cube_from_patches_then_patches_and_clears_its
             s.execute(Tm1Request.post(ODataPath.of("Cubes"), CubeCreate.builder().name(name).bind_dimensions(dimension, groups).build(), Cube))
 
             created = s.execute(Tm1Request.get(cube, ODataQuery.none().expand(Cube.DIMENSIONS, lambda d: d.select(Dimension.NAME)), Cube))
-            assert [d.name for d in created.dimensions] == ["Sandboxes", name, "}Groups"], "TM1 lists its virtual Sandboxes dimension first"
+            version = s.capabilities().product_version
+            if version is not None and version >= TM1_12:
+                assert [d.name for d in created.dimensions] == [name, "}Groups"]
+            else:
+                assert [d.name for d in created.dimensions] == ["Sandboxes", name, "}Groups"], "TM1 lists its virtual Sandboxes dimension first"
             elements = list(s.stream(Tm1Request.list(dimension.nav("Hierarchies").key(name).nav("Elements"), ODataQuery.none(), Element)))
             assert sorted((e.name, e.type) for e in elements) == [("North", ElementType.NUMERIC), ("South", ElementType.NUMERIC)]
 

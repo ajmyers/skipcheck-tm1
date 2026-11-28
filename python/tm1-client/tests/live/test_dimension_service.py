@@ -27,6 +27,7 @@ from .conftest import CONFIGURED, REASON
 from .support import (
     assume_supports,
     dimension_of,
+    is_v12,
     made,
     names,
     numeric,
@@ -66,7 +67,10 @@ def test_ignores_hierarchies_and_the_all_leaves_name_in_a_patch(tm1: Tm1Client, 
         hierarchy = HierarchyCreate.builder().name(d).elements([numeric("North"), numeric("South"), numeric("East")]).build()
         tm1.session.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(d), {"AllLeavesHierarchyName": "AllLeaves", "Hierarchies": [hierarchy.json()]}))
         read = tm1.dimensions.get(d, ODataQuery.none().expand(Dimension.HIERARCHIES, lambda h: h.expand(Hierarchy.ELEMENTS)))
-        assert not read.all_leaves_hierarchy_name, "TM1 accepts the PATCH and ignores it"
+        if is_v12(tm1):
+            assert read.all_leaves_hierarchy_name == "AllLeaves", "TM1 v12 applies AllLeavesHierarchyName"
+        else:
+            assert not read.all_leaves_hierarchy_name, "TM1 accepts the PATCH and ignores it"
         assert len(read.hierarchies) == 1 and len(read.hierarchies[0].elements) == 2
 
 

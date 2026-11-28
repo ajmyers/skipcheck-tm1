@@ -19,10 +19,9 @@ from skipcheck_tm1 import (
     Tm1Session,
     Tm1SessionPool,
     Tm1UnsupportedOperationError,
-    auth,
 )
 
-from .conftest import CONFIGURED, REASON, _builder, session, started_version, target
+from .conftest import CONFIGURED, REASON, _builder, authenticator, session, started_version, target
 from .support import own_snapshot, schema_version_in
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
@@ -68,7 +67,7 @@ def test_shares_one_fetch_between_a_pools_sessions() -> None:
     pool = Tm1SessionPool.builder(_builder(Tm1Session.builder())).build()
     try:
         first = pool.session().capabilities()
-        second = pool.session(Tm1Identity.with_credentials("again", auth.basic(user, password))).capabilities()
+        second = pool.session(Tm1Identity.with_credentials("again", authenticator(user, password))).capabilities()
         assert second is first
     finally:
         pool.close()

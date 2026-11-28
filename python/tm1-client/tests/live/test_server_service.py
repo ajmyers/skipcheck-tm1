@@ -6,17 +6,22 @@ from __future__ import annotations
 
 import pytest
 
-from skipcheck_tm1 import ODataPath, Tm1BadRequestError, Tm1Client, Tm1Request
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1BadRequestError, Tm1Client, Tm1Request
 from skipcheck_tm1.model import AdministrationSettingsPatch, LogLevel, ServerSettingsPatch
 
 from .conftest import CONFIGURED, REASON
+from .support import is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
+    v12 = is_v12(tm1)
     read = tm1.server.server()
-    assert read.product_version
+    if v12:
+        assert tm1.server.server(ODataQuery.none().select("ProductVersion")).product_version
+    else:
+        assert read.product_version
     assert read.etag is None, "none for the Server"
     fixed = tm1.server.static_configuration()
     active = tm1.server.active_configuration()
@@ -38,8 +43,11 @@ def test_reads_the_server_and_its_configurations(tm1: Tm1Client) -> None:
                 .build(),
             )
         )
-    # A duration here, though declared Int32
-    assert isinstance(active.access.cam.client_ping_cam_passport, str)
+    if v12:
+        assert active.access is None
+    else:
+        # A duration here, though declared Int32
+        assert isinstance(active.access.cam.client_ping_cam_passport, str)
 
 
 def test_reads_and_sets_logger_levels(tm1: Tm1Client) -> None:

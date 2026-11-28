@@ -20,10 +20,13 @@ from urllib.parse import urlsplit
 import httpx2
 import pytest
 
-from .conftest import CONFIGURED, REASON, target
+from .conftest import CONFIGURED, IS_ENGINE, REASON, target
 from .raw_tm1 import RawTm1
 
-pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
+pytestmark = [
+    pytest.mark.skipif(not CONFIGURED, reason=REASON),
+    pytest.mark.skipif(IS_ENGINE, reason="TM1 11 bare-HTTP session behavior tests"),
+]
 
 
 def dimension(name: str) -> str:
