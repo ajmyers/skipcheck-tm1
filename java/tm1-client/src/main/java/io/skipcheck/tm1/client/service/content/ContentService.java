@@ -73,8 +73,9 @@ public final class ContentService {
 	}
 
 	/**
-	 * {@code GET Contents}, streamed: the root folders, {@code Applications} and
-	 * {@code Blobs}.
+	 * {@code GET Contents}, streamed: the root folders ({@code Applications} and
+	 * {@code Blobs} on TM1 11; {@code Applications}, {@code Files}, {@code Home}, and
+	 * {@code Session} on TM1 12).
 	 * @param query what to select, expand, filter and order
 	 * @return the roots
 	 */
@@ -119,13 +120,16 @@ public final class ContentService {
 	/**
 	 * Makes an entry in a folder: a {@code FolderCreate}, {@code DocumentCreate},
 	 * {@code LinkCreate} or a reference, such as a {@code CubeReferenceCreate} with
-	 * {@code bindCube(ODataPath.of("Cubes").key("Sales"))}. A document made outside
-	 * {@code Blobs} comes back as a {@code DocumentReference}, with an empty document
-	 * behind it; {@link #upload} gives it content.
+	 * {@code bindCube(ODataPath.of("Cubes").key("Sales"))}. A document made under
+	 * {@code Applications} comes back as a {@code DocumentReference}, with an empty
+	 * document behind it; a document made under a direct-document root ({@code Blobs},
+	 * {@code Files}, {@code Home}, or {@code Session}) comes back as a {@code Document}.
+	 * {@link #upload} gives it content.
 	 * @param folder the folder
 	 * @param scope whether it's public or private
 	 * @param entry the entry
-	 * @return the entry as made, with the {@code ID} to find it by
+	 * @return the entry as made, with the {@code ID} (TM1 11) or {@code Name} (TM1 12) to
+	 * find it by
 	 */
 	@Tm1Endpoint("Navigation Folder/Contents")
 	@Tm1Endpoint("Navigation Folder/PrivateContents")
@@ -194,8 +198,10 @@ public final class ContentService {
 	}
 
 	/**
-	 * {@code Document}: the document a reference refers to, in {@code Blobs}.
-	 * @param reference where the {@code DocumentReference} is
+	 * {@code Document}: the document itself (under {@code Blobs}, {@code Files},
+	 * {@code Home}, or {@code Session}), or the document a reference in
+	 * {@code Applications} refers to.
+	 * @param reference where the document or {@code DocumentReference} is
 	 * @param query what to select
 	 * @return the document, with its {@code Size} and {@code LastUpdated}
 	 */
@@ -206,7 +212,8 @@ public final class ContentService {
 
 	/**
 	 * A document's {@code Content}, streamed as it arrives. The path is a document
-	 * reference, or a document in {@code Blobs}. Each buffer is the subscriber's to
+	 * reference in {@code Applications}, or a direct document under {@code Blobs},
+	 * {@code Files}, {@code Home}, or {@code Session}. Each buffer is the subscriber's to
 	 * release, or to hand on, such as to {@code DataBufferUtils.write}.
 	 * @param document where it is
 	 * @return the bytes
@@ -217,11 +224,12 @@ public final class ContentService {
 	}
 
 	/**
-	 * Replaces a document's {@code Content}. The path is a document reference, or a
-	 * document in {@code Blobs}. TM1 (11.8) refuses a chunked upload, so the content is
-	 * gathered and sent with its length: it's held in memory whole while it's sent. If
-	 * the session has to log in again, {@code content} is subscribed again, so it should
-	 * be one that can be, such as {@code DataBufferUtils.read} of a file.
+	 * Replaces a document's {@code Content}. The path is a document reference in
+	 * {@code Applications}, or a direct document under {@code Blobs}, {@code Files},
+	 * {@code Home}, or {@code Session}. TM1 (11.8) refuses a chunked upload, so the
+	 * content is gathered and sent with its length: it's held in memory whole while it's
+	 * sent. If the session has to log in again, {@code content} is subscribed again, so
+	 * it should be one that can be, such as {@code DataBufferUtils.read} of a file.
 	 * @param document where it is
 	 * @param content the bytes
 	 * @return completes when they're written
@@ -232,7 +240,7 @@ public final class ContentService {
 	}
 
 	private static ODataPath document(ContentPath entry) {
-		return entry.inBlobs() ? entry.path().cast("tm1.Document")
+		return entry.isDirectDocumentRoot() ? entry.path().cast("tm1.Document")
 				: entry.path().cast("tm1.DocumentReference").nav("Document");
 	}
 
