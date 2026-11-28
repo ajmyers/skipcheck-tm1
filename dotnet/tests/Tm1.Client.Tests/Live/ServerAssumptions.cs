@@ -19,6 +19,12 @@ internal static class ServerAssumptions
     /// (2.1.17) the stale, and no build between them was released.</summary>
     public static readonly Tm1Version StaleFirstPullFrom = Tm1Version.Parse("11.8.03400");
 
+    /// <summary>First TM1 v12 (Planning Analytics Engine) version.</summary>
+    public static readonly Tm1Version Tm1_12 = Tm1Version.Parse("12.0");
+
+    /// <summary>Whether the server is TM1 v12 or newer.</summary>
+    public static Task<bool> IsV12Async(Tm1Client tm1) => IsAtLeastAsync(tm1, Tm1_12);
+
     /// <summary>Whether the server defines the operation.</summary>
     public static async Task<bool> SupportsAsync(Tm1Client tm1, Tm1Operation operation) =>
         (await tm1.Session.CapabilitiesAsync()).Supports(operation.Capability());

@@ -13,6 +13,7 @@ from skipcheck_tm1 import (
 )
 
 from .conftest import CONFIGURED, REASON
+from .support import is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -20,9 +21,12 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 def test_reads_and_clears_the_oidc_key_cache(tm1: Tm1Client) -> None:
     assert tm1.oidc_keys.keys() == []
     tm1.oidc_keys.remove([])
-    with pytest.raises(Tm1NotFoundError, match="ObjectNotFound"):
-        # TM1 answers 400 ObjectNotFound, read as not found
+    if is_v12(tm1):
         tm1.oidc_keys.remove(["not-cached"])
+    else:
+        with pytest.raises(Tm1NotFoundError, match="ObjectNotFound"):
+            # TM1 answers 400 ObjectNotFound, read as not found
+            tm1.oidc_keys.remove(["not-cached"])
 
 
 def test_lists_the_hosts_odbc_sources(tm1: Tm1Client) -> None:

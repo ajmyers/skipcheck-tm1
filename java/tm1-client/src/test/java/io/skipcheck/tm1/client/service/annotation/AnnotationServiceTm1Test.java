@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1ErrorKind;
@@ -59,8 +60,16 @@ class AnnotationServiceTm1Test {
 			assertThat(made.dynamicProperties()).containsKeys("objectName", "commentValue", "commentLocation");
 			assertThat(made.dynamicProperties().get("commentLocation").asString()).isEqualTo("Admin,ADMIN");
 
-			assertThat(tm1.annotations().list(ODataQuery.none()).collectList().block(WAIT)).as("TM1 lists none here")
-				.isEmpty();
+			if (ServerAssumptions.isV12(tm1)) {
+				assertThat(tm1.annotations().list(ODataQuery.none()).map(Annotation::id).collectList().block(WAIT))
+					.as("TM1 v12 lists annotations at GET Annotations")
+					.contains(id);
+			}
+			else {
+				assertThat(tm1.annotations().list(ODataQuery.none()).collectList().block(WAIT))
+					.as("TM1 lists none here")
+					.isEmpty();
+			}
 			assertThat(tm1.annotations()
 				.cubeAnnotations(CUBE, ODataQuery.none())
 				.map(Annotation::id)

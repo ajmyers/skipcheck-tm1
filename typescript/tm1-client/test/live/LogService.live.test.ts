@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { ODataQuery, ProcessCreate, UserCreate, type MessageLogEntry, type Tm1Client, type Tm1Stream } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -35,7 +36,8 @@ describe("LogService on TM1" + liveReason, () => {
     if (tm1) await tm1.close();
   });
 
-  tm1Test("reads the message log", async () => {
+  tm1Test("reads the message log", async (context) => {
+    if (await isV12(tm1)) return context.skip("TM1 v12 does not populate MessageLogEntries");
     const first = await tm1.logs.messageLogEntries(ODataQuery.none().top(20)).toArray();
     expect(first.length).toBeGreaterThan(0);
     expect(
@@ -51,7 +53,8 @@ describe("LogService on TM1" + liveReason, () => {
     expect(Date.parse(newest[0]!.TimeStamp!)).toBeGreaterThanOrEqual(Date.parse(newest[2]!.TimeStamp!));
   });
 
-  tm1Test("follows the message log without repeating", async () => {
+  tm1Test("follows the message log without repeating", async (context) => {
+    if (await isV12(tm1)) return context.skip("TM1 v12 does not populate MessageLogEntries");
     const login = async (): Promise<void> => {
       const other = await Live.client();
       try {
@@ -73,7 +76,8 @@ describe("LogService on TM1" + liveReason, () => {
     expect(distinct.size, "no entry twice, though each poll returns them all again").toBe(seen.length);
   });
 
-  tm1Test("reads a password's hash that isn't UTF-8 as replacement characters", async () => {
+  tm1Test("reads a password's hash that isn't UTF-8 as replacement characters", async (context) => {
+    if (await isV12(tm1)) return context.skip("TM1 v12 stores no local passwords and does not populate legacy TransactionLogEntries by default");
     const user = Live.name();
     await tm1.users.create(UserCreate.builder().name(user).password("pw").build());
     try {
@@ -87,7 +91,8 @@ describe("LogService on TM1" + liveReason, () => {
     }
   });
 
-  tm1Test("reads the transaction and audit logs", async () => {
+  tm1Test("reads the transaction and audit logs", async (context) => {
+    if (await isV12(tm1)) return context.skip("TM1 v12 leaves TransactionLogEntries empty unless LegacyTransactionLog is set");
     expect((await tm1.logs.transactionLogEntries(ODataQuery.none().top(5)).toArray()).length).toBeGreaterThan(0);
     expect((await tm1.logs.transactionLog(true, true, ODataQuery.none().top(5)).toArray()).every((e) => e.StatusMessage == null)).toBe(true);
     expect(await tm1.logs.auditLogEntries(ODataQuery.none().expand("AuditDetails").top(5)).toArray(), "the audit log is off on the test server").toEqual([]);
@@ -96,6 +101,7 @@ describe("LogService on TM1" + liveReason, () => {
   });
 
   tm1Test("reads a process error log", async () => {
+    const v12 = await isV12(tm1);
     const process = Live.name();
     await tm1.processes.create(ProcessCreate.builder().name(process).prologProcedure("ProcessError;\n").build());
     try {
@@ -104,7 +110,7 @@ describe("LogService on TM1" + liveReason, () => {
       expect((await tm1.logs.errorLogFiles(ODataQuery.none()).toArray()).some((f) => f.Filename === filename)).toBe(true);
       expect((await tm1.logs.errorLogFile(filename, ODataQuery.none())).Filename).toBe(filename);
       const content = await tm1.logs.errorLogContent(filename);
-      expect(content.startsWith("Error:"), "without the byte order mark").toBe(true);
+      expect(content.startsWith(v12 ? "{" : "Error:"), "without the byte order mark (JSONL on v12)").toBe(true);
       expect(content).toContain("ProcessError");
     } finally {
       await tm1.processes.delete(process);

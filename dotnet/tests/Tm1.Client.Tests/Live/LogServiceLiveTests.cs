@@ -17,6 +17,10 @@ public class LogServiceLiveTests
     public async Task ReadsTheMessageLog()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 does not populate MessageLogEntries (xUnit 2 can't skip once started)
+        }
         var first = await tm1.Logs.MessageLogEntriesAsync(ODataQuery.None().Top(20)).ToListAsync();
         Assert.NotEmpty(first);
         // An entry without a time reads as null rather than failing
@@ -33,6 +37,10 @@ public class LogServiceLiveTests
     public async Task FollowsTheMessageLogWithoutRepeating()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 does not populate MessageLogEntries
+        }
         using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(6));
         var logins = Task.Run(async () =>
         {
@@ -65,6 +73,10 @@ public class LogServiceLiveTests
     public async Task ReadsAPasswordsHashThatIsntUtf8AsReplacementCharacters()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 stores no local passwords and does not populate legacy TransactionLogEntries by default
+        }
         var user = Live.Name();
         await tm1.Users.CreateAsync(UserCreate.Builder().Name(user).Password("pw").Build());
         try
@@ -84,6 +96,10 @@ public class LogServiceLiveTests
     public async Task ReadsTheTransactionAndAuditLogs()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 leaves TransactionLogEntries empty unless LegacyTransactionLog is set (xUnit 2 can't skip once started)
+        }
         Assert.NotEmpty(await tm1.Logs.TransactionLogEntriesAsync(ODataQuery.None().Top(5)).ToListAsync());
         Assert.All(await tm1.Logs.TransactionLogAsync(true, true, ODataQuery.None().Top(5)).ToListAsync(), e => Assert.Null(e.StatusMessage));
         // The audit log is off on the test server
@@ -96,6 +112,7 @@ public class LogServiceLiveTests
     public async Task ReadsAProcessErrorLog()
     {
         await using var tm1 = Live.Client();
+        var v12 = await ServerAssumptions.IsV12Async(tm1);
         var process = Live.Name();
         await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(process).PrologProcedure("ProcessError;\n").Build());
         try
@@ -104,7 +121,7 @@ public class LogServiceLiveTests
             Assert.Contains(await tm1.Logs.ErrorLogFilesAsync().ToListAsync(), f => f.Filename == filename);
             Assert.Equal(filename, (await tm1.Logs.ErrorLogFileAsync(filename)).Filename);
             var content = await tm1.Logs.ErrorLogContentAsync(filename);
-            Assert.StartsWith("Error:", content); // without the byte order mark
+            Assert.StartsWith(v12 ? "{" : "Error:", content); // without the byte order mark (JSONL on v12)
             Assert.Contains("ProcessError", content);
         }
         finally

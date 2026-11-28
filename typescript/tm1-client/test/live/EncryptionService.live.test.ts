@@ -12,7 +12,7 @@ import {
 } from "../../src/index.js";
 import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { type Install, installOf, lacks } from "./server-assumptions.js";
+import { type Install, installOf, isV12, lacks } from "./server-assumptions.js";
 
 const LOCAL = LocalKeyFileProviderSettingsPatch.builder().keyRef("/tmp/tm1-client.key").build();
 
@@ -90,15 +90,12 @@ describe("EncryptionService on TM1" + liveReason, () => {
     await refused(Tm1Operations.DisableEncryptionAtRest, () => tm1.encryption.disable(), "DataModelConversion");
     await refused(Tm1Operations.RotateDataEncryptionKey, () => tm1.encryption.rotateDataEncryptionKey(), "DataEncryptionKeyRotationFailed");
     await refused(Tm1Operations.RotateDataModelKey, () => tm1.encryption.rotateDataModelKey(), "RotateDataModelKey");
-    await refused(
-      Tm1Operations.EncryptDataFile,
-      () => tm1.encryption.encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object),
-      "DataFileConversion",
-    );
+    const fileCode = (await isV12(tm1)) ? "UnsupportedOperation" : "DataFileConversion";
+    await refused(Tm1Operations.EncryptDataFile, () => tm1.encryption.encryptFile("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object), fileCode);
     await refused(
       Tm1Operations.DecryptDataFile,
       () => tm1.encryption.decryptFile("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.Object),
-      "DataFileConversion",
+      fileCode,
     );
   });
 });

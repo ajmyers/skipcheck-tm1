@@ -5,6 +5,7 @@ import { describe, expect } from "vitest";
 import { Json, ODataPath, ODataQuery, Tm1Exception, Tm1NotFoundException, Tm1Request } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
 import { failure, createProcess, execute } from "./raw-tm1.js";
+import { isV12 } from "./server-assumptions.js";
 
 /** The Java client's `Tm1BatchTm1Test`. */
 describe("Tm1 batches on TM1" + liveReason, () => {
@@ -17,13 +18,14 @@ describe("Tm1 batches on TM1" + liveReason, () => {
       await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
       await tm1.session.execute(createProcess(process, "x = 1;\n"));
       try {
+        const v12 = await isV12(tm1);
         const batch = tm1.batch();
         const queued = batch.client.session;
         const elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements");
         const cube = queued.execute(Tm1Request.get<{ Name: string }>(ODataPath.of("Cubes").key("}ClientGroups"), ODataQuery.none().select("Name")));
         const missing = queued.execute(Tm1Request.get(ODataPath.of("Cubes").key("not-a-cube")));
         const north = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json) as Tm1Request<{ Name: string }>);
-        const twice = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json));
+        const twice = queued.execute(Tm1Request.post(elements, { Name: "North" }, Json) as Tm1Request<{ Name: string }>);
         const listed = queued
           .stream(Tm1Request.list<{ Name: string }>(elements, null))
           .map((e) => e.Name)
@@ -33,11 +35,35 @@ describe("Tm1 batches on TM1" + liveReason, () => {
         await batch.run();
         expect((await cube).Name).toBe("}ClientGroups");
         expect(await failure(missing)).toBeInstanceOf(Tm1NotFoundException);
-        expect((await north).Name).toBe("North");
-        // TM1 carries on past it, in order
-        expect(await failure(twice)).toBeInstanceOf(Tm1Exception);
-        // Sees the element made before it
-        expect(await listed).toEqual(["North"]);
+        if (v12) {
+          // TM1 v12 runs batch requests concurrently: one of the duplicate creates succeeds and the other fails,
+          // and the list may observe the dimension before or after the create
+          const results: string[] = [];
+          const failures: unknown[] = [];
+          for (const outcome of [north, twice]) {
+            try {
+              results.push((await outcome).Name);
+            } catch (e) {
+              if (e instanceof Tm1Exception) failures.push(e);
+              else throw e;
+            }
+          }
+          expect(results).toEqual(["North"]);
+          expect(failures).toHaveLength(1);
+          await listed;
+          expect(
+            await tm1.session
+              .stream(Tm1Request.list<{ Name: string }>(elements, null))
+              .map((e) => e.Name)
+              .toArray(),
+          ).toEqual(["North"]);
+        } else {
+          expect((await north).Name).toBe("North");
+          // TM1 carries on past it, in order
+          expect(await failure(twice)).toBeInstanceOf(Tm1Exception);
+          // Sees the element made before it
+          expect(await listed).toEqual(["North"]);
+        }
         expect((await run).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
       } finally {
         await tm1.session.execute(Tm1Request.delete(ODataPath.of("Processes").key(process)));
@@ -50,11 +76,13 @@ describe("Tm1 batches on TM1" + liveReason, () => {
 
   tm1Test(
     "runs requests in order",
-    async () => {
+    async (context) => {
       const tm1 = await Live.client();
-      const dimension = "batch" + randomUUID().replace(/-/g, "").slice(0, 8);
-      await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
+      let dimension: string | undefined;
       try {
+        if (await isV12(tm1)) return context.skip("TM1 v12 runs batch requests concurrently");
+        dimension = "batch" + randomUUID().replace(/-/g, "").slice(0, 8);
+        await tm1.session.execute(Tm1Request.post(ODataPath.of("Dimensions"), { Name: dimension, Hierarchies: [{ Name: dimension }] }));
         const batch = tm1.batch();
         const queued = batch.client.session;
         const elements = ODataPath.of("Dimensions").key(dimension).nav("Hierarchies").key(dimension).nav("Elements");
@@ -76,7 +104,7 @@ describe("Tm1 batches on TM1" + liveReason, () => {
           expect((await after[i]!).Name).toBe("e" + i);
         }
       } finally {
-        await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(dimension)));
+        if (dimension) await tm1.session.execute(Tm1Request.delete(ODataPath.of("Dimensions").key(dimension))).catch(() => undefined);
         await tm1.close();
       }
     },

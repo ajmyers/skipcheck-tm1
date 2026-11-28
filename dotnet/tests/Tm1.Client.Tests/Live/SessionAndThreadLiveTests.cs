@@ -29,14 +29,22 @@ public sealed class SessionAndThreadLiveTests
         Assert.Contains(id, await tm1.Users.SessionsAsync(Live.Target().User).Select(s => s.Id).ToListAsync());
 
         await tm1.Sessions.CloseAsync(id);
-        // The other client logs in again, as a new session
-        Assert.NotEqual(id, (await other.Sessions.ActiveSessionAsync()).Id);
+        var after = (await other.Sessions.ActiveSessionAsync()).Id;
+        if (!await ServerAssumptions.IsV12Async(tm1))
+        {
+            // The other client logs in again, as a new session (on v12, database-scoped Sessions(id)/tm1.Close leaves the gateway session open)
+            Assert.NotEqual(id, after);
+        }
     }
 
     [Tm1Fact]
     public async Task CancelsARunningProcessThroughItsThread()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 tracks work in Jobs rather than Threads (xUnit 2 can't skip once started)
+        }
         var process = Live.Name();
         await tm1.Processes.CreateAsync(ProcessCreate.Builder().Name(process).PrologProcedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").Build());
         var runner = OtherClient.Build();

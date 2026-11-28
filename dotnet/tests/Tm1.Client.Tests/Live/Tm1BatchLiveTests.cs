@@ -30,6 +30,7 @@ public class Tm1BatchLiveTests
         await tm1.Session.ExecuteAsync(Tm1SessionAsyncLiveTests.CreateProcess(process, "x = 1;\n"));
         try
         {
+            var v12 = await ServerAssumptions.IsV12Async(tm1);
             var batch = tm1.Batch();
             var queued = batch.Client.Session;
             var elements = ODataPath.Of("Dimensions").Key(dimension).Nav("Hierarchies").Key(dimension).Nav("Elements");
@@ -44,9 +45,38 @@ public class Tm1BatchLiveTests
             await batch.RunAsync().WaitAsync(Wait);
             Assert.Equal("}ClientGroups", (await cube).GetProperty("Name").GetString());
             await Assert.ThrowsAsync<Tm1NotFoundException>(() => missing);
-            Assert.Equal("North", (await north).GetProperty("Name").GetString());
-            await Assert.ThrowsAnyAsync<Tm1Exception>(() => twice); // TM1 carries on past it, in order
-            Assert.Equal(["North"], await listed); // sees the element made before it
+            if (v12)
+            {
+                // TM1 v12 runs batch requests concurrently: one of the duplicate creates succeeds and the other fails,
+                // and the list may observe the dimension before or after the create
+                var outcomes = new List<Task<JsonElement>> { north, twice };
+                var results = new List<string?>();
+                var failures = new List<Exception>();
+                foreach (var outcome in outcomes)
+                {
+                    try
+                    {
+                        results.Add((await outcome).GetProperty("Name").GetString());
+                    }
+                    catch (Tm1Exception e)
+                    {
+                        failures.Add(e);
+                    }
+                }
+                Assert.Equal(["North"], results);
+                Assert.Single(failures);
+                await listed;
+                Assert.Equal(
+                    ["North"],
+                    await tm1.Session.StreamAsync(Tm1Request.List<JsonElement>(elements)).Select(e => e.GetProperty("Name").GetString()).ToListAsync()
+                );
+            }
+            else
+            {
+                Assert.Equal("North", (await north).GetProperty("Name").GetString());
+                await Assert.ThrowsAnyAsync<Tm1Exception>(() => twice); // TM1 carries on past it, in order
+                Assert.Equal(["North"], await listed); // sees the element made before it
+            }
             Assert.Equal("CompletedSuccessfully", (await run).GetProperty("ProcessExecuteStatusCode").GetString());
         }
         finally
@@ -60,6 +90,10 @@ public class Tm1BatchLiveTests
     public async Task RunsRequestsInOrder()
     {
         await using var tm1 = Live.Client();
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            return; // TM1 v12 runs batch requests concurrently (xUnit 2 can't skip a test once it runs)
+        }
         var dimension = "batch" + Guid.NewGuid().ToString("N")[..8];
         await tm1.Session.ExecuteAsync(
             Tm1Request.Post(

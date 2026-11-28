@@ -1,0 +1,621 @@
+{
+	"specVersion": 1,
+	"name": "content-v12",
+	"tm1From": "12.0",
+	"description": "TM1 v12 contents tree: Name-keyed entries in Applications (folder, document reference, link, move) and direct documents in Files.",
+	"names": [
+		"app",
+		"other",
+		"doc",
+		"file"
+	],
+	"steps": [
+		{
+			"service": "contents",
+			"method": "roots",
+			"params": [
+				"query"
+			],
+			"args": [
+				{
+					"$query": {
+						"select": [
+							"Name"
+						],
+						"filter": "Name eq 'Files'"
+					}
+				}
+			],
+			"expect": {
+				"items": {
+					"Name": [
+						"Files"
+					]
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "create",
+			"params": [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "applications",
+					"args": []
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				{
+					"$patch": "FolderCreate",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.Folder",
+						"Name": "${app}"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"Name": "${app}"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "create",
+			"params": [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "applications",
+					"args": []
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				{
+					"$patch": "FolderCreate",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.Folder",
+						"Name": "${other}"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"Name": "${other}"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "create",
+			"params": [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "applications",
+							"args": []
+						},
+						"${app}",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				{
+					"$patch": "DocumentCreate",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.Document",
+						"Name": "${doc}.txt"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"@odata.type": "#ibm.tm1.api.v1.DocumentReference",
+					"Name": "${doc}.txt"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "upload",
+			"params": [
+				"document",
+				"content"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "child",
+							"args": [
+								{
+									"$type": "ContentPath",
+									"factory": "applications",
+									"args": []
+								},
+								"${app}",
+								{
+									"$enum": "ContentScope",
+									"name": "PUBLIC",
+									"json": "PUBLIC"
+								}
+							]
+						},
+						"${doc}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$bytes": "aGVsbG8gdGhlcmU="
+				}
+			],
+			"expect": {
+				"none": true
+			}
+		},
+		{
+			"service": "contents",
+			"method": "content",
+			"params": [
+				"document"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "child",
+							"args": [
+								{
+									"$type": "ContentPath",
+									"factory": "applications",
+									"args": []
+								},
+								"${app}",
+								{
+									"$enum": "ContentScope",
+									"name": "PUBLIC",
+									"json": "PUBLIC"
+								}
+							]
+						},
+						"${doc}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				}
+			],
+			"expect": {
+				"fields": {
+					"$bytes": "aGVsbG8gdGhlcmU="
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "document",
+			"params": [
+				"reference",
+				"query"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "child",
+							"args": [
+								{
+									"$type": "ContentPath",
+									"factory": "applications",
+									"args": []
+								},
+								"${app}",
+								{
+									"$enum": "ContentScope",
+									"name": "PUBLIC",
+									"json": "PUBLIC"
+								}
+							]
+						},
+						"${doc}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query": {
+						"select": [
+							"Size"
+						]
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"Size": 11
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "create",
+			"params": [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "applications",
+							"args": []
+						},
+						"${app}",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				{
+					"$patch": "LinkCreate",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.Link",
+						"Name": "ibm",
+						"URL": "https://www.ibm.com"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"Name": "ibm"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "move",
+			"params": [
+				"entry",
+				"target",
+				"scope",
+				"name"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "child",
+							"args": [
+								{
+									"$type": "ContentPath",
+									"factory": "applications",
+									"args": []
+								},
+								"${app}",
+								{
+									"$enum": "ContentScope",
+									"name": "PUBLIC",
+									"json": "PUBLIC"
+								}
+							]
+						},
+						"ibm",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "applications",
+							"args": []
+						},
+						"${other}",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				null
+			],
+			"expect": {
+				"fields": {
+					"Name": "ibm"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "create",
+			"params": [
+				"folder",
+				"scope",
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "files",
+					"args": []
+				},
+				{
+					"$enum": "ContentScope",
+					"name": "PUBLIC",
+					"json": "PUBLIC"
+				},
+				{
+					"$patch": "DocumentCreate",
+					"json": {
+						"@odata.type": "#ibm.tm1.api.v1.Document",
+						"Name": "${file}.txt"
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"@odata.type": "#ibm.tm1.api.v1.Document",
+					"Name": "${file}.txt"
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "upload",
+			"params": [
+				"document",
+				"content"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "files",
+							"args": []
+						},
+						"${file}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$bytes": "ZGlyZWN0IGZpbGU="
+				}
+			],
+			"expect": {
+				"none": true
+			}
+		},
+		{
+			"service": "contents",
+			"method": "content",
+			"params": [
+				"document"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "files",
+							"args": []
+						},
+						"${file}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				}
+			],
+			"expect": {
+				"fields": {
+					"$bytes": "ZGlyZWN0IGZpbGU="
+				}
+			}
+		},
+		{
+			"service": "contents",
+			"method": "document",
+			"params": [
+				"reference",
+				"query"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "files",
+							"args": []
+						},
+						"${file}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				},
+				{
+					"$query": {
+						"select": [
+							"Size"
+						]
+					}
+				}
+			],
+			"expect": {
+				"fields": {
+					"Size": 11
+				}
+			}
+		}
+	],
+	"finally": [
+		{
+			"service": "contents",
+			"method": "delete",
+			"params": [
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "files",
+							"args": []
+						},
+						"${file}.txt",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				}
+			]
+		},
+		{
+			"service": "contents",
+			"method": "delete",
+			"params": [
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "applications",
+							"args": []
+						},
+						"${app}",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				}
+			]
+		},
+		{
+			"service": "contents",
+			"method": "delete",
+			"params": [
+				"entry"
+			],
+			"args": [
+				{
+					"$type": "ContentPath",
+					"factory": "child",
+					"args": [
+						{
+							"$type": "ContentPath",
+							"factory": "applications",
+							"args": []
+						},
+						"${other}",
+						{
+							"$enum": "ContentScope",
+							"name": "PUBLIC",
+							"json": "PUBLIC"
+						}
+					]
+				}
+			]
+		}
+	]
+}

@@ -127,7 +127,9 @@ tasks.register("checkAll") {
 // The live tests: each client's tests against a real TM1, which CI doesn't have. Each suite starts
 // its own tm1-server container, so they run one after the other, never two at once.
 val traffic = layout.buildDirectory.dir("conformance-live")
-val liveSources = listOf("TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR", "TM1_BUNDLE_URL", "TM1_URL")
+val serverSources = listOf("TM1_PRIVATE_IMAGE", "TM1_HOME_DIR", "TM1_INSTALL_VOLUME", "TM1_BUNDLE_DIR", "TM1_BUNDLE_URL")
+val engineSources = listOf("TM1_ENGINE_PRIVATE_IMAGE", "TM1_ENGINE_HOME_DIR", "TM1_ENGINE_INSTALL_VOLUME", "TM1_ENGINE_BUNDLE_DIR", "TM1_ENGINE_BUNDLE_URL")
+val liveSources = serverSources + engineSources + "TM1_URL"
 // Where the Python, .NET and TypeScript live suites write their reports, under build/test-results, for
 // scripts/test-summary.py and scripts/live-test-versions.py (Java's are Gradle's own)
 val liveReports = listOf("python-live", "dotnet-live", "typescript-live")
@@ -227,9 +229,9 @@ val containerLogs = layout.buildDirectory.dir("container-conformance")
 
 val containerConformancePrepare = tasks.register("containerConformancePrepare") {
 	description = "Checks a TM1 is configured for the container conformance run, and clears the run before's logs."
-	// Not TM1_URL: a server that's already running has no container to compare. And TM1 v12's
-	// sources: the engine scenario needs only those
-	val names = liveSources - "TM1_URL" + listOf("TM1_ENGINE_PRIVATE_IMAGE", "TM1_ENGINE_HOME_DIR", "TM1_ENGINE_INSTALL_VOLUME", "TM1_ENGINE_BUNDLE_DIR", "TM1_ENGINE_BUNDLE_URL")
+	// Not TM1_URL: a server that's already running has no container to compare. Both TM1 11 and
+	// TM1 v12 sources work here
+	val names = serverSources + engineSources
 	val configured = names.map { providers.environmentVariable(it) }
 	val directory = containerLogs
 	outputs.upToDateWhen { false }
@@ -299,7 +301,7 @@ tasks.register("containerConformance") {
 // The probe: what a TM1 version does that its $metadata doesn't say (java/tools/tm1-probe/README.md).
 // It reads the server's binary out of the container it starts, so it needs a TM1 source the
 // container mounts: TM1_URL, a server already running, won't do.
-val probeSources = liveSources - "TM1_URL"
+val probeSources = serverSources
 val probeTm1Prepare = tasks.register("probeTm1Prepare") {
 	description = "Checks a TM1 source is configured for the probe."
 	val configured = probeSources.map { providers.environmentVariable(it) }

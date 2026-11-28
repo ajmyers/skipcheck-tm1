@@ -40,11 +40,15 @@ class MetadataDriftTm1Test {
 
 	@Test
 	void matchesTheSnapshotOrReportsTheDifferences(LiveServer tm1) throws Exception {
-		String live = tm1.httpClient()
+		HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata"));
+		if (tm1.isEngine()) {
+			tm1.authorize(request);
+		}
+		HttpResponse<String> response = tm1.httpClient()
 			.build()
-			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
-					HttpResponse.BodyHandlers.ofString())
-			.body();
+			.send(request.build(), HttpResponse.BodyHandlers.ofString());
+		assertThat(response.statusCode()).as("GET $metadata status").isEqualTo(200);
+		String live = response.body();
 		CsdlDocument liveDoc = CsdlParser.parse(live);
 
 		if (liveDoc.schemaVersion().orElse("").equals(MetadataSnapshot.VERSION)) {

@@ -51,6 +51,7 @@
 			"expect" : { "items" : { "Ordinal" : [ 0, 1, 2, 3, 4, 5 ] } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "cellsets",
 			"method" : "executeStatement",
 			"params" : [ "mdx" ],

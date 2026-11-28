@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx2
 
-from .conftest import target
+from .conftest import IS_ENGINE, target
 
 COOKIE = "TM1SessionId"
 
@@ -43,7 +43,13 @@ class RawTm1:
         self._http.close()
 
     def login(self) -> str:
-        """Logs in with Basic credentials and no cookie, and returns the new session's cookie."""
+        """Logs in with credentials and no cookie, and returns the new session's cookie."""
+        if IS_ENGINE:
+            from skipcheck_tm1_testcontainers import Tm1EngineContainer
+
+            db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+            login = db.login()
+            return login.session(RawTm1.basic(login.client_id, login.client_secret))
         cookie = RawTm1.cookie(self.send("GET", "ActiveSession?$select=ID", basic=True))
         assert cookie is not None, "a login sets the session's cookie"
         return cookie
@@ -54,10 +60,24 @@ class RawTm1:
 
     def close(self, cookie: str) -> None:
         """Closes the session behind a cookie."""
+        if IS_ENGINE:
+            from skipcheck_tm1_testcontainers import Tm1EngineContainer
+
+            db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+            close_url = f"{db.engine.url}{db.instance}/api/v1/ActiveSession/tm1s.Close"
+            self._http.post(close_url, headers={"Cookie": cookie, "Content-Type": "application/json"}, content=b"{}")
+            return
         self.send("POST", "ActiveSession/tm1.Close", cookie=cookie, body="{}")
 
     def kill(self, admin: str, id: int) -> int:
-        """Kills another session by ID, through ``Sessions(id)/tm1.Close``, from ``admin``'s."""
+        """Kills another session by ID, through ``Sessions(id)/tm1.Close`` on TM1 11 or
+        instance-level ``Sessions(id)/tm1s.Close`` on TM1 v12, from ``admin``'s."""
+        if IS_ENGINE:
+            from skipcheck_tm1_testcontainers import Tm1EngineContainer
+
+            db = Tm1EngineContainer.shared().database(Tm1EngineContainer.DEFAULT_DATABASE)
+            kill_url = f"{db.engine.url}{db.instance}/api/v1/Sessions({id})/tm1s.Close"
+            return self._http.post(kill_url, headers={"Cookie": admin, "Content-Type": "application/json"}, content=b"{}").status_code
         return self.send("POST", f"Sessions({id})/tm1.Close", cookie=admin, body="{}").status_code
 
     def await_gone(self, admin: str, id: int, timeout: float = 30) -> bool:

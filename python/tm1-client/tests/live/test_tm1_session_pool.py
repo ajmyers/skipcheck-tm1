@@ -13,7 +13,7 @@ import pytest
 
 from skipcheck_tm1 import ODataPath, ODataQuery, Tm1ApiError, Tm1ErrorKind, Tm1Identity, Tm1Request, Tm1Session, Tm1SessionPool, auth
 
-from .conftest import CONFIGURED, REASON, _builder
+from .conftest import CONFIGURED, IS_ENGINE, REASON, _builder, authenticator
 from .raw_tm1 import RawTm1
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
@@ -54,8 +54,18 @@ def name(s: Tm1Session) -> str:
     return s.execute(ACTIVE_USER)["Name"]
 
 
+def _identity(user: str, password: str) -> Tm1Identity:
+    return Tm1Identity.with_credentials(user, authenticator(user, password)) if IS_ENGINE else Tm1Identity.impersonating(user)
+
+
 def test_runs_each_identity_as_itself(pool: Tm1SessionPool, people: tuple[str, str], raw: RawTm1) -> None:
     alice, bob = people
+    if IS_ENGINE:
+        assert name(pool.session(_identity(alice, "a"))) == alice
+        assert name(pool.session(_identity(bob, "b"))) == bob
+        assert name(pool.session()).lower() == raw.user.lower()
+        assert pool.stats().held == 3
+        return
     assert name(pool.session(Tm1Identity.impersonating(alice))) == alice
     assert name(pool.session(Tm1Identity.impersonating(bob))) == bob
     assert name(pool.session(Tm1Identity.with_credentials(bob, auth.basic(bob, "b")))) == bob
@@ -65,7 +75,7 @@ def test_runs_each_identity_as_itself(pool: Tm1SessionPool, people: tuple[str, s
 
 def test_closes_evicted_sessions_on_tm1(pool: Tm1SessionPool, people: tuple[str, str], raw: RawTm1, admin: str) -> None:
     alice, _ = people
-    s = pool.session(Tm1Identity.impersonating(alice))
+    s = pool.session(_identity(alice, "a"))
     assert name(s) == alice
     id = s.session_id()
 
@@ -77,14 +87,16 @@ def test_closes_evicted_sessions_on_tm1(pool: Tm1SessionPool, people: tuple[str,
 
 def test_leaves_no_session_behind_when_closed(pool: Tm1SessionPool, people: tuple[str, str], raw: RawTm1, admin: str, context: str) -> None:
     alice, bob = people
-    name(pool.session(Tm1Identity.impersonating(alice)))
-    name(pool.session(Tm1Identity.impersonating(bob)))
+    name(pool.session(_identity(alice, "a")))
+    name(pool.session(_identity(bob, "b")))
     pool.close()
     assert raw.await_session_count(admin, context, 0) == 0
 
 
 def test_never_falls_back_to_another_identity(pool: Tm1SessionPool) -> None:
     """Asking for an administrator fails; nothing runs as the pool's own user instead."""
+    if IS_ENGINE:
+        pytest.skip("TM1 v12 does not support TM1-Impersonate")
     with pytest.raises(Tm1ApiError) as refused:
         pool.session(Tm1Identity.impersonating("Admin")).execute(ACTIVE_USER)
     assert refused.value.kind is Tm1ErrorKind.IMPERSONATION_REFUSED

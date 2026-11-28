@@ -18,7 +18,7 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
   };
 
   beforeAll(async () => {
-    if (!Live.configured) return;
+    if (!Live.configured || Live.isEngine) return;
     raw = await RawTm1.connect();
     admin = await raw.login();
     alice = scratch("zz_alice_");
@@ -31,7 +31,8 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
     await raw.close(admin);
   });
 
-  tm1Test("runs as the impersonated user", async () => {
+  tm1Test("runs as the impersonated user", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const s = await session(alice.toUpperCase());
     try {
       expect((await s.execute(ACTIVE_USER)).Name).toBe(alice);
@@ -40,7 +41,8 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
     }
   });
 
-  tm1Test("runs as a user whose name is outside ASCII", async () => {
+  tm1Test("runs as a user whose name is outside ASCII", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     for (const name of [alice + "_ë", alice + "_日本"]) {
       await raw.createUser(admin, name, "a");
       const s = await session(name);
@@ -53,15 +55,18 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
     }
   });
 
-  tm1Test("reports an unknown user", async () => {
+  tm1Test("reports an unknown user", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     expect(await kindOf(await session("zz_nobody"))).toBe("UnknownUser");
   });
 
-  tm1Test("reports that administrators can't be impersonated", async () => {
+  tm1Test("reports that administrators can't be impersonated", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     expect(await kindOf(await session("Admin"))).toBe("ImpersonationRefused");
   });
 
-  tm1Test("reports a disabled user as refused credentials", async () => {
+  tm1Test("reports a disabled user as refused credentials", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     await raw.request("PATCH", `Users('${alice}')`).withCookie(admin).withBody('{"Enabled":false}').send();
     try {
       expect(await kindOf(await session(alice))).toBe("CredentialRejected");
@@ -71,7 +76,8 @@ describe("Tm1Session impersonating on TM1" + liveReason, () => {
   });
 
   /** Each refused login leaves a session on TM1; a remembered refusal doesn't add more. */
-  tm1Test("doesn't log in again while a refusal is remembered", async () => {
+  tm1Test("doesn't log in again while a refusal is remembered", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const s = await session("zz_nobody");
     expect(await kindOf(s)).toBe("UnknownUser");
     const after = await raw.allSessionCount(admin);

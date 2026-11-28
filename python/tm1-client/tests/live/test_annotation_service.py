@@ -10,6 +10,7 @@ from skipcheck_tm1 import ODataQuery, Tm1Client, Tm1NotFoundError
 from skipcheck_tm1.model import AnnotationPatch
 
 from .conftest import CONFIGURED, REASON
+from .support import is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -26,7 +27,10 @@ def test_annotates_a_cell_and_finds_it_by_cube_cell_and_id(tm1: Tm1Client) -> No
         assert {"objectName", "commentValue", "commentLocation"} <= set(extra)
         assert extra["commentLocation"] == "Admin,ADMIN"
 
-        assert tm1.annotations.list() == [], "TM1 lists none here"
+        if is_v12(tm1):
+            assert id in [a.id for a in tm1.annotations.list()], "TM1 v12 lists annotations at GET Annotations"
+        else:
+            assert tm1.annotations.list() == [], "TM1 lists none here"
         assert id in [a.id for a in tm1.annotations.cube_annotations(CUBE)]
         mdx = f"SELECT {{[}}Clients].[Admin]}} ON 0, {{[}}Groups].[ADMIN]}} ON 1 FROM [{CUBE}]"
         cellset = tm1.cellsets.execute(mdx, ODataQuery.none().select("ID"))

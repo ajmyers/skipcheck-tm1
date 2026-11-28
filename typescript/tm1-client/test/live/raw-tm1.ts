@@ -4,8 +4,9 @@ import { connect as netConnect } from "node:net";
 import { connect as tlsConnect } from "node:tls";
 import { randomUUID } from "node:crypto";
 import { expect } from "vitest";
-import { Json, ODataPath, ODataQuery, Tm1Authenticator, Tm1Request, Tm1Session, type Tm1SessionBuilder } from "../../src/index.js";
-import { Live } from "./live.js";
+import { Json, ODataPath, ODataQuery, Tm1Authenticator, Tm1Dialect, Tm1Request, Tm1Session, type Tm1SessionBuilder } from "../../src/index.js";
+import { parseJson } from "../../src/json.js";
+import { Live, type Target } from "./live.js";
 
 // What the session tests share: TM1 over plain HTTP, and a few requests and waits.
 
@@ -17,6 +18,12 @@ export const basic = (user: string, password: string): string => "Basic " + Buff
 /** Settings for a session of the TM1 under test, logging in as `Live.client()` does. */
 export async function sessions(): Promise<Tm1SessionBuilder> {
   const t = await Live.target();
+  if (t.engine) {
+    return Tm1Session.builder()
+      .baseUrl(t.url)
+      .dialect(Tm1Dialect.v12(t.engine.instance, t.engine.database))
+      .authenticator(Tm1Authenticator.application(t.engine.clientId, t.engine.clientSecret, t.user));
+  }
   // Node's fetch takes no per-request certificate options: TM1_VERIFY=false turns checking off for the run
   if (process.env["TM1_VERIFY"] === "false") process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
   return Tm1Session.builder()
@@ -82,6 +89,7 @@ export class RawTm1 {
     readonly root: string,
     readonly user: string,
     readonly password: string,
+    readonly engine: Target["engine"],
   ) {}
 
   get basic(): string {
@@ -91,7 +99,7 @@ export class RawTm1 {
   static async connect(): Promise<RawTm1> {
     await sessions();
     const t = await Live.target();
-    return new RawTm1(t.url, t.user, t.password);
+    return new RawTm1(t.url, t.user, t.password, t.engine);
   }
 
   request(method: string, path: string): RawRequest {
@@ -127,33 +135,71 @@ export class RawTm1 {
   }
 
   static json(response: RawResponse): any {
-    return JSON.parse(response.body);
+    return parseJson(response.body);
   }
 
-  /** Logs in with Basic credentials and no cookie; the new session's cookie, as `name=value`. */
+  /** Logs in with credentials and no cookie; the new session's cookie, as `name=value`. */
   async login(): Promise<string> {
+    if (this.engine) {
+      const response = await fetch(`${this.engine.url}${this.engine.instance}/auth/v1/session`, {
+        method: "POST",
+        headers: {
+          Authorization: basic(this.engine.clientId, this.engine.clientSecret),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ User: this.user }),
+        redirect: "manual",
+        signal: AbortSignal.timeout(60_000),
+      });
+      const cookie = response.headers
+        .getSetCookie()
+        .find((c) => c.startsWith("TM1SessionId="))
+        ?.split(";")[0];
+      if (!cookie) throw new Error(`TM1 v12 set no session cookie (${response.status}): ${await response.text()}`);
+      return cookie;
+    }
     const cookie = RawTm1.cookieOf(await this.request("GET", "ActiveSession?$select=ID").withBasic().send());
     if (!cookie) throw new Error("TM1 set no session cookie");
     return cookie;
   }
 
-  async sessionId(cookie: string): Promise<number> {
-    return RawTm1.json(await this.request("GET", "ActiveSession?$select=ID").withCookie(cookie).send())["ID"] as number;
+  async sessionId(cookie: string): Promise<number | bigint> {
+    return RawTm1.json(await this.request("GET", "ActiveSession?$select=ID").withCookie(cookie).send())["ID"] as number | bigint;
   }
 
   async close(cookie: string): Promise<void> {
+    if (this.engine) {
+      await fetch(`${this.engine.url}${this.engine.instance}/api/v1/ActiveSession/tm1s.Close`, {
+        method: "POST",
+        headers: { Cookie: cookie, "Content-Type": "application/json" },
+        body: "{}",
+        redirect: "manual",
+        signal: AbortSignal.timeout(60_000),
+      });
+      return;
+    }
     await this.request("POST", "ActiveSession/tm1.Close").withCookie(cookie).withBody("{}").send();
   }
 
   /** Kills another session by ID from `admin`'s session. */
-  async kill(admin: string, id: number): Promise<number> {
-    return (await this.request("POST", `Sessions(${id})/tm1.Close`).withCookie(admin).withBody("{}").send()).status;
+  async kill(admin: string, id: number | bigint): Promise<number> {
+    if (this.engine) {
+      const response = await fetch(`${this.engine.url}${this.engine.instance}/api/v1/Sessions(${id.toString()})/tm1s.Close`, {
+        method: "POST",
+        headers: { Cookie: admin, "Content-Type": "application/json" },
+        body: "{}",
+        redirect: "manual",
+        signal: AbortSignal.timeout(60_000),
+      });
+      return response.status;
+    }
+    return (await this.request("POST", `Sessions(${id.toString()})/tm1.Close`).withCookie(admin).withBody("{}").send()).status;
   }
 
   /** Waits until session `id` is no longer listed (TM1 takes a few seconds). */
-  async awaitGone(admin: string, id: number, timeout = WAIT): Promise<boolean> {
+  async awaitGone(admin: string, id: number | bigint, timeout = WAIT): Promise<boolean> {
     const deadline = Date.now() + timeout;
-    while ((await this.request("GET", `Sessions(${id})?$select=ID`).withCookie(admin).send()).status === 200) {
+    while ((await this.request("GET", `Sessions(${id.toString()})?$select=ID`).withCookie(admin).send()).status === 200) {
       if (Date.now() > deadline) return false;
       await sleep(250);
     }

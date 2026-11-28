@@ -13,6 +13,7 @@ from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Client, Tm1Error, Tm1NotFoun
 from skipcheck_tm1.model import Cube, DimensionCreate, ElementCreate, HierarchyCreate, ProcessCreate, ProcessExecuteStatusCode
 
 from .conftest import CONFIGURED, REASON
+from .support import assume_v11, is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -40,18 +41,33 @@ def test_runs_reads_writes_and_failures_together(tm1: Tm1Client) -> None:
         assert cube.result().name == "}ClientGroups"
         with pytest.raises(Tm1NotFoundError):
             missing.result()
-        assert north.result().name == "North"
-        with pytest.raises(Tm1Error):  # TM1 carries on past it, in order
-            twice.result()
-        assert [e.name for e in listed.result()] == ["North"], "sees the element made before it"
-        assert run.result().process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY
-        assert count.result() == "1", "plain text, which TM1 refuses under the batch's own Accept"
+        if is_v12(tm1):
+            # TM1 v12 executes $batch requests concurrently rather than sequentially
+            outcomes: list[object] = []
+            for call in (north, twice):
+                try:
+                    outcomes.append(call.result().name)
+                except Tm1Error as e:
+                    outcomes.append(e)
+            assert "North" in outcomes and any(isinstance(o, Tm1Error) for o in outcomes)
+            assert listed.result() is not None
+            assert run.result().process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY
+            assert count.result() in ("0", "1"), "plain text, which TM1 refuses under the batch's own Accept"
+            assert [e.name for e in tm1.elements.list(dimension, dimension)] == ["North"]
+        else:
+            assert north.result().name == "North"
+            with pytest.raises(Tm1Error):  # TM1 carries on past it, in order
+                twice.result()
+            assert [e.name for e in listed.result()] == ["North"], "sees the element made before it"
+            assert run.result().process_execute_status_code is ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY
+            assert count.result() == "1", "plain text, which TM1 refuses under the batch's own Accept"
     finally:
         tm1.processes.delete(process)
         tm1.dimensions.delete(dimension)
 
 
 def test_runs_requests_in_order(tm1: Tm1Client) -> None:
+    assume_v11(tm1, "TM1 v12 $batch reads don't see writes from earlier requests in the same batch")
     dimension = "batch" + uuid.uuid4().hex[:8]
     tm1.dimensions.create(DimensionCreate.builder().name(dimension).hierarchies([HierarchyCreate.builder().name(dimension).build()]).build())
     try:

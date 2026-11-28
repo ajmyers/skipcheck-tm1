@@ -3,7 +3,6 @@
 import { describe, expect } from "vitest";
 import {
   ODataPath,
-  Tm1Authenticator,
   Tm1Capabilities,
   Tm1Capability,
   Tm1Identity,
@@ -65,7 +64,7 @@ describe("Tm1 capabilities on TM1" + liveReason, () => {
     const pool = Tm1SessionPool.builder(await sessions()).build();
     try {
       const first = await pool.session().capabilities();
-      const second = await pool.session(Tm1Identity.withCredentials("again", Tm1Authenticator.basic(t.user, t.password))).capabilities();
+      const second = await pool.session(Tm1Identity.withCredentials("again", await Live.authenticator(t.user, t.password))).capabilities();
       expect(second).toBe(first);
     } finally {
       await pool.close();

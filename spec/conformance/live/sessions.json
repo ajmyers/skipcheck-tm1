@@ -19,6 +19,7 @@
 			"expect" : { "error" : { "category" : "api", "kind" : "NOT_FOUND", "status" : 404 } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "threads",
 			"method" : "list",
 			"params" : [ "query" ],
@@ -47,6 +48,7 @@
 			"expect" : { "none" : true }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "oidcKeys",
 			"method" : "remove",
 			"params" : [ "keyIds" ],

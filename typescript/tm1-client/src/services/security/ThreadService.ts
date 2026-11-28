@@ -53,12 +53,12 @@ export class ThreadService {
   }
 
   /** `GET Threads(id)`: the thread, or a `Tm1NotFoundException` if it's gone. */
-  get(id: number, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Thread> {
+  get(id: number | bigint, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Thread> {
     return this.#session.execute(Tm1Request.get(threadPath(id), query, Thread), options);
   }
 
   /** `GET Threads(id)/Session`: the thread's session. */
-  session(id: number, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Session> {
+  session(id: number | bigint, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Session> {
     return this.#session.execute(Tm1Request.get(threadPath(id).nav("Session"), query, Session), options);
   }
 
@@ -66,12 +66,12 @@ export class ThreadService {
    * (11.8) then fails the process's `ExecuteWithReturn` request with 500, `TM1UserException: Cancel`
    * (code 174), rather than reporting it `Aborted`. Needs schema 10.2.2.1. Resolves when the request
    * is made; the thread stops soon after. */
-  cancel(id: number, options?: Tm1CallOptions): Promise<void> {
+  cancel(id: number | bigint, options?: Tm1CallOptions): Promise<void> {
     const operation = Tm1Operations.ThreadCancelOperation;
     return this.#session.execute(Tm1Request.post(threadPath(id).action(operation.name), {}).requires(operation.capability()), options);
   }
 }
 
-function threadPath(id: number): ODataPath {
+function threadPath(id: number | bigint): ODataPath {
   return THREADS.key(required(id, "id"));
 }

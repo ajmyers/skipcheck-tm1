@@ -26,6 +26,7 @@ TRAFFIC = REPO / "build" / "conformance-live"
 
 # The session's own requests, which differ by when each client logs in and caches capabilities
 _SESSION = ("ActiveSession", "$metadata", "Server?$select=ProductVersion")
+_V12_SESSION_SUFFIXES = ("/auth/v1/session", "/auth/v1/token", "/ActiveSession/tm1s.Close")
 
 
 def scenarios() -> list[Path]:
@@ -45,7 +46,7 @@ class Traffic:
         url = str(request.url.raw_path.decode())
         prefix = httpx2.URL(self.root).raw_path.decode()
         target = url[len(prefix) :] if url.startswith(prefix) else url
-        if target.startswith(_SESSION):
+        if target.startswith(_SESSION) or request.url.path.endswith(_V12_SESSION_SUFFIXES):
             return
         headers = {k.lower(): v for k, v in request.headers.items()}
         self.exchanges.append(
@@ -226,6 +227,7 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
     values as their placeholders too. A step ``applies`` refuses sends nothing and isn't checked."""
     failures = []
     kept: dict[str, Any] = {}
+    cleanup_error: Exception | None = None
     try:
         for i, step in enumerate(scenario["steps"]):
             if not applies(step):
@@ -240,7 +242,13 @@ def run(client: Any, traffic: Traffic, scenario: dict[str, Any], names: dict[str
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
             if applies(step) and not _unkept(step, kept):
-                _outcome(_invoke(client, step, names, kept), step, kept)
+                try:
+                    _outcome(_invoke(client, step, names, kept), step, kept)
+                except Exception as exc:  # noqa: BLE001 - don't mask a step failure with an unsaved placeholder
+                    if cleanup_error is None:
+                        cleanup_error = exc
+    if cleanup_error is not None and not failures:
+        raise cleanup_error
     return failures
 
 
@@ -250,6 +258,7 @@ async def arun(
     """Runs the scenario with an asyncio client; the steps whose expectation failed, as :func:`run`."""
     failures = []
     kept: dict[str, Any] = {}
+    cleanup_error: Exception | None = None
     try:
         for i, step in enumerate(scenario["steps"]):
             if not applies(step):
@@ -264,5 +273,11 @@ async def arun(
         for i, step in enumerate(scenario.get("finally", [])):
             traffic.step = f"finally[{i}]"
             if applies(step) and not _unkept(step, kept):
-                await _aoutcome(_invoke(client, step, names, kept), step, kept)
+                try:
+                    await _aoutcome(_invoke(client, step, names, kept), step, kept)
+                except Exception as exc:  # noqa: BLE001 - don't mask a step failure with an unsaved placeholder
+                    if cleanup_error is None:
+                        cleanup_error = exc
+    if cleanup_error is not None and not failures:
+        raise cleanup_error
     return failures

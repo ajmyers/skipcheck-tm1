@@ -2,7 +2,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Tm1Source } from "@skipcheck/tm1-testcontainers";
+import { Tm1EngineSource, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { type Tm1Capabilities, type Tm1Client, type Tm1Operation, Tm1Version } from "../../src/index.js";
 import { Repo } from "../support/repo.js";
 
@@ -15,6 +15,14 @@ import { Repo } from "../support/repo.js";
  * 11.8.03200.3 (2.1.13 to 2.1.16) plans the new one, 11.8.03400.2 (2.1.17) the stale, and no build
  * between them was released. */
 export const STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03400");
+
+/** First TM1 v12 (Planning Analytics Engine) version. */
+export const TM1_12 = Tm1Version.parse("12.0");
+
+/** Whether the server is TM1 v12 or newer. */
+export function isV12(tm1: Tm1Client): Promise<boolean> {
+  return isAtLeast(tm1, TM1_12);
+}
 
 /** Whether TM1 can write to its own install, as Java's `ServerAssumptions.Install` names it: TM1
  * makes a local encryption key in its install's `bin64/ssl/ibmtm1.kdb`, so local key file settings
@@ -34,7 +42,9 @@ export function sharedInstall(): Install | undefined {
   if (process.env.TM1_URL?.trim()) return undefined; // as global-setup reads it: a blank one is unset
   try {
     const source = Tm1Source.discover();
-    return source ? installOf(source) : undefined;
+    if (source) return installOf(source);
+    const engine = Tm1EngineSource.discover();
+    return engine ? (engine instanceof Tm1EngineSource.InstallDir ? "readOnly" : "writable") : undefined;
   } catch {
     return undefined; // a source set but wrong, which starting the container reports
   }

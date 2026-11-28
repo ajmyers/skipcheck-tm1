@@ -1,6 +1,7 @@
 {
 	"specVersion" : 1,
 	"name" : "settings",
+	"tm1Before" : "12.0",
 	"description" : "Every server setting the static configuration takes (tm1s.cfg), written through every client's ServerSettingsPatch and its nested settings patches, read back, and set back as a fresh container has them. A setting takes effect when the server next starts, which no scenario does, and each is set back before the next scenario, in finally too. The values are the probe's: a boolean flipped, a number one more, a string made up. It leaves out what TM1 never sends back (four SSL file settings, and EncryptionAtRest, which it takes but reads as null), which no read could check nor set back. LiveBuildersCoverageTest holds every settings setter to this scenario, or to live-builders-excluded.txt.",
 	"names" : [ "process", "chore" ],
 	"steps" : [

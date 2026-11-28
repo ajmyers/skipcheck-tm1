@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { Cube, Dimension, ODataQuery, Tm1BadRequestException, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 /** MDX statements, and the model and control cube and dimension functions, against a real TM1: the
  * Java client's `MdxAndModelTm1Test`. */
@@ -19,7 +20,12 @@ describe("MDX statements and model objects on TM1" + liveReason, () => {
   });
 
   tm1Test("runs an MDX statement, but not CREATE SET", async () => {
-    await tm1.cellsets.executeStatement("SELECT {} ON 0 FROM [}ClientGroups]");
+    if (await isV12(tm1)) {
+      // TM1 v12 ExecuteMDXStatement supports CREATE/DROP only, not SELECT
+      await expect(tm1.cellsets.executeStatement("SELECT {} ON 0 FROM [}ClientGroups]")).rejects.toBeInstanceOf(Tm1BadRequestException);
+    } else {
+      await tm1.cellsets.executeStatement("SELECT {} ON 0 FROM [}ClientGroups]");
+    }
     await expect(tm1.cellsets.executeStatement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")).rejects.toBeInstanceOf(
       Tm1BadRequestException,
     );

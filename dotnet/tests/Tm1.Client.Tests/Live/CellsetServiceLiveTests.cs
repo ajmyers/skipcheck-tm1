@@ -56,15 +56,16 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task RunsMdxAndReadsTheCellsetPieceByPiece()
     {
+        var v12 = await ServerAssumptions.IsV12Async(_tm1);
         var cellset = await Cellsets.ExecuteAsync(Mdx, ODataQuery.None().Expand("Axes").Expand("Cells", c => c.Select("Ordinal", "Value")));
         var id = cellset.Id!;
-        Assert.Equal(3, cellset.Axes!.Count); // columns, rows and the slicer TM1 adds
+        Assert.Equal(v12 ? 2 : 3, cellset.Axes!.Count); // columns, rows, and on v11 the slicer TM1 adds
         Assert.Equal(8, cellset.Cells!.Count);
         try
         {
             Assert.Empty(await Cellsets.ListAsync().ToListAsync()); // TM1 lists none, though each reads by ID
             Assert.Equal(id, (await Cellsets.GetAsync(id)).Id);
-            Assert.Equal([2, 4, 1], (await Cellsets.AxesAsync(id).ToListAsync()).Select(a => a.Cardinality));
+            Assert.Equal(v12 ? new int?[] { 2, 4 } : new int?[] { 2, 4, 1 }, (await Cellsets.AxesAsync(id).ToListAsync()).Select(a => a.Cardinality));
             Assert.Equal([Region], await Cellsets.HierarchiesAsync(id, 1).Select(h => h.Name).ToListAsync());
             Assert.Equal(4, (await Cellsets.TuplesAsync(id, 1).ToListAsync()).Count);
             Assert.Equal(["E"], await Cellsets.TupleMembersAsync(id, 1, 2).Select(m => m.Name).ToListAsync());
@@ -72,7 +73,10 @@ public sealed class CellsetServiceLiveTests : IAsyncLifetime
                 [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
                 Values(await Cellsets.CellsAsync(id, ODataQuery.None().Select("Ordinal", "Value")).ToListAsync())
             );
-            Assert.Equal(["Base", "E", "Count"], await Cellsets.CellMembersAsync(id, 5).Select(m => m.Name).ToListAsync()); // Sandboxes' Base first
+            Assert.Equal(
+                v12 ? new[] { "E", "Count" } : new[] { "Base", "E", "Count" },
+                await Cellsets.CellMembersAsync(id, 5).Select(m => m.Name).ToListAsync()
+            ); // Sandboxes' Base first on v11
             Assert.Equal(_cube, (await Cellsets.CubeAsync(id)).Name);
             // A rectangle: column 0 of rows 1 and 2
             Assert.Equal([2L, 4L], await Cellsets.PartitionAsync(id, 2, 4, ODataQuery.None().Select("Ordinal")).Select(c => c.Ordinal).ToListAsync());

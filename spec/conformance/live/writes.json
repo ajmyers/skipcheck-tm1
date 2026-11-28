@@ -2,7 +2,7 @@
 	"specVersion" : 1,
 	"name" : "writes",
 	"description" : "What the probe found TM1 applies, written through every client's create and patch types: each property a create or a patch applies, by tm1-probe-<schema>.json, that no other scenario writes, read back after its create and after its patch. ProbedWritesCoverageTest holds the scenarios to the probe. It also writes, through each client's builders, what LiveBuildersCoverageTest holds every builder and setter to that no other scenario writes: a dimension's default hierarchy, a hierarchy's subsets, an element's parents and components, a cube's views with bound axis and title subsets, a process's code and variables, a chore's tasks, a user's new group, and an application folder with contents and a reference to each kind of object.",
-	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "debug", "context", "fourth", "views", "coded", "member", "group", "app", "bound", "ascii", "viewed" ],
+	"names" : [ "dim", "month", "third", "cube", "native", "process", "chore", "sandbox", "subset", "user", "level", "fourth", "views", "coded", "member", "group", "app", "bound", "ascii", "viewed" ],
 	"steps" : [
 		{
 			"service" : "dimensions",
@@ -236,6 +236,7 @@
 			"expect" : { "none" : true }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "users",
 			"method" : "update",
 			"params" : [ "name", "patch" ],
@@ -243,6 +244,7 @@
 			"expect" : { "none" : true }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "users",
 			"method" : "get",
 			"params" : [ "name", "query" ],
@@ -384,6 +386,7 @@
 			"expect" : { "fields" : { "Name" : "${member}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -391,6 +394,7 @@
 			"expect" : { "fields" : { "Name" : "${app}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -398,6 +402,7 @@
 			"expect" : { "fields" : { "Name" : "${chore}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -405,6 +410,7 @@
 			"expect" : { "fields" : { "Name" : "${dim}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -412,6 +418,7 @@
 			"expect" : { "fields" : { "Name" : "${process}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -419,6 +426,7 @@
 			"expect" : { "fields" : { "Name" : "${subset}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "create",
 			"params" : [ "folder", "scope", "entry" ],
@@ -473,106 +481,6 @@
 			"params" : [ "name", "patch" ],
 			"args" : [ "${viewed}", { "$patch" : "ProcessPatch", "json" : { "DataSource" : { "Type" : "TM1CubeView", "dataSourceNameForServer" : "${cube}", "dataSourceNameForClient" : "${cube}", "view" : "${bound}" } } } ],
 			"expect" : { "none" : true }
-		},
-		{
-			"service" : "processes",
-			"method" : "create",
-			"params" : [ "process" ],
-			"args" : [ { "$patch" : "ProcessCreate", "json" : { "Name" : "${debug}", "PrologProcedure" : "x = 1;\r\ny = 2;\r\nz = 3;\r\n" } } ],
-			"expect" : { "fields" : { "Name" : "${debug}" } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "debug",
-			"params" : [ "process", "parameters", "query" ],
-			"args" : [ "${debug}", { "$map" : { } }, { "$query" : { } } ],
-			"expect" : { "fields" : { } },
-			"save" : { "context" : "ID" }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "addBreakpoint",
-			"params" : [ "id", "breakpoint" ],
-			"args" : [ "${context}", { "$patch" : "ProcessDebugContextLineBreakpointCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint", "ID" : 1, "Enabled" : true, "Expression" : "x = 1", "HitCount" : 2, "HitMode" : "BreakEqual", "ProcessName" : "${debug}", "Procedure" : "Prolog", "LineNumber" : 2 } } ],
-			"expect" : { "fields" : { "ID" : 1, "LineNumber" : 2, "Procedure" : "Prolog", "ProcessName" : "${debug}" } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "addBreakpoint",
-			"params" : [ "id", "breakpoint" ],
-			"args" : [ "${context}", { "$patch" : "ProcessDebugContextDataBreakpointCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint", "ID" : 2, "Enabled" : true, "Expression" : "x = 1", "HitCount" : 2, "HitMode" : "BreakEqual", "VariableName" : "y" } } ],
-			"expect" : { "fields" : { "ID" : 2, "VariableName" : "y" } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "addBreakpoint",
-			"params" : [ "id", "breakpoint" ],
-			"args" : [ "${context}", { "$patch" : "ProcessDebugContextLockBreakpointCreate", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint", "ID" : 3, "Enabled" : true, "Expression" : "x = 1", "HitCount" : 2, "HitMode" : "BreakEqual", "ObjectName" : "${cube}", "ObjectType" : "Cube", "LockMode" : "Write" } } ],
-			"expect" : { "fields" : { "ID" : 3, "ObjectName" : "${cube}", "ObjectType" : "Cube", "LockMode" : "Write" } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "breakpoints",
-			"params" : [ "id", "query" ],
-			"args" : [ "${context}", { "$query" : { } } ],
-			"expect" : { "items" : { "ID" : [ 1, 3, 2 ], "Enabled" : [ true, true, true ], "Expression" : [ "x = 1", "x = 1", "x = 1" ], "HitCount" : [ 2, 2, 2 ], "HitMode" : [ "BreakEqual", "BreakEqual", "BreakEqual" ] } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "updateBreakpoint",
-			"params" : [ "id", "breakpoint", "patch" ],
-			"args" : [ "${context}", 1, { "$patch" : "ProcessDebugContextLineBreakpointPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLineBreakpoint", "Enabled" : false, "Expression" : "y = 2", "HitCount" : 3, "HitMode" : "BreakGreaterOrEqual", "ProcessName" : "${debug}", "Procedure" : "Prolog", "LineNumber" : 3 } } ],
-			"expect" : { "none" : true }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "updateBreakpoint",
-			"params" : [ "id", "breakpoint", "patch" ],
-			"args" : [ "${context}", 2, { "$patch" : "ProcessDebugContextDataBreakpointPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextDataBreakpoint", "Enabled" : false, "Expression" : "y = 2", "HitCount" : 3, "HitMode" : "BreakGreaterOrEqual", "VariableName" : "z" } } ],
-			"expect" : { "none" : true }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "updateBreakpoint",
-			"params" : [ "id", "breakpoint", "patch" ],
-			"args" : [ "${context}", 3, { "$patch" : "ProcessDebugContextLockBreakpointPatch", "json" : { "@odata.type" : "#ibm.tm1.api.v1.ProcessDebugContextLockBreakpoint", "Enabled" : false, "Expression" : "y = 2", "HitCount" : 3, "HitMode" : "BreakGreaterOrEqual", "ObjectName" : "${dim}", "ObjectType" : "Dimension", "LockMode" : "Read" } } ],
-			"expect" : { "none" : true }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "breakpoints",
-			"params" : [ "id", "query" ],
-			"args" : [ "${context}", { "$query" : { } } ],
-			"expect" : { "items" : { "ID" : [ 1, 3, 2 ], "Enabled" : [ false, false, false ], "Expression" : [ "y = 2", "y = 2", "y = 2" ], "HitCount" : [ 3, 3, 3 ], "HitMode" : [ "BreakGreaterOrEqual", "BreakGreaterOrEqual", "BreakGreaterOrEqual" ] } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "breakpoints",
-			"params" : [ "id", "query" ],
-			"args" : [ "${context}", { "$query" : { "filter" : "ID eq 1" } } ],
-			"expect" : { "items" : { "LineNumber" : [ 3 ], "Procedure" : [ "Prolog" ], "ProcessName" : [ "${debug}" ] } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "breakpoints",
-			"params" : [ "id", "query" ],
-			"args" : [ "${context}", { "$query" : { "filter" : "ID eq 2" } } ],
-			"expect" : { "items" : { "VariableName" : [ "z" ] } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "breakpoints",
-			"params" : [ "id", "query" ],
-			"args" : [ "${context}", { "$query" : { "filter" : "ID eq 3" } } ],
-			"expect" : { "items" : { "ObjectName" : [ "${dim}" ], "ObjectType" : [ "Dimension" ], "LockMode" : [ "Read" ] } }
-		},
-		{
-			"service" : "processDebugging",
-			"method" : "finish",
-			"params" : [ "id" ],
-			"args" : [ "${context}" ],
-			"repeats" : "tm1\\.Continue$",
-			"expect" : { "fields" : { "Status" : "Complete" } }
 		}
 	],
 	"finally" : [
@@ -601,6 +509,7 @@
 			"args" : [ "${month}", "${month}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "delete",
 			"params" : [ "entry" ],
@@ -619,6 +528,7 @@
 			"args" : [ "${dim}", "Sub", { "$enum" : "SubsetScope", "name" : "PRIVATE", "json" : "PRIVATE" }, "mine" ]
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "contents",
 			"method" : "delete",
 			"params" : [ "entry" ],
@@ -648,8 +558,6 @@
 			"params" : [ "dimension", "hierarchy", "scope", "subset" ],
 			"args" : [ "${third}", "${third}", { "$enum" : "SubsetScope", "name" : "PUBLIC", "json" : "PUBLIC" }, "${subset}" ]
 		},
-		{ "service" : "processDebugging", "method" : "finish", "params" : [ "id" ], "args" : [ "${context}" ], "repeats" : "tm1\\.Continue$" },
-		{ "service" : "processes", "method" : "delete", "params" : [ "name" ], "args" : [ "${debug}" ] },
 		{
 			"service" : "users",
 			"method" : "delete",

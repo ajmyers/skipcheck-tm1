@@ -84,7 +84,7 @@ public class Tm1CapabilitiesLiveTests
         var (_, user, password) = Live.Target();
         await using var pool = Tm1SessionPool.Builder(RawTm1.Sessions()).Build();
         var first = await pool.Session().CapabilitiesAsync();
-        var second = await pool.Session(Tm1Identity.WithCredentials("again", Tm1Authenticator.Basic(user, password))).CapabilitiesAsync();
+        var second = await pool.Session(Tm1Identity.WithCredentials("again", Live.Authenticator(user, password))).CapabilitiesAsync();
         Assert.Same(first, second);
     }
 

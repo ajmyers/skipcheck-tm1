@@ -25,7 +25,7 @@ from skipcheck_tm1._generated.operations import Tm1Operations
 from skipcheck_tm1.model import EncryptionFileType, LocalKeyFileProviderSettingsPatch
 
 from .conftest import CONFIGURED, INSTALL, REASON
-from .support import assume_supports
+from .support import assume_supports, is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -69,15 +69,16 @@ def test_refuses_changes_with_bare_code_names(tm1: Tm1Client) -> None:
     _refuses(tm1, Tm1Operations.DISABLE_ENCRYPTION_AT_REST, tm1.encryption.disable, "DataModelConversion")
     _refuses(tm1, Tm1Operations.ROTATE_DATA_ENCRYPTION_KEY, tm1.encryption.rotate_data_encryption_key, "DataEncryptionKeyRotationFailed")
     _refuses(tm1, Tm1Operations.ROTATE_DATA_MODEL_KEY, tm1.encryption.rotate_data_model_key, "RotateDataModelKey")
+    file_code = "UnsupportedOperation" if is_v12(tm1) else "DataFileConversion"
     _refuses(
         tm1,
         Tm1Operations.ENCRYPT_DATA_FILE,
         lambda: tm1.encryption.encrypt_file("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.OBJECT),
-        "DataFileConversion",
+        file_code,
     )
     _refuses(
         tm1,
         Tm1Operations.DECRYPT_DATA_FILE,
         lambda: tm1.encryption.decrypt_file("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.OBJECT),
-        "DataFileConversion",
+        file_code,
     )

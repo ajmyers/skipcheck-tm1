@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { AnnotationPatch, ODataQuery, Tm1NotFoundException, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 const CUBE = "}ClientGroups";
 
@@ -34,7 +35,12 @@ describe("AnnotationService on TM1" + liveReason, () => {
       expect(Object.keys(made)).toEqual(expect.arrayContaining(["objectName", "commentValue", "commentLocation"]));
       expect(made["commentLocation"]).toBe("Admin,ADMIN");
 
-      expect(await tm1.annotations.list().toArray(), "TM1 lists none here").toEqual([]);
+      const listed = (await tm1.annotations.list().toArray()).map((a) => a.ID);
+      if (await isV12(tm1)) {
+        expect(listed).toContain(id);
+      } else {
+        expect(listed, "TM1 11 lists none here").toEqual([]);
+      }
       expect((await tm1.annotations.cubeAnnotations(CUBE).toArray()).map((a) => a.ID)).toContain(id);
       const cellset = await tm1.cellsets.execute(`SELECT {[}Clients].[Admin]} ON 0, {[}Groups].[ADMIN]} ON 1 FROM [${CUBE}]`);
       try {

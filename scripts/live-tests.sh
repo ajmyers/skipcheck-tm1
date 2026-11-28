@@ -4,13 +4,21 @@
 # Runs every client's tests against a real TM1: the Java *Tm1Test classes, the Python
 # tests/live, the .NET Live tests and the TypeScript test/live. Give TM1 the way the Java tests take it, one of:
 #
-#   TM1_PRIVATE_IMAGE   an image with TM1 built in
-#   TM1_HOME_DIR        an installed tm1_64 folder
-#   TM1_INSTALL_VOLUME  a Docker volume holding an install
-#   TM1_BUNDLE_DIR      a folder holding IBM's bundle (TM1_BUNDLE picks the file)
-#   TM1_BUNDLE_URL      a download link for the bundle (TM1_BUNDLE_SHA256 checks it)
+#   TM1_PRIVATE_IMAGE          an image with TM1 11 built in
+#   TM1_HOME_DIR               an installed tm1_64 folder
+#   TM1_INSTALL_VOLUME         a Docker volume holding a TM1 11 install
+#   TM1_BUNDLE_DIR             a folder holding IBM's TM1 11 bundle (TM1_BUNDLE picks the file)
+#   TM1_BUNDLE_URL             a download link for the TM1 11 bundle (TM1_BUNDLE_SHA256 checks it)
 #
-# Each suite starts its own tm1-server container from it (they share the bundle cache volume),
+# Or TM1 v12 (Planning Analytics 3.x), starting a tm1-engine container:
+#
+#   TM1_ENGINE_PRIVATE_IMAGE   an image with TM1 v12 built in
+#   TM1_ENGINE_HOME_DIR        an installed tm1-engine folder
+#   TM1_ENGINE_INSTALL_VOLUME  a Docker volume holding a TM1 v12 install
+#   TM1_ENGINE_BUNDLE_DIR      a folder holding IBM's tm1-v*-standalone-linux.tgz (TM1_ENGINE_BUNDLE picks the file)
+#   TM1_ENGINE_BUNDLE_URL      a download link for the TM1 v12 package (TM1_ENGINE_BUNDLE_SHA256 checks it)
+#
+# Each suite starts its own container from it (they share the bundle cache volume),
 # or, with TM1_URL set, every suite uses that server instead (TM1_USER, TM1_PASSWORD, TM1_NAMESPACE,
 # TM1_VERIFY=false as needed). A test that needs a container of its own (CAM, Git's daemon,
 # encryption's own server, the examples' samples) still starts one from a source, or skips.

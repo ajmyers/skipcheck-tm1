@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
@@ -122,7 +123,13 @@ class ProcessServiceTm1Test {
 				.block(WAIT);
 			assertThat(result.processExecuteStatusCode()).as("ProcessError, then a runtime error")
 				.isEqualTo(ProcessExecuteStatusCode.ABORTED);
-			assertThat(result.errorLogFile().filename()).startsWith("tm1processerror_").endsWith("_" + name + ".log");
+			if (ServerAssumptions.isV12(tm1)) {
+				assertThat(result.errorLogFile().filename()).startsWith("ProcessLog_").endsWith("_" + name + ".jsonl");
+			}
+			else {
+				assertThat(result.errorLogFile().filename()).startsWith("tm1processerror_")
+					.endsWith("_" + name + ".log");
+			}
 		}
 		assertThat(status(1)).isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
 		assertThat(status(2)).isEqualTo(ProcessExecuteStatusCode.QUIT_CALLED);
@@ -143,9 +150,11 @@ class ProcessServiceTm1Test {
 		processes.execute(name, parameters(1)).block(WAIT);
 		processes.execute(definition("unsaved", PROLOG), parameters(1)).block(WAIT);
 		List<ProcessErrorLog> logs = processes.errorLogs(name, ODataQuery.none()).collectList().block(WAIT);
-		assertThat(logs).as("the aborted run's").hasSize(1);
-		assertThat(processes.errorLogContent(name, logs.get(0)).block(WAIT)).as("keyed by its quoted timestamp")
-			.contains("ProcessError");
+		if (!ServerAssumptions.isV12(tm1)) {
+			assertThat(logs).as("the aborted run's").hasSize(1);
+			assertThat(processes.errorLogContent(name, logs.get(0)).block(WAIT)).as("keyed by its quoted timestamp")
+				.contains("ProcessError");
+		}
 	}
 
 	private ProcessExecuteStatusCode status(int count) {

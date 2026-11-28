@@ -27,6 +27,7 @@ from skipcheck_tm1.model import (
 
 from .conftest import CONFIGURED, REASON
 from .support import (
+    is_v12,
     process_definition,
 )
 
@@ -86,12 +87,17 @@ def test_compiles_saved_and_unsaved_code(tm1: Tm1Client, process: str) -> None:
 
 
 def test_runs_and_says_how_it_ended(tm1: Tm1Client, process: str) -> None:
+    v12 = is_v12(tm1)
     processes = tm1.processes
     for count in (3, 4):
         result = processes.execute_with_return(process, parameters(count), ODataQuery.none().expand("ErrorLogFile"))
         assert result.process_execute_status_code is ProcessExecuteStatusCode.ABORTED, "ProcessError, then a runtime error"
-        assert result.error_log_file.filename.startswith("tm1processerror_")
-        assert result.error_log_file.filename.endswith(f"_{process}.log")
+        if v12:
+            assert result.error_log_file.filename.startswith("ProcessLog_")
+            assert result.error_log_file.filename.endswith(f"_{process}.jsonl")
+        else:
+            assert result.error_log_file.filename.startswith("tm1processerror_")
+            assert result.error_log_file.filename.endswith(f"_{process}.log")
 
     def status(count: int) -> Any:
         return processes.execute_with_return(process, parameters(count)).process_execute_status_code
@@ -109,5 +115,6 @@ def test_runs_unsaved_code_and_the_deprecated_ways(tm1: Tm1Client, process: str)
     processes.execute(process, parameters(1))
     processes.execute(process_definition("unsaved", PROLOG), parameters(1))
     logs = processes.error_logs(process)
-    assert len(logs) == 1, "the aborted run's"
-    assert "ProcessError" in processes.error_log_content(process, logs[0]), "keyed by its quoted timestamp"
+    if not is_v12(tm1):
+        assert len(logs) == 1, "the aborted run's"
+        assert "ProcessError" in processes.error_log_content(process, logs[0]), "keyed by its quoted timestamp"

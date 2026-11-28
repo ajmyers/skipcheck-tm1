@@ -16,6 +16,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Skipcheck.Tm1.Client.Auth;
 using Skipcheck.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Version;
+using Skipcheck.Tm1.Testcontainers;
 
 namespace Skipcheck.Tm1.Client.Tests.Live;
 
@@ -65,6 +67,16 @@ public sealed class RawTm1 : IDisposable
     /// <summary>Settings for a session of the TM1 under test, logging in as <see cref="Live.Client"/> does.</summary>
     public static Tm1SessionBuilder Sessions()
     {
+        if (Live.IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            var login = db.Login();
+            return Tm1Session
+                .Builder()
+                .BaseUrl(db.RestUrl)
+                .Dialect(Tm1Dialect.V12(db.Instance, db.Name))
+                .Authenticator(Tm1Authenticator.Application(login.ClientId, login.ClientSecret, login.User));
+        }
         var (url, user, password) = Live.Target();
         var ns = Environment.GetEnvironmentVariable("TM1_URL") is { Length: > 0 } ? Environment.GetEnvironmentVariable("TM1_NAMESPACE") : null;
         var builder = Tm1Session
@@ -83,16 +95,48 @@ public sealed class RawTm1 : IDisposable
     /// <summary>A label unique to one test, for <see cref="SessionCount"/>.</summary>
     public static string UniqueContext() => "test-" + Guid.NewGuid();
 
-    /// <summary>Logs in with Basic credentials and no cookie; the new session's cookie, as <c>name=value</c>.</summary>
-    public string Login() =>
-        CookieOf(Send(Request("GET", "ActiveSession?$select=ID").WithBasic())) ?? throw new InvalidOperationException("TM1 set no session cookie");
+    /// <summary>Logs in with credentials and no cookie; the new session's cookie, as <c>name=value</c>.</summary>
+    public string Login()
+    {
+        if (Live.IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            var login = db.Login();
+            return login.SessionAsync(Basic(login.ClientId, login.ClientSecret)).GetAwaiter().GetResult();
+        }
+        return CookieOf(Send(Request("GET", "ActiveSession?$select=ID").WithBasic())) ?? throw new InvalidOperationException("TM1 set no session cookie");
+    }
 
     public long SessionId(string cookie) => Json(Send(Request("GET", "ActiveSession?$select=ID").WithCookie(cookie))).GetProperty("ID").GetInt64();
 
-    public void Close(string cookie) => Send(Request("POST", "ActiveSession/tm1.Close").WithCookie(cookie).WithBody("{}"));
+    public void Close(string cookie)
+    {
+        if (Live.IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            using var message = new HttpRequestMessage(HttpMethod.Post, db.Engine.Url + db.Instance + "/api/v1/ActiveSession/tm1s.Close");
+            message.Headers.TryAddWithoutValidation("Cookie", cookie);
+            message.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            using var response = _http.Send(message);
+            return;
+        }
+        Send(Request("POST", "ActiveSession/tm1.Close").WithCookie(cookie).WithBody("{}"));
+    }
 
     /// <summary>Kills another session by ID from <paramref name="admin"/>'s session.</summary>
-    public int Kill(string admin, long id) => (int)Send(Request("POST", $"Sessions({id})/tm1.Close").WithCookie(admin).WithBody("{}")).Status;
+    public int Kill(string admin, long id)
+    {
+        if (Live.IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            using var message = new HttpRequestMessage(HttpMethod.Post, db.Engine.Url + db.Instance + $"/api/v1/Sessions({id})/tm1s.Close");
+            message.Headers.TryAddWithoutValidation("Cookie", admin);
+            message.Content = new StringContent("{}", Encoding.UTF8, "application/json");
+            using var response = _http.Send(message);
+            return (int)response.StatusCode;
+        }
+        return (int)Send(Request("POST", $"Sessions({id})/tm1.Close").WithCookie(admin).WithBody("{}")).Status;
+    }
 
     /// <summary>Waits until session <paramref name="id"/> is no longer listed (TM1 takes a few seconds).</summary>
     public bool AwaitGone(string admin, long id, TimeSpan timeout)

@@ -48,7 +48,7 @@ export class SessionService extends Tm1Service {
   }
 
   /** `GET Sessions(id)`: the session, or a `Tm1NotFoundException` if there's none. */
-  get(id: number, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Session> {
+  get(id: number | bigint, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<Session> {
     return this.session.execute(Tm1Request.get(sessionPath(id), query, Session), options);
   }
 
@@ -58,22 +58,22 @@ export class SessionService extends Tm1Service {
   }
 
   /** `GET Sessions(id)/User`: the session's user. */
-  user(id: number, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<User> {
+  user(id: number | bigint, query?: ODataQuery | null, options?: Tm1CallOptions): Promise<User> {
     return this.session.execute(Tm1Request.get(sessionPath(id).nav("User"), query, User), options);
   }
 
   /** `GET Sessions(id)/Threads`, streamed: what the session is running now. */
-  threads(id: number, query?: ODataQuery | null, options?: Tm1CallOptions): Tm1Stream<Thread> {
+  threads(id: number | bigint, query?: ODataQuery | null, options?: Tm1CallOptions): Tm1Stream<Thread> {
     return this.session.stream(Tm1Request.list(sessionPath(id).nav("Threads"), query, Thread), options);
   }
 
   /** `tm1.Close`: ends another session; its client must log in again. Needs schema 10.2.2.5. */
-  close(id: number, options?: Tm1CallOptions): Promise<void> {
+  close(id: number | bigint, options?: Tm1CallOptions): Promise<void> {
     const operation = Tm1Operations.SessionClose;
     return this.session.execute(Tm1Request.post(sessionPath(id).action(operation.name), {}).requires(operation.capability()), options);
   }
 }
 
-function sessionPath(id: number): ODataPath {
+function sessionPath(id: number | bigint): ODataPath {
   return SESSIONS.key(required(id, "id"));
 }

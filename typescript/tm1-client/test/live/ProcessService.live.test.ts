@@ -14,6 +14,7 @@ import {
   type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 const PROLOG = `If(pCount = 2);
   ProcessQuit;
@@ -94,11 +95,17 @@ describe("ProcessService on TM1" + liveReason, () => {
   });
 
   tm1Test("runs and says how it ended", async () => {
+    const v12 = await isV12(tm1);
     for (const count of [3, 4]) {
       const result = await tm1.processes.executeWithReturn(name, parameters(count), ODataQuery.none().expand("ErrorLogFile"));
       expect(result.ProcessExecuteStatusCode, "ProcessError, then a runtime error").toBe("Aborted");
-      expect(result.ErrorLogFile?.Filename).toMatch(/^tm1processerror_/);
-      expect(result.ErrorLogFile?.Filename?.endsWith(`_${name}.log`)).toBe(true);
+      if (v12) {
+        expect(result.ErrorLogFile?.Filename).toMatch(/^ProcessLog_/);
+        expect(result.ErrorLogFile?.Filename?.endsWith(`_${name}.jsonl`)).toBe(true);
+      } else {
+        expect(result.ErrorLogFile?.Filename).toMatch(/^tm1processerror_/);
+        expect(result.ErrorLogFile?.Filename?.endsWith(`_${name}.log`)).toBe(true);
+      }
     }
     expect(await status(1)).toBe("CompletedSuccessfully");
     expect(await status(2)).toBe("QuitCalled");
@@ -113,7 +120,12 @@ describe("ProcessService on TM1" + liveReason, () => {
     await tm1.processes.execute(name, parameters(1));
     await tm1.processes.execute(definition("unsaved", PROLOG), parameters(1));
     const logs = await tm1.processes.errorLogs(name, ODataQuery.none()).toArray();
-    expect(logs, "the aborted run's").toHaveLength(1);
-    expect(await tm1.processes.errorLogContent(name, logs[0]!), "keyed by its quoted timestamp").toContain("ProcessError");
+    if (await isV12(tm1)) {
+      // Deprecated Processes('...')/ErrorLogs is empty on TM1 v12
+      expect(logs).toEqual([]);
+    } else {
+      expect(logs, "the aborted run's").toHaveLength(1);
+      expect(await tm1.processes.errorLogContent(name, logs[0]!), "keyed by its quoted timestamp").toContain("ProcessError");
+    }
   });
 });

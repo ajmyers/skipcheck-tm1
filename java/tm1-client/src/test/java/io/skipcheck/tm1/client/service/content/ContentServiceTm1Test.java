@@ -4,8 +4,10 @@ package io.skipcheck.tm1.client.service.content;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -23,12 +25,14 @@ import org.springframework.core.io.buffer.DefaultDataBufferFactory;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.model.CubeReference;
 import io.skipcheck.tm1.client.model.CubeReferenceCreate;
+import io.skipcheck.tm1.client.model.Document;
 import io.skipcheck.tm1.client.model.DocumentCreate;
 import io.skipcheck.tm1.client.model.DocumentReference;
 import io.skipcheck.tm1.client.model.Entry;
@@ -83,12 +87,18 @@ class ContentServiceTm1Test {
 
 	@Test
 	void listsTheRoots() {
-		assertThat(tm1.contents().roots(ODataQuery.none()).map(Entry::name).collectList().block(WAIT))
-			.contains("Applications", "Blobs");
+		List<String> roots = tm1.contents().roots(ODataQuery.none()).map(Entry::name).collectList().block(WAIT);
+		if (ServerAssumptions.isV12(tm1)) {
+			assertThat(roots).contains("Applications", "Files", "Home", "Session");
+		}
+		else {
+			assertThat(roots).contains("Applications", "Blobs");
+		}
 	}
 
 	@Test
 	void keepsADocumentInBlobsBehindAReference() {
+		boolean v12 = ServerAssumptions.isV12(tm1);
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		tm1.contents()
@@ -104,27 +114,47 @@ class ContentServiceTm1Test {
 				.block(WAIT);
 			assertThat(made).as("a document made in an application is a reference")
 				.isInstanceOf(DocumentReference.class);
-			assertThat(made.id()).as("found by ID, the name plus a suffix").isEqualTo(doc + ".txt.blob");
+			if (v12) {
+				assertThat(made.id()).as("TM1 v12 omits deprecated Entry.ID").isNull();
+				assertThat(made.name()).isEqualTo(doc + ".txt");
+			}
+			else {
+				assertThat(made.id()).as("found by ID, the name plus a suffix").isEqualTo(doc + ".txt.blob");
+			}
 			ContentPath notes = folder.child(made);
-			assertThatThrownBy(() -> tm1.contents().get(folder.child(doc + ".txt"), ODataQuery.none()).block(WAIT))
-				.as("not by name")
-				.isInstanceOf(Tm1NotFoundException.class);
+			if (!v12) {
+				assertThatThrownBy(() -> tm1.contents().get(folder.child(doc + ".txt"), ODataQuery.none()).block(WAIT))
+					.as("not by name")
+					.isInstanceOf(Tm1NotFoundException.class);
+			}
 
 			tm1.contents().upload(notes, bytes("hello there")).block(WAIT);
 			assertThat(text(tm1.contents().content(notes))).isEqualTo("hello there");
 			var document = tm1.contents().document(notes, ODataQuery.none()).block(WAIT);
 			assertThat(document.size()).isEqualTo(11);
 			assertThat(document.name()).as("named by TM1, with a timestamp").startsWith(doc + "_").endsWith(".txt");
-			ContentPath blob = ContentPath.blobs().child(document.id());
-			assertThat(text(tm1.contents().content(blob))).isEqualTo("hello there");
+			ContentPath blob = v12 ? null : ContentPath.blobs().child(document.id());
+			if (blob != null) {
+				assertThat(text(tm1.contents().content(blob))).isEqualTo("hello there");
+			}
 
 			Entry copy = tm1.contents().copy(notes, folder, ContentScope.PUBLIC, doc + "-copy.txt").block(WAIT);
-			assertThat(copy.id()).isEqualTo(doc + "-copy.txt.blob");
-			assertThat(tm1.contents().document(folder.child(copy.id()), ODataQuery.none()).block(WAIT).id())
-				.as("a copy refers to the same document")
-				.isEqualTo(document.id());
+			if (v12) {
+				assertThat(copy.name()).isEqualTo(doc + "-copy.txt");
+				assertThat(tm1.contents().document(folder.child(copy), ODataQuery.none()).block(WAIT).name())
+					.as("TM1 v12 gives a copy its own backing document")
+					.startsWith(doc + "-copy_")
+					.endsWith(".txt");
+			}
+			else {
+				assertThat(copy.id()).isEqualTo(doc + "-copy.txt.blob");
+				assertThat(tm1.contents().document(folder.child(copy.id()), ODataQuery.none()).block(WAIT).id())
+					.as("a copy refers to the same document")
+					.isEqualTo(document.id());
+			}
 			tm1.contents().delete(notes).block(WAIT);
-			assertThat(text(tm1.contents().content(blob))).as("kept while the copy refers to it")
+			assertThat(text(tm1.contents().content(blob != null ? blob : folder.child(copy))))
+				.as("kept while the copy refers to it")
 				.isEqualTo("hello there");
 		}
 		finally {
@@ -134,6 +164,7 @@ class ContentServiceTm1Test {
 
 	@Test
 	void makesLinksAndReferencesAndMovesThem() {
+		boolean v12 = ServerAssumptions.isV12(tm1);
 		String name = unique();
 		ContentPath folder = ContentPath.applications().child(name);
 		ContentPath other = ContentPath.applications().child(name + "-2");
@@ -148,7 +179,7 @@ class ContentServiceTm1Test {
 				.create(folder, ContentScope.PUBLIC,
 						LinkCreate.builder().name("ibm").url("https://www.ibm.com").build())
 				.block(WAIT);
-			assertThat(link.id()).isEqualTo("ibm.extr");
+			assertThat(v12 ? link.name() : link.id()).isEqualTo(v12 ? "ibm" : "ibm.extr");
 			Entry reference = tm1.contents()
 				.create(folder, ContentScope.PUBLIC,
 						CubeReferenceCreate.builder()
@@ -156,7 +187,7 @@ class ContentServiceTm1Test {
 							.bindCube(ODataPath.of("Cubes").key("}ClientGroups"))
 							.build())
 				.block(WAIT);
-			assertThat(reference.id()).isEqualTo("}ClientGroups.cube");
+			assertThat(v12 ? reference.name() : reference.id()).isEqualTo(v12 ? "}ClientGroups" : "}ClientGroups.cube");
 
 			List<Entry> listed = tm1.contents()
 				.contents(folder, ContentScope.PUBLIC, ODataQuery.none().expand("tm1.CubeReference/Cube($select=Name)"))
@@ -166,29 +197,30 @@ class ContentServiceTm1Test {
 				.singleElement()
 				.extracting(e -> ((CubeReference) e).cube().name())
 				.isEqualTo("}ClientGroups");
-			assertThat(tm1.contents().get(folder.child(link.id()), ODataQuery.none()).block(WAIT))
-				.isInstanceOfSatisfying(Link.class, l -> assertThat(l.url()).isEqualTo("https://www.ibm.com"));
-			Folder parent = tm1.contents().containedBy(folder.child(link.id()), ODataQuery.none()).block(WAIT);
-			assertThat(parent.id()).isEqualTo(name);
+			ContentPath linkPath = folder.child(link);
+			assertThat(tm1.contents().get(linkPath, ODataQuery.none()).block(WAIT)).isInstanceOfSatisfying(Link.class,
+					l -> assertThat(l.url()).isEqualTo("https://www.ibm.com"));
+			Folder parent = tm1.contents().containedBy(linkPath, ODataQuery.none()).block(WAIT);
+			assertThat(v12 ? parent.name() : parent.id()).isEqualTo(name);
 
 			assertThatThrownBy(() -> tm1.session()
-				.execute(Tm1Request.patch(folder.child(link.id()).path(), Map.of("Name", "renamed")))
+				.execute(Tm1Request.patch(linkPath.path(), Map.of("Name", "renamed")))
 				.block(WAIT)).as("entries can't be changed").isInstanceOf(Tm1BadRequestException.class);
 
-			Entry moved = tm1.contents().move(folder.child(link.id()), other, ContentScope.PUBLIC, null).block(WAIT);
-			assertThat(moved.id()).isEqualTo("ibm.extr");
+			Entry moved = tm1.contents().move(linkPath, other, ContentScope.PUBLIC, null).block(WAIT);
+			assertThat(v12 ? moved.name() : moved.id()).isEqualTo(v12 ? "ibm" : "ibm.extr");
 			assertThat(tm1.contents()
 				.contents(other, ContentScope.PUBLIC, ODataQuery.none())
-				.map(Entry::id)
+				.map(e -> v12 ? e.name() : e.id())
 				.collectList()
-				.block(WAIT)).containsExactly("ibm.extr");
+				.block(WAIT)).containsExactly(v12 ? "ibm" : "ibm.extr");
 
 			tm1.contents()
 				.create(folder, ContentScope.PRIVATE, FolderCreate.builder().name("mine").build())
 				.block(WAIT);
 			assertThat(tm1.contents()
 				.contents(folder, ContentScope.PRIVATE, ODataQuery.none())
-				.map(Entry::id)
+				.map(e -> v12 ? e.name() : e.id())
 				.collectList()
 				.block(WAIT)).containsExactly("mine");
 			assertThat(tm1.contents().get(folder.child("mine", ContentScope.PRIVATE), ODataQuery.none()).block(WAIT))
@@ -198,6 +230,27 @@ class ContentServiceTm1Test {
 		}
 		finally {
 			Mono.when(tm1.contents().delete(folder), tm1.contents().delete(other)).block(WAIT);
+		}
+	}
+
+	@Test
+	void readsAndWritesDocumentsInFilesHomeAndSession() {
+		assumeTrue(ServerAssumptions.isV12(tm1), "Files, Home and Session direct-document roots are TM1 v12");
+		String filename = unique() + ".txt";
+		for (ContentPath root : List.of(ContentPath.files(), ContentPath.home(), ContentPath.session())) {
+			Entry created = tm1.contents()
+				.create(root, ContentScope.PUBLIC, DocumentCreate.builder().name(filename).build())
+				.block(WAIT);
+			assertThat(created).isInstanceOf(Document.class);
+			ContentPath doc = root.child(created);
+			try {
+				tm1.contents().upload(doc, bytes("direct content")).block(WAIT);
+				assertThat(text(tm1.contents().content(doc))).isEqualTo("direct content");
+				assertThat(tm1.contents().document(doc, ODataQuery.none()).block(WAIT).size()).isEqualTo(14);
+			}
+			finally {
+				tm1.contents().delete(doc).block(WAIT);
+			}
 		}
 	}
 
@@ -213,16 +266,18 @@ class ContentServiceTm1Test {
 			Entry made = tm1.contents()
 				.create(folder, ContentScope.PUBLIC, DocumentCreate.builder().name(name + "-notes.txt").build())
 				.block(WAIT);
-			HttpRequest chunked = HttpRequest
-				.newBuilder(URI.create(server.getRestUrl() + folder.child(made.id()).path()
-						+ "/tm1.DocumentReference/Document/Content"))
-				.header("Authorization", server.getAuthorization())
+			HttpRequest chunked = server
+				.authorize(HttpRequest.newBuilder(URI.create(
+						server.getRestUrl() + folder.child(made).path() + "/tm1.DocumentReference/Document/Content")))
+				.version(HttpClient.Version.HTTP_1_1)
 				.header("Content-Type", "application/octet-stream")
 				// a publisher of unknown length is sent chunked
 				.PUT(HttpRequest.BodyPublishers.fromPublisher(HttpRequest.BodyPublishers.ofString("hello")))
 				.build();
+			// TM1 11 refuses chunked uploads (400); TM1 v12's gateway accepts them (204)
+			int expected = ServerAssumptions.isV12(tm1) ? 204 : 400;
 			assertThat(server.httpClient().build().send(chunked, HttpResponse.BodyHandlers.discarding()).statusCode())
-				.isEqualTo(400);
+				.isEqualTo(expected);
 		}
 		finally {
 			tm1.contents().delete(folder).block(WAIT);

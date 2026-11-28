@@ -71,7 +71,11 @@ Last checked on 2026-11-26, every client's live tests on each release ([`scripts
 
 What a release's schema lacks is skipped there, not failed. "But for `settings`": that conformance scenario failed in one client's run, nearly always .NET's, when TM1 read back a setting it had just been given as empty ([#399](https://github.com/ajmyers/skipcheck-tm1/issues/399)). It isn't a release's: it fails and passes on releases with the same TM1 build (2.1.8 passed and 2.1.9 failed on 11.8.02900.8; 2.1.13 and 2.1.14 on 11.8.03200.3; 2.1.21 and 2.1.23 on 11.8.03700.2), and passes alone. Everything else passed, and every client sent TM1 the same requests in every other scenario.
 
-Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine), and isn't covered by this table.
+Planning Analytics 3.x (TM1 v12) is a different engine, run by [`docker/tm1-engine`](docker/tm1-engine). All four clients (`Java`, `Python`, `.NET`, `TypeScript`) also run the live conformance suite and traffic comparison against it:
+
+| Planning Analytics | TM1 version | `$metadata` schema | Result |
+|---|---|---|---|
+| 3.1.13 | 12.6.7 | 12.6.0 | Pass |
 
 ## Stability
 

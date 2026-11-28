@@ -3,6 +3,7 @@
 package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -43,6 +44,7 @@ class Tm1SessionImpersonationTm1Test {
 
 	@BeforeEach
 	void createUser(LiveServer server) {
+		assumeFalse(server.isEngine(), "TM1 v12 does not support TM1-Impersonate; pass the user to application auth");
 		this.server = server;
 		raw = new RawTm1(server);
 		admin = raw.login();
@@ -52,8 +54,12 @@ class Tm1SessionImpersonationTm1Test {
 
 	@AfterEach
 	void deleteUser() {
-		raw.deleteUser(admin, alice);
-		raw.close(admin);
+		if (raw != null && admin != null) {
+			if (alice != null) {
+				raw.deleteUser(admin, alice);
+			}
+			raw.close(admin);
+		}
 	}
 
 	@Test

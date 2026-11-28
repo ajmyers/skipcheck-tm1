@@ -33,7 +33,18 @@ class GeneratedModelTm1Test {
 		try {
 			Server server = session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Server.class))
 				.block(WAIT);
-			assertThat(server.productVersion()).isEqualTo(tm1.getTm1Version().toString());
+			if (tm1.getTm1Version().isAtLeast(ServerAssumptions.TM1_12)) {
+				// TM1 v12 omits ProductVersion from GET Server unless explicitly selected
+				assertThat(server.name()).isNotBlank();
+				Server selected = session
+					.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select("ProductVersion"),
+							Server.class))
+					.block(WAIT);
+				assertThat(selected.productVersion()).isEqualTo(tm1.getTm1Version().toString());
+			}
+			else {
+				assertThat(server.productVersion()).isEqualTo(tm1.getTm1Version().toString());
+			}
 			assertThat(server.etag()).as("TM1 sends no ETag for the Server singleton").isNull();
 
 			List<Dimension> dimensions = session
@@ -144,9 +155,14 @@ class GeneratedModelTm1Test {
 				.execute(Tm1Request.get(cube, ODataQuery.none().expand(Cube.DIMENSIONS, d -> d.select(Dimension.NAME)),
 						Cube.class))
 				.block(WAIT);
-			assertThat(created.dimensions()).extracting(Dimension::name)
-				.as("TM1 lists its virtual Sandboxes dimension first")
-				.containsExactly("Sandboxes", name, "}Groups");
+			if (tm1.getTm1Version().isAtLeast(ServerAssumptions.TM1_12)) {
+				assertThat(created.dimensions()).extracting(Dimension::name).containsExactly(name, "}Groups");
+			}
+			else {
+				assertThat(created.dimensions()).extracting(Dimension::name)
+					.as("TM1 lists its virtual Sandboxes dimension first")
+					.containsExactly("Sandboxes", name, "}Groups");
+			}
 			List<Element> elements = session
 				.stream(Tm1Request.list(dimension.nav("Hierarchies").key(name).nav("Elements"), ODataQuery.none(),
 						Element.class))

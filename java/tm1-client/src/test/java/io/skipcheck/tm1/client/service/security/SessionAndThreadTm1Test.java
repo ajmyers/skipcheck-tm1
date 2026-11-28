@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1ServerException;
 import io.skipcheck.tm1.client.model.ProcessCreate;
@@ -70,9 +71,10 @@ class SessionAndThreadTm1Test {
 				.block(WAIT)).contains(id);
 
 			tm1.sessions().close(id).block(WAIT);
-			assertThat(other.sessions().activeSession(ODataQuery.none()).block(WAIT).id())
-				.as("the other client logs in again, as a new session")
-				.isNotEqualTo(id);
+			long after = other.sessions().activeSession(ODataQuery.none()).block(WAIT).id();
+			if (!ServerAssumptions.isV12(tm1)) {
+				assertThat(after).as("the other client logs in again, as a new session").isNotEqualTo(id);
+			}
 		}
 		finally {
 			other.close().block(WAIT);
@@ -81,6 +83,7 @@ class SessionAndThreadTm1Test {
 
 	@Test
 	void cancelsARunningProcessThroughItsThread() throws Exception {
+		ServerAssumptions.assumeV11(tm1, "TM1 v12 tracks active work in Jobs rather than Threads");
 		String process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
 			.create(ProcessCreate.builder()

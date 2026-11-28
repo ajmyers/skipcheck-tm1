@@ -66,17 +66,26 @@ public sealed class Tm1SessionPoolLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task RunsEachIdentityAsItself()
     {
+        var targetUser = Live.Target().User;
+        if (Live.IsEngine)
+        {
+            Assert.Equal(_alice, await Name(Pool.Session(Identity(_alice, "a"))));
+            Assert.Equal(_bob, await Name(Pool.Session(Identity(_bob, "b"))));
+            Assert.Equal(targetUser, await Name(Pool.Session()), ignoreCase: true);
+            Assert.Equal(3, Pool.Stats().Held);
+            return;
+        }
         Assert.Equal(_alice, await Name(Pool.Session(Tm1Identity.Impersonating(_alice))));
         Assert.Equal(_bob, await Name(Pool.Session(Tm1Identity.Impersonating(_bob))));
         Assert.Equal(_bob, await Name(Pool.Session(Tm1Identity.WithCredentials(_bob, Tm1Authenticator.Basic(_bob, "b")))));
-        Assert.Equal("Admin", await Name(Pool.Session()), ignoreCase: true);
+        Assert.Equal(targetUser, await Name(Pool.Session()), ignoreCase: true);
         Assert.Equal(4, Pool.Stats().Held);
     }
 
     [Tm1Fact]
     public async Task ClosesEvictedSessionsOnTm1()
     {
-        var session = Pool.Session(Tm1Identity.Impersonating(_alice));
+        var session = Pool.Session(Identity(_alice, "a"));
         Assert.Equal(_alice, await Name(session));
         var id = await session.SessionIdAsync();
         await Task.Delay(1100);
@@ -88,8 +97,8 @@ public sealed class Tm1SessionPoolLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task LeavesNoSessionBehindWhenClosed()
     {
-        await Name(Pool.Session(Tm1Identity.Impersonating(_alice)));
-        await Name(Pool.Session(Tm1Identity.Impersonating(_bob)));
+        await Name(Pool.Session(Identity(_alice, "a")));
+        await Name(Pool.Session(Identity(_bob, "b")));
         await Pool.CloseAsync().WaitAsync(Wait);
         Assert.Equal(0, Raw.AwaitSessionCount(_admin, _context, 0, Wait));
     }
@@ -98,9 +107,16 @@ public sealed class Tm1SessionPoolLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task NeverFallsBackToAnotherIdentity()
     {
+        if (Live.IsEngine)
+        {
+            return; // TM1 v12 does not support TM1-Impersonate (xUnit 2 can't skip once started)
+        }
         var e = await Assert.ThrowsAnyAsync<Tm1ApiException>(() => Pool.Session(Tm1Identity.Impersonating("Admin")).ExecuteAsync(ActiveUser));
         Assert.Equal(Tm1ErrorKind.ImpersonationRefused, e.Kind);
     }
+
+    private static Tm1Identity Identity(string user, string password) =>
+        Live.IsEngine ? Tm1Identity.WithCredentials(user, Live.Authenticator(user, password)) : Tm1Identity.Impersonating(user);
 
     private static async Task<string?> Name(Tm1Session session) => (await session.ExecuteAsync(ActiveUser)).GetProperty("Name").GetString();
 }

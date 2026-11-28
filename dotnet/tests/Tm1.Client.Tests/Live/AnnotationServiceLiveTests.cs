@@ -29,7 +29,15 @@ public class AnnotationServiceLiveTests
             Assert.True(made.DynamicProperties!.ContainsKey("objectName"));
             Assert.True(made.DynamicProperties.ContainsKey("commentValue"));
             Assert.Equal("Admin,ADMIN", made.DynamicProperties["commentLocation"].GetString());
-            Assert.Empty(await tm1.Annotations.ListAsync().ToListAsync()); // TM1 lists none here
+            var listed = await tm1.Annotations.ListAsync().Select(a => a.Id).ToListAsync();
+            if (await ServerAssumptions.IsV12Async(tm1))
+            {
+                Assert.Contains(id, listed);
+            }
+            else
+            {
+                Assert.Empty(listed); // TM1 11 lists none here
+            }
             Assert.Contains(id, await tm1.Annotations.CubeAnnotationsAsync(Cube).Select(a => a.Id).ToListAsync());
 
             var mdx = $"SELECT {{[}}Clients].[Admin]}} ON 0, {{[}}Groups].[ADMIN]}} ON 1 FROM [{Cube}]";

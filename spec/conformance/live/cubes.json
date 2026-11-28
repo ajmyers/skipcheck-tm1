@@ -33,6 +33,7 @@
 			"expect" : { "fields" : { "Name" : "${cube}" } }
 		},
 		{
+			"tm1Before" : "12.0",
 			"service" : "cubes",
 			"method" : "dimensions",
 			"params" : [ "name", "query" ],

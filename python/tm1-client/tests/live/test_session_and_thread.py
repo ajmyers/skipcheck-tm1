@@ -18,6 +18,7 @@ from skipcheck_tm1 import (
 from skipcheck_tm1.model import ProcessCreate
 
 from .conftest import ADMIN, CONFIGURED, REASON, other_client
+from .support import assume_v11, is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
@@ -35,12 +36,15 @@ def test_reads_sessions_their_users_and_threads_and_closes_another(tm1: Tm1Clien
         assert id in [s.id for s in tm1.users.sessions(ADMIN)]
 
         tm1.sessions.close(id)
-        assert other.sessions.active_session().id != id, "the other client logs in again, as a new session"
+        after = other.sessions.active_session().id
+        if not is_v12(tm1):
+            assert after != id, "the other client logs in again, as a new session"
     finally:
         other.close()
 
 
 def test_cancels_a_running_process_through_its_thread(tm1: Tm1Client, name: str) -> None:
+    assume_v11(tm1, "TM1 v12 tracks active work in Jobs rather than Threads")
     tm1.processes.create(ProcessCreate.builder().name(name).prolog_procedure("i = 0;\nWhile(i < 100000000);\n  i = i + 1;\nEnd;\n").build())
     runner = other_client()
     outcome: list[BaseException | object] = []

@@ -14,6 +14,7 @@ import {
 } from "../../src/index.js";
 import { Fixtures } from "./data-fixtures.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 const REGIONS = ["N", "S", "E", "W"];
 const MEASURES = ["Amount", "Count"];
@@ -66,6 +67,7 @@ describe("CellsetService on TM1" + liveReason, () => {
     );
 
   tm1Test("runs MDX and reads the cellset piece by piece", async () => {
+    const v12 = await isV12(tm1);
     const cellset = await tm1.cellsets.execute(
       mdx,
       ODataQuery.none()
@@ -74,20 +76,20 @@ describe("CellsetService on TM1" + liveReason, () => {
     );
     const id = cellset.ID!;
     expect(id).toBeTruthy();
-    expect(cellset.Axes, "columns, rows and the slicer TM1 adds").toHaveLength(3);
+    expect(cellset.Axes, "columns, rows, and on v11 the slicer TM1 adds").toHaveLength(v12 ? 2 : 3);
     expect(cellset.Cells).toHaveLength(8);
     try {
       expect(await tm1.cellsets.list().toArray(), "TM1 lists none, though each reads by ID").toEqual([]);
       expect((await tm1.cellsets.get(id)).ID).toBe(id);
-      expect((await tm1.cellsets.axes(id).toArray()).map((a) => a.Cardinality)).toEqual([2, 4, 1]);
+      expect((await tm1.cellsets.axes(id).toArray()).map((a) => a.Cardinality)).toEqual(v12 ? [2, 4] : [2, 4, 1]);
       expect((await tm1.cellsets.hierarchies(id, 1).toArray()).map((h) => h.Name)).toEqual([region]);
       expect(await tm1.cellsets.tuples(id, 1).toArray()).toHaveLength(4);
       expect((await tm1.cellsets.tupleMembers(id, 1, 2).toArray()).map((m) => m.Name)).toEqual(["E"]);
       expect(values(await tm1.cellsets.cells(id, ODataQuery.none().select("Ordinal", "Value")).toArray())).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
       expect(
         (await tm1.cellsets.cellMembers(id, 5).toArray()).map((m) => m.Name),
-        "Sandboxes' Base first",
-      ).toEqual(["Base", "E", "Count"]);
+        "Sandboxes' Base first on v11",
+      ).toEqual(v12 ? ["E", "Count"] : ["Base", "E", "Count"]);
       expect((await tm1.cellsets.cube(id)).Name).toBe(cube);
       expect(
         (await tm1.cellsets.partition(id, 2, 4, ODataQuery.none().select("Ordinal")).toArray()).map((c) => c.Ordinal),

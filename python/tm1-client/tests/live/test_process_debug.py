@@ -35,6 +35,9 @@ pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 @pytest.fixture
 def three_lines(tm1: Tm1Client, name: str) -> Iterator[str]:
+    ti = tm1.server.active_configuration().modelling.ti
+    if ti is None or not ti.enable_ti_debugging:
+        pytest.skip("TI debugging is disabled in ActiveConfiguration (EnableTIDebugging=false)")
     tm1.processes.create(ProcessCreate.builder().name(name).prolog_procedure("nA = 1;\nnB = nA + 1;\nnC = nB + 1;\n").build())
     yield name
     tm1.processes.delete(name)

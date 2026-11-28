@@ -15,12 +15,13 @@ import {
   ODataQuery,
   type Tm1Client,
   Tm1NotFoundException,
+  Tm1NotImplementedException,
   Tm1PreconditionFailedException,
   type Tm1Stream,
 } from "../../src/index.js";
 import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { lacks } from "./server-assumptions.js";
+import { isV12, lacks } from "./server-assumptions.js";
 
 const dim = (name: string): ODataPath => ODataPath.of("Dimensions").key(name);
 
@@ -79,8 +80,9 @@ describe("CubeService on TM1" + liveReason, () => {
     expect((await tm1.cubes.get(cube))["@odata.etag"]?.trim()).toBeTruthy();
     const listed = await tm1.cubes.list(ODataQuery.none().select(Cube.Fields.Name).filter(Filter.startsWith(Cube.Fields.Name, cube))).toArray();
     expect(listed.map((c) => c.Name)).toEqual([cube]);
-    // Sandboxes first
-    expect(await names(tm1.cubes.dimensions(cube, ODataQuery.none().select(Dimension.Fields.Name)))).toEqual(["Sandboxes", region, measure]);
+    // Sandboxes first on v11; omitted on v12 when EnableSandboxDimension is off
+    const expected = (await isV12(tm1)) ? [region, measure] : ["Sandboxes", region, measure];
+    expect(await names(tm1.cubes.dimensions(cube, ODataQuery.none().select(Dimension.Fields.Name)))).toEqual(expected);
 
     await tm1.cubes.delete(cube);
     await expect(tm1.cubes.get(cube)).rejects.toBeInstanceOf(Tm1NotFoundException);
@@ -104,12 +106,17 @@ describe("CubeService on TM1" + liveReason, () => {
     const change = await tm1.cubes.reorderDimensions(cube, [measure, region]);
     expect(typeof change).toBe("number");
     expect(await names(tm1.cubes.dimensionsStorageOrder(cube))).toEqual([measure, region]);
-    expect(await names(tm1.cubes.dimensions(cube)), "presentation order unchanged").toEqual(["Sandboxes", region, measure]);
+    const expected = (await isV12(tm1)) ? [region, measure] : ["Sandboxes", region, measure];
+    expect(await names(tm1.cubes.dimensions(cube)), "presentation order unchanged").toEqual(expected);
   });
 
   tm1Test("loads, unloads, locks and reserves", async (context) => {
-    await tm1.cubes.unload(cube);
-    await tm1.cubes.load(cube);
+    if (await isV12(tm1)) {
+      await expect(tm1.cubes.unload(cube), "TM1 v12 removed demand load/unload").rejects.toBeInstanceOf(Tm1NotImplementedException);
+    } else {
+      await tm1.cubes.unload(cube);
+      await tm1.cubes.load(cube);
+    }
     await tm1.cubes.lock(cube);
     await tm1.cubes.unlock(cube);
     const why = await lacks(tm1, Tm1Operations.CubeReserve);

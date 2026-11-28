@@ -51,11 +51,19 @@ SOURCES = (
     "TM1_INSTALL_VOLUME",
     "TM1_BUNDLE_DIR",
     "TM1_BUNDLE_URL",
+    "TM1_ENGINE_PRIVATE_IMAGE",
+    "TM1_ENGINE_HOME_DIR",
+    "TM1_ENGINE_INSTALL_VOLUME",
+    "TM1_ENGINE_BUNDLE_DIR",
+    "TM1_ENGINE_BUNDLE_URL",
     "TM1_URL",
 )
 WITH_SOURCES = (
     "TM1_BUNDLE",
     "TM1_BUNDLE_SHA256",
+    "TM1_ENGINE_BUNDLE",
+    "TM1_ENGINE_BUNDLE_SHA256",
+    "TM1_ENGINE_IMAGE",
     "TM1_USER",
     "TM1_PASSWORD",
     "TM1_NAMESPACE",
@@ -63,9 +71,9 @@ WITH_SOURCES = (
 )
 
 # Paths in the list are read from the list's own folder, so every suite (each runs from its own) sees one
-PATHS = ("TM1_HOME_DIR", "TM1_BUNDLE_DIR")
+PATHS = ("TM1_HOME_DIR", "TM1_BUNDLE_DIR", "TM1_ENGINE_HOME_DIR", "TM1_ENGINE_BUNDLE_DIR")
 SECRET = ("TM1_PASSWORD",)
-URLS = ("TM1_BUNDLE_URL", "TM1_URL")
+URLS = ("TM1_BUNDLE_URL", "TM1_ENGINE_BUNDLE_URL", "TM1_URL")
 LABEL = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 SUMMARY = "summary.md"
 

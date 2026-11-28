@@ -66,7 +66,14 @@ public class DimensionServiceLiveTests
             )
         );
         var read = await tm1.Dimensions.GetAsync(d, ODataQuery.None().Expand(Dimension.Fields.Hierarchies, h => h.Expand(Hierarchy.Fields.Elements)));
-        Assert.True(string.IsNullOrEmpty(read.AllLeavesHierarchyName), "TM1 accepts the PATCH and ignores it");
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            Assert.Equal("AllLeaves", read.AllLeavesHierarchyName);
+        }
+        else
+        {
+            Assert.True(string.IsNullOrEmpty(read.AllLeavesHierarchyName), "TM1 11 accepts the PATCH and ignores it");
+        }
         Assert.Equal(2, Assert.Single(read.Hierarchies!).Elements!.Count);
     }
 

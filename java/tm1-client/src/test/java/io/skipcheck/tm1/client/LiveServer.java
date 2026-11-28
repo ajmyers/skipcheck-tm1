@@ -2,6 +2,7 @@
 
 package io.skipcheck.tm1.client;
 
+import java.net.http.HttpRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.time.Duration;
@@ -21,7 +22,11 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
 import io.skipcheck.tm1.client.session.Tm1Session;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 import io.skipcheck.tm1.client.version.Tm1Version;
+import io.skipcheck.tm1.testcontainers.Tm1Database;
+import io.skipcheck.tm1.testcontainers.Tm1EngineContainer;
+import io.skipcheck.tm1.testcontainers.Tm1Login;
 import io.skipcheck.tm1.testcontainers.Tm1ServerContainer;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
@@ -56,19 +61,29 @@ public final class LiveServer {
 
 	private final boolean verify;
 
+	private final Tm1Dialect dialect;
+
 	private final @Nullable Tm1ServerContainer container;
+
+	private final @Nullable Tm1EngineContainer engine;
+
+	private final @Nullable Tm1Database database;
 
 	private @Nullable Tm1Version version;
 
 	private LiveServer(String restUrl, String username, String password, @Nullable String namespace, boolean verify,
-			@Nullable Tm1ServerContainer container) {
+			Tm1Dialect dialect, @Nullable Tm1ServerContainer container, @Nullable Tm1EngineContainer engine,
+			@Nullable Tm1Database database) {
 		this.restUrl = restUrl.endsWith("/") ? restUrl : restUrl + "/";
 		this.username = username;
 		this.password = password;
 		this.namespace = namespace;
 		this.verify = verify;
+		this.dialect = dialect;
 		this.container = container;
-		this.version = container == null ? null : container.getTm1Version();
+		this.engine = engine;
+		this.database = database;
+		this.version = container != null ? container.getTm1Version() : database != null ? database.getVersion() : null;
 	}
 
 	/**
@@ -102,13 +117,20 @@ public final class LiveServer {
 		String password = lookup.apply("TM1_PASSWORD");
 		return Optional.of(new LiveServer(url, user == null ? "admin" : user, password == null ? "apple" : password,
 				blankIsNull(lookup.apply("TM1_NAMESPACE")),
-				!"false".equalsIgnoreCase(blankIsNull(lookup.apply("TM1_VERIFY"))), null));
+				!"false".equalsIgnoreCase(blankIsNull(lookup.apply("TM1_VERIFY"))), Tm1Dialect.V11, null, null, null));
 	}
 
-	/** The container, as a live test's server. */
+	/** The TM1 11 container, as a live test's server. */
 	static LiveServer of(Tm1ServerContainer container) {
 		return new LiveServer(container.getRestUrl(), container.getUsername(), container.getPassword(), null, true,
-				container);
+				Tm1Dialect.V11, container, null, null);
+	}
+
+	/** The TM1 v12 engine container, as a live test's server. */
+	static LiveServer of(Tm1EngineContainer engine) {
+		Tm1Database db = engine.database(Tm1EngineContainer.DEFAULT_DATABASE);
+		return new LiveServer(db.getRestUrl(), db.login().getUser(), "", null, true,
+				Tm1Dialect.v12(db.getInstance(), db.getName()), null, engine, db);
 	}
 
 	private static @Nullable String lookup(String name) {
@@ -148,12 +170,46 @@ public final class LiveServer {
 	}
 
 	/**
-	 * How the tests log in: basic, or through the CAM namespace {@code TM1_NAMESPACE}
-	 * names.
+	 * How the tests log in: basic, through the CAM namespace {@code TM1_NAMESPACE} names,
+	 * or through the v12 instance's application.
 	 */
 	public Tm1Authenticator authenticator() {
+		if (database != null) {
+			Tm1Login login = database.login();
+			return Tm1Authenticator.application(login.getClientId(), login.getClientSecret(), login.getUser());
+		}
 		return namespace == null ? Tm1Authenticator.basic(username, password)
 				: Tm1Authenticator.camNamespace(username, password, namespace);
+	}
+
+	/**
+	 * How a named user logs in: basic on TM1 11, or through the v12 instance's
+	 * application on TM1 v12.
+	 */
+	public Tm1Authenticator authenticator(String user, String password) {
+		if (database != null) {
+			Tm1Login login = database.login(user);
+			return Tm1Authenticator.application(login.getClientId(), login.getClientSecret(), user);
+		}
+		return Tm1Authenticator.basic(user, password);
+	}
+
+	/** Adds this server's authentication to a raw JDK HTTP request. */
+	public HttpRequest.Builder authorize(HttpRequest.Builder request) {
+		if (database != null) {
+			return database.login().authorize(request);
+		}
+		return request.header("Authorization", getAuthorization());
+	}
+
+	/** The TM1 dialect for this server (v11 or v12). */
+	public Tm1Dialect dialect() {
+		return dialect;
+	}
+
+	/** Whether this server is a TM1 v12 engine container. */
+	public boolean isEngine() {
+		return engine != null;
 	}
 
 	/**
@@ -184,7 +240,7 @@ public final class LiveServer {
 	 * {@code TM1_VERIFY} says.
 	 */
 	public Tm1Session.Builder sessionBuilder() {
-		return trusting(Tm1Session.builder().baseUrl(restUrl).authenticator(authenticator()));
+		return trusting(Tm1Session.builder().baseUrl(restUrl).dialect(dialect).authenticator(authenticator()));
 	}
 
 	/**
@@ -241,7 +297,7 @@ public final class LiveServer {
 	 * {@code TM1_VERIFY} says.
 	 */
 	public Tm1Client.Builder clientBuilder() {
-		return trusting(Tm1Client.builder().baseUrl(restUrl).authenticator(authenticator()));
+		return trusting(Tm1Client.builder().baseUrl(restUrl).dialect(dialect).authenticator(authenticator()));
 	}
 
 	/** The server's product version, read from it the first time for a running one. */
@@ -254,9 +310,19 @@ public final class LiveServer {
 		return version;
 	}
 
-	/** The container, when the suite started it; empty for a running server. */
+	/** The TM1 11 container, when the suite started one; empty otherwise. */
 	public Optional<Tm1ServerContainer> container() {
 		return Optional.ofNullable(container);
+	}
+
+	/** The TM1 v12 engine container, when the suite started one; empty otherwise. */
+	public Optional<Tm1EngineContainer> engine() {
+		return Optional.ofNullable(engine);
+	}
+
+	/** The TM1 v12 database, when the suite started an engine; empty otherwise. */
+	public Optional<Tm1Database> database() {
+		return Optional.ofNullable(database);
 	}
 
 	/**
@@ -264,13 +330,25 @@ public final class LiveServer {
 	 * it.
 	 */
 	public ServerAssumptions.Install install() {
-		return container == null ? ServerAssumptions.Install.UNKNOWN : ServerAssumptions.install(container.getSource());
+		if (container != null) {
+			return ServerAssumptions.install(container.getSource());
+		}
+		if (engine != null) {
+			return ServerAssumptions.install(engine.getSource());
+		}
+		return ServerAssumptions.Install.UNKNOWN;
 	}
 
 	/** Where the server is, for messages. */
 	@Override
 	public String toString() {
-		return container == null ? restUrl + " (TM1_URL)" : restUrl + " (" + container.getSource().describe() + ")";
+		if (container != null) {
+			return restUrl + " (" + container.getSource().describe() + ")";
+		}
+		if (engine != null) {
+			return restUrl + " (" + engine.getSource().describe() + ")";
+		}
+		return restUrl + " (TM1_URL)";
 	}
 
 	private record Closing(Tm1Client client) implements AutoCloseable {

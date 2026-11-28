@@ -23,6 +23,8 @@ public static class ConformanceLive
     /// <summary>The session's own requests, which differ by when each client logs in and caches capabilities.</summary>
     private static readonly string[] SessionRequests = ["ActiveSession", "$metadata", "Server?$select=ProductVersion"];
 
+    private static readonly string[] V12SessionSuffixes = ["/auth/v1/session", "/auth/v1/token", "/ActiveSession/tm1s.Close"];
+
     public static IEnumerable<string> Names() =>
         Directory.GetFiles(Scenarios, "*.json").Select(Path.GetFileNameWithoutExtension).Order(StringComparer.Ordinal)!;
 
@@ -68,7 +70,11 @@ public static class ConformanceLive
             var url = request.RequestUri!.AbsoluteUri;
             var prefix = root.EndsWith('/') ? root : root + "/";
             var target = url.StartsWith(prefix, StringComparison.Ordinal) ? url[prefix.Length..] : url;
-            if (!SessionRequests.Any(s => target.StartsWith(s, StringComparison.Ordinal)))
+            var path = request.RequestUri!.AbsolutePath;
+            if (
+                !SessionRequests.Any(s => target.StartsWith(s, StringComparison.Ordinal))
+                && !V12SessionSuffixes.Any(s => path.EndsWith(s, StringComparison.Ordinal))
+            )
             {
                 Exchanges.Add(
                     new JsonObject
@@ -313,6 +319,7 @@ public static class ConformanceLive
         var failures = new List<string>();
         // What steps keep of their results, as read, for a $fromRead after them
         var kept = new Dictionary<string, object>();
+        Exception? cleanupError = null;
         try
         {
             foreach (var (step, i) in scenario["steps"]!.AsArray().Select((s, i) => (s!, i)))
@@ -346,8 +353,19 @@ public static class ConformanceLive
                 {
                     continue;
                 }
-                await Outcome(client, step, names, kept);
+                try
+                {
+                    await Outcome(client, step, names, kept);
+                }
+                catch (Exception e)
+                {
+                    cleanupError ??= e;
+                }
             }
+        }
+        if (cleanupError is not null && failures.Count == 0)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanupError).Throw();
         }
         return failures;
     }

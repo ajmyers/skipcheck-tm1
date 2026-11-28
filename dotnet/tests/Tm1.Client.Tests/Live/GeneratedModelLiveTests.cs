@@ -21,9 +21,20 @@ public class GeneratedModelLiveTests
         var server = await session.ExecuteAsync(Tm1Request.Get<Server>(ODataPath.Of("Server")));
         // The version the container read as it started; of a server already running, the session's
         var version = string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("TM1_URL"))
-            ? (await Tm1ServerContainer.SharedAsync()).Tm1Version.ToString()
+            ? Live.IsEngine
+                ? (await Tm1EngineContainer.SharedAsync()).Tm1Version.ToString()
+                : (await Tm1ServerContainer.SharedAsync()).Tm1Version.ToString()
             : (await session.VersionAsync()).ToString();
-        Assert.Equal(version, server.ProductVersion);
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            // TM1 v12 omits ProductVersion from bare GET Server unless selected
+            var selected = await session.ExecuteAsync(Tm1Request.Get<Server>(ODataPath.Of("Server"), ODataQuery.None().Select(Server.Fields.ProductVersion)));
+            Assert.Equal(version, selected.ProductVersion);
+        }
+        else
+        {
+            Assert.Equal(version, server.ProductVersion);
+        }
         Assert.Null(server.ETag); // TM1 sends no ETag for the Server singleton
 
         var dimensions = await session
@@ -128,8 +139,9 @@ public class GeneratedModelLiveTests
             var created = await session.ExecuteAsync(
                 Tm1Request.Get<Cube>(cube, ODataQuery.None().Expand(Cube.Fields.Dimensions, d => d.Select(Dimension.Fields.Name)))
             );
-            // TM1 lists its virtual Sandboxes dimension first
-            Assert.Equal(["Sandboxes", name, "}Groups"], created.Dimensions!.Select(d => d.Name));
+            // TM1 11 lists its virtual Sandboxes dimension first; v12 omits it when EnableSandboxDimension is off
+            var expectedDimensions = await ServerAssumptions.IsV12Async(tm1) ? new[] { name, "}Groups" } : new[] { "Sandboxes", name, "}Groups" };
+            Assert.Equal(expectedDimensions, created.Dimensions!.Select(d => d.Name));
             var elements = await session.StreamAsync(Tm1Request.List<Element>(dimension.Nav("Hierarchies").Key(name).Nav("Elements"))).ToListAsync();
             Assert.Equal([("North", ElementType.Numeric), ("South", ElementType.Numeric)], elements.Select(e => (e.Name!, e.Type!.Value)).Order());
 

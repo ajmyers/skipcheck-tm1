@@ -176,10 +176,26 @@ export function typeOf<T>(type: Tm1Model<T>, value: T): string {
   return typeof value === "object" && value !== null ? chosen(type.$type, value as Record<string, unknown>) : type.$type;
 }
 
+type JsonReviver = (this: unknown, key: string, value: unknown, context?: { source?: string }) => unknown;
+
+/** @internal Parses a JSON response body, keeping integers outside IEEE-754's safe range
+ * (`Number.MAX_SAFE_INTEGER`, such as TM1 v12's 64-bit session IDs) as `bigint` instead of
+ * silently rounding them. */
+export function parseJson(text: string): unknown {
+  const reviver: JsonReviver = (_key, value, context) => {
+    if (typeof value === "number" && !Number.isSafeInteger(value) && typeof context?.source === "string" && /^-?\d+$/.test(context.source)) {
+      return BigInt(context.source);
+    }
+    return value;
+  };
+  return JSON.parse(text, reviver as (key: string, value: unknown) => unknown);
+}
+
 /** @internal JSON for a request body: TM1's names, patches as set. */
 export function writeJson(body: unknown): string {
   try {
-    return JSON.stringify(body);
+    const rawJson = (JSON as unknown as { rawJSON?: (text: string) => unknown }).rawJSON;
+    return JSON.stringify(body, (_key, value: unknown) => (typeof value === "bigint" && rawJson ? rawJson(value.toString()) : value));
   } catch (e) {
     // The caller's mistake, not a failure talking to TM1
     throw new TypeError("The request body can't be written as JSON: " + (e as Error).message, { cause: e });

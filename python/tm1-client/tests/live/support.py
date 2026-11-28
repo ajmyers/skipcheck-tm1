@@ -40,6 +40,9 @@ new one; before, the first plans the new one. Tried on every Planning Analytics 
 11.8.03200.3 (2.1.13 to 2.1.16) plans the new one, 11.8.03400.2 (2.1.17) the stale, and no build
 between them was released."""
 
+TM1_12 = Tm1Version.parse("12.0")
+"""First TM1 v12 version (Planning Analytics Engine 3.x)."""
+
 _SCHEMA_VERSION = re.compile(r'Term="Core\.SchemaVersion">\s*<String>([^<]+)</String>')
 
 
@@ -71,6 +74,17 @@ def product_version(tm1: Tm1Client) -> Tm1Version:
 def is_at_least(tm1: Tm1Client, version: Tm1Version) -> bool:
     """Whether the server's product version is at least the version."""
     return product_version(tm1) >= version
+
+
+def is_v12(tm1: Tm1Client) -> bool:
+    """Whether the server is TM1 v12 (major version 12 or later)."""
+    return is_at_least(tm1, TM1_12)
+
+
+def assume_v11(tm1: Tm1Client, reason: str) -> None:
+    """Skips the rest of the test on TM1 v12 with the given reason."""
+    if is_v12(tm1):
+        pytest.skip(f"{reason} (TM1 {product_version(tm1)})")
 
 
 def own_snapshot(capabilities: Tm1Capabilities) -> bytes:

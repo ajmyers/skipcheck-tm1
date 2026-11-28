@@ -14,11 +14,13 @@ from skipcheck_tm1 import ODataQuery, Tm1Client
 from skipcheck_tm1.model import ProcessCreate, UserCreate
 
 from .conftest import CONFIGURED, REASON, client
+from .support import assume_v11, is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def test_reads_the_message_log(tm1: Tm1Client) -> None:
+    assume_v11(tm1, "TM1 v12 does not populate MessageLogEntries")
     first = tm1.logs.message_log_entries(ODataQuery.none().top(20))
     assert first
     assert any(e.time_stamp is None for e in first), "an entry without a time reads as None rather than failing"
@@ -31,6 +33,8 @@ def test_reads_the_message_log(tm1: Tm1Client) -> None:
 
 
 def test_follows_the_message_log_without_repeating(tm1: Tm1Client) -> None:
+    assume_v11(tm1, "TM1 v12 does not populate MessageLogEntries")
+
     def logins() -> None:
         for _ in range(2):
             time.sleep(1.5)
@@ -52,12 +56,14 @@ def test_follows_the_message_log_without_repeating(tm1: Tm1Client) -> None:
 
 
 def test_reads_the_transaction_and_audit_logs(tm1: Tm1Client) -> None:
+    assume_v11(tm1, "TM1 v12 leaves TransactionLogEntries empty unless LegacyTransactionLog is set")
     assert tm1.logs.transaction_log_entries(ODataQuery.none().top(5))
     assert all(e.status_message is None for e in tm1.logs.transaction_log(True, True, ODataQuery.none().top(5)))
     assert tm1.logs.audit_log_entries(ODataQuery.none().expand("AuditDetails").top(5)) == [], "the audit log is off on the test server"
 
 
 def test_reads_a_passwords_hash_that_isnt_utf8_as_replacement_characters(tm1: Tm1Client, name: str) -> None:
+    assume_v11(tm1, "TM1 v12 does not store native password hashes in TransactionLogEntries")
     tm1.users.create(UserCreate.builder().name(name).password("pw").build())
     try:
         newest = tm1.logs.transaction_log(True, True, ODataQuery.none().top(50))
@@ -77,7 +83,10 @@ def test_reads_a_process_error_log(tm1: Tm1Client, name: str) -> None:
         assert any(f.filename == filename for f in tm1.logs.error_log_files())
         assert tm1.logs.error_log_file(filename).filename == filename
         content = tm1.logs.error_log_content(filename)
-        assert content.startswith("Error:"), "without the byte order mark"
+        if is_v12(tm1):
+            assert content.startswith("{"), "JSONL without BOM"
+        else:
+            assert content.startswith("Error:"), "without the byte order mark"
         assert "ProcessError" in content
     finally:
         tm1.api.processes[name].delete()

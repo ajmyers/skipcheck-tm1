@@ -30,7 +30,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary>The client replays a request once after a 401 on an established session, POSTs
     /// included. That's only safe if TM1 refuses the request before running it.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void RefusesARequestOnAKilledSessionWithoutRunningIt()
     {
         var admin = Tm1.Login();
@@ -58,7 +58,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary>Every 401 opens a TM1 session with no user, and sets its cookie. Sending that cookie
     /// with the credentials logs that same session in, instead of opening another.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void OpensASessionOnEvery401AndLogsThatSessionInWhenItsCookieIsSentWithCredentials()
     {
         var admin = Tm1.Login();
@@ -85,7 +85,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary><c>Server</c> can be read with no credentials, but even that opens a session. So the
     /// client never reads anything, the version included, outside its own session.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void OpensASessionForAnAnonymousReadOfServer()
     {
         var admin = Tm1.Login();
@@ -107,7 +107,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary>A closed session is refused at once, but TM1 lists it in <c>Sessions</c> for several
     /// seconds more, so a check that no session is left behind has to wait for the count to settle.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task RefusesAClosedSessionAtOnceButListsItForSecondsMore()
     {
         var admin = Tm1.Login();
@@ -128,7 +128,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
     }
 
     /// <summary>Closing a session expires its cookie, and later requests with that cookie get a 401.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void ExpiresTheCookieOnCloseAndRefusesItAfterwards()
     {
         var cookie = Tm1.Login();
@@ -146,7 +146,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary>Requests on one session run in parallel: three one-second process runs finish in
     /// about one second. So one shared session doesn't serialize the client's traffic.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task RunsConcurrentRequestsOnOneSessionInParallel()
     {
         var cookie = Tm1.Login();
@@ -177,7 +177,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary><c>TM1-SessionContext</c> labels the whole session, and the last request to send it
     /// wins. So it can't be a per-request setting on views that share one session.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void LabelsTheSessionWithTheLastSessionContextSent()
     {
         var login = Tm1.Send(Tm1.Request("GET", "ActiveSession?$select=Context").WithBasic().WithHeader("TM1-SessionContext", "first"));
@@ -199,7 +199,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
 
     /// <summary>A create answers 201 with a relative <c>Location</c> and an <c>ETag</c>; with
     /// <c>Prefer: return=minimal</c>, 204 with <c>Location</c> and <c>OData-EntityId</c>.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void AnswersACreateWithItsLocation()
     {
         var cookie = Tm1.Login();
@@ -225,7 +225,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
     }
 
     /// <summary><c>odata.metadata=none</c> drops <c>@odata.etag</c> but still sends <c>@odata.context</c>.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void DropsTheEtagButNotTheContextWithMetadataNone()
     {
         var cookie = Tm1.Login();
@@ -251,7 +251,7 @@ public sealed class Tm1SessionBehaviorLiveTests : IDisposable
     /// <summary>TM1 closes a kept-alive connection idle for about 90 seconds, and a request sent on
     /// it as it closes gets no response at all. The client's own handler retires idle connections
     /// after 60 seconds (<c>Connection.MaxIdle</c>) so that never happens. Takes up to 150 s.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task ClosesAConnectionIdleForNinetySeconds()
     {
         var (url, user, password) = Live.Target();

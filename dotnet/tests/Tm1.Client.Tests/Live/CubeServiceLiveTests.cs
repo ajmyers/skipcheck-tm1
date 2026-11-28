@@ -43,7 +43,8 @@ public sealed class CubeServiceLiveTests : IAsyncLifetime
             .Select(c => c.Name)
             .ToListAsync();
         Assert.Equal([_cube], listed);
-        Assert.Equal(["Sandboxes", Region, Measure], await Names(Cubes.DimensionsAsync(_cube, ODataQuery.None().Select(Dimension.Fields.Name))));
+        var expectedDimensions = await ServerAssumptions.IsV12Async(_tm1) ? new[] { Region, Measure } : new[] { "Sandboxes", Region, Measure };
+        Assert.Equal(expectedDimensions, await Names(Cubes.DimensionsAsync(_cube, ODataQuery.None().Select(Dimension.Fields.Name))));
         await Cubes.DeleteAsync(_cube);
         await Assert.ThrowsAsync<Tm1NotFoundException>(() => Cubes.GetAsync(_cube));
         // Its dimensions stay
@@ -72,14 +73,23 @@ public sealed class CubeServiceLiveTests : IAsyncLifetime
         );
         await Cubes.ReorderDimensionsAsync(_cube, [Measure, Region]);
         Assert.Equal([Measure, Region], await Names(Cubes.DimensionsStorageOrderAsync(_cube)));
-        Assert.Equal(["Sandboxes", Region, Measure], await Names(Cubes.DimensionsAsync(_cube))); // presentation order unchanged
+        var expectedDimensions = await ServerAssumptions.IsV12Async(_tm1) ? new[] { Region, Measure } : new[] { "Sandboxes", Region, Measure };
+        Assert.Equal(expectedDimensions, await Names(Cubes.DimensionsAsync(_cube))); // presentation order unchanged
     }
 
     [Tm1Fact]
     public async Task LoadsUnloadsLocksAndReserves()
     {
-        await Cubes.UnloadAsync(_cube);
-        await Cubes.LoadAsync(_cube);
+        if (await ServerAssumptions.IsV12Async(_tm1))
+        {
+            // TM1 v12 removed demand load/unload
+            await Assert.ThrowsAsync<Tm1NotImplementedException>(() => Cubes.UnloadAsync(_cube));
+        }
+        else
+        {
+            await Cubes.UnloadAsync(_cube);
+            await Cubes.LoadAsync(_cube);
+        }
         await Cubes.LockAsync(_cube);
         await Cubes.UnlockAsync(_cube);
         if (!await ServerAssumptions.SupportsAsync(_tm1, Tm1Operations.CubeReserve))

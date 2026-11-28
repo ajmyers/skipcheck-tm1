@@ -10,12 +10,17 @@ import pytest
 from skipcheck_tm1 import Tm1BadRequestError, Tm1Client
 
 from .conftest import CONFIGURED, REASON
+from .support import is_v12
 
 pytestmark = pytest.mark.skipif(not CONFIGURED, reason=REASON)
 
 
 def test_runs_an_mdx_statement_but_not_create_set(tm1: Tm1Client) -> None:
-    tm1.cellsets.execute_statement("SELECT {} ON 0 FROM [}ClientGroups]")
+    if is_v12(tm1):
+        with pytest.raises(Tm1BadRequestError):
+            tm1.cellsets.execute_statement("SELECT {} ON 0 FROM [}ClientGroups]")
+    else:
+        tm1.cellsets.execute_statement("SELECT {} ON 0 FROM [}ClientGroups]")
     with pytest.raises(Tm1BadRequestError):
         tm1.cellsets.execute_statement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")
 
