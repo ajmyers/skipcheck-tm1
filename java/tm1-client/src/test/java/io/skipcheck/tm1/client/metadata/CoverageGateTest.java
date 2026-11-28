@@ -46,7 +46,7 @@ class CoverageGateTest {
 
 	private static final String PENDING = "/metadata/coverage-pending.txt";
 
-	private final NavigableSet<String> endpoints = Endpoints.of(MetadataSnapshot.load());
+	private final NavigableSet<String> endpoints = Endpoints.of(MetadataSnapshot.loadMerged());
 
 	@Test
 	void everyEndpointIsAccountedFor() throws IOException {
@@ -85,13 +85,14 @@ class CoverageGateTest {
 
 	@Test
 	void countsEveryKindOfEndpoint() {
-		assertThat(endpoints).contains("EntitySet Cubes", "Singleton Server", "ActionImport ExecuteMDX",
-				"FunctionImport TailMessageLog", "Action Cube/Reserve", "Function Cube/DimensionsStorageOrder",
-				"Navigation Cube/Views", "Navigation ViewTitle/Subset");
-		// 27 entity sets + 6 singletons + 30 action imports + 11 function imports + 64
+		assertThat(endpoints).contains("EntitySet Cubes", "EntitySet Jobs", "Singleton Server",
+				"ActionImport ExecuteMDX", "FunctionImport TailMessageLog", "FunctionImport Metrics",
+				"Action Cube/Reserve", "Function Cube/DimensionsStorageOrder", "Navigation Cube/Views",
+				"Navigation ViewTitle/Subset");
+		// 28 entity sets + 6 singletons + 31 action imports + 12 function imports + 69
 		// bound operations
-		// + 104 navigation properties (90 on entity types, 14 on complex types)
-		assertThat(endpoints).hasSize(242);
+		// + 110 navigation properties (95 on entity types, 15 on complex types)
+		assertThat(endpoints).hasSize(256);
 	}
 
 	/**

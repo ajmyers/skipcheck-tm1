@@ -31,6 +31,7 @@ import io.skipcheck.tm1.client.odata.ODataQuery;
  * Every call is recorded to {@code spec/conformance/calls/UserServiceTest.json}, which
  * the Python, .NET and TypeScript clients replay.
  */
+@SuppressWarnings("deprecation")
 class UserServiceTest {
 
 	@RegisterExtension

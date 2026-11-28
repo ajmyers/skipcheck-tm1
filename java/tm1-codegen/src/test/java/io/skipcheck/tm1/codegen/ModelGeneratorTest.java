@@ -162,8 +162,10 @@ class ModelGeneratorTest {
 
 	@Test
 	void generatesTheSnapshotsModelAndItCompiles(@TempDir Path out) throws Exception {
-		// As the build generates it: with the probe file beside the snapshot
-		Tm1Codegen.Model model = Tm1Codegen.Model.of(Path.of(System.getProperty("tm1.snapshot")));
+		// As the build generates it: with the merged snapshots, referenced schemas, and
+		// probe files beside them
+		List<Path> snapshots = List.of(System.getProperty("tm1.snapshots").split(",")).stream().map(Path::of).toList();
+		Tm1Codegen.Model model = Tm1Codegen.Model.of(snapshots);
 		new ModelGenerator(model.metadata(), model.overlay(), model.undeclared(), model.writes(), model.offers())
 			.writeTo(out);
 
@@ -172,8 +174,8 @@ class ModelGeneratorTest {
 			sources = walk.filter(p -> p.toString().endsWith(".java")).toList();
 		}
 		assertThat(sources)
-			.as("31 enums, 122 records, 7 hierarchies, 102 write types, the catalog, the read bindings, package-info")
-			.hasSize(265);
+			.as("34 enums, 130 records, 7 hierarchies, 102 write types, the catalog, the read bindings, package-info")
+			.hasSize(276);
 
 		JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
 		DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
@@ -297,6 +299,51 @@ class ModelGeneratorTest {
 		assertThat(source(new ModelGenerator(CsdlParser.parse(sample)), "MessageLogEntry"))
 			.contains("@JsonDeserialize(using = LenientOffsetDateTimeDeserializer.class)")
 			.contains("0000-00-00T00:00Z");
+	}
+
+	@Test
+	void mapsEdmUntypedAndReferencedSchemaTypes() {
+		String sample = """
+				<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+				  <edmx:Reference Uri="ibm.tm1s.api.v1.xml">
+				    <edmx:Include Namespace="ibm.tm1s.api.v1" Alias="tm1s"/>
+				  </edmx:Reference>
+				  <edmx:DataServices>
+				    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+				      <EntityType Name="Job">
+				        <Key><PropertyRef Name="ID"/></Key>
+				        <Property Name="ID" Type="Edm.String" Nullable="false"/>
+				        <Property Name="Payload" Type="Edm.Untyped"/>
+				        <NavigationProperty Name="Replica" Type="tm1s.DatabaseReplica"/>
+				      </EntityType>
+				      <Action Name="Run">
+				        <Parameter Name="Context" Type="Edm.Untyped" Nullable="true"/>
+				      </Action>
+				      <EntityContainer Name="API">
+				        <ActionImport Name="Run" Action="tm1.Run"/>
+				      </EntityContainer>
+				    </Schema>
+				    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1s.api.v1" Alias="tm1s">
+				      <EnumType Name="ReplicaRole">
+				        <Member Name="Primary" Value="0"/>
+				      </EnumType>
+				      <EntityType Name="DatabaseReplica">
+				        <Key><PropertyRef Name="ID"/></Key>
+				        <Property Name="ID" Type="Edm.String" Nullable="false"/>
+				        <Property Name="Role" Type="tm1s.ReplicaRole"/>
+				      </EntityType>
+				    </Schema>
+				  </edmx:DataServices>
+				</edmx:Edmx>
+				""";
+		ModelGenerator generator = new ModelGenerator(CsdlParser.parse(sample));
+		assertThat(source(generator, "Job")).contains("@JsonProperty(\"Payload\") @Nullable JsonNode payload")
+			.contains("@JsonProperty(\"Replica\") @Nullable DatabaseReplica replica");
+		assertThat(source(generator, "DatabaseReplica")).contains("@JsonProperty(\"Role\") @Nullable ReplicaRole role");
+		assertThat(source(generator, "ReplicaRole"))
+			.contains("return ODataLiterals.enumMember(\"ibm.tm1s.api.v1.ReplicaRole\", json);");
+		assertThat(source(generator, "Tm1Operations"))
+			.contains("new Tm1Operation.Parameter(\"Context\", \"Edm.Untyped\", true)");
 	}
 
 	private static ModelGenerator sample() {

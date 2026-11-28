@@ -1,3 +1,18 @@
 # Endpoints not implemented yet. This list only shrinks: implementing an endpoint means
 # taking it off. A new $metadata snapshot's new endpoints go here or in coverage-excluded.txt.
 # See CoverageGateTest.
+# Added in TM1 schema 12.6.0 (slated for #472 and #473):
+Action Chore/ExecuteWithReturn
+Action Cube/FlushCollectedRuleStats
+Action Cube/StartCollectingRuleStats
+Action Cube/StopCollectingRuleStats
+Action Job/Cancel
+ActionImport ExecuteChoreWithReturn
+EntitySet Jobs
+FunctionImport Metrics
+Navigation ChoreExecuteResult/ErrorLogFile
+Navigation Cube/MeasuresDimension
+Navigation Cube/TimeDimension
+Navigation Job/Replica
+Navigation Job/Session
+Navigation Job/WaitingOn

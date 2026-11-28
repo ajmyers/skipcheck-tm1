@@ -27,6 +27,7 @@ import io.skipcheck.tm1.client.odata.ODataQuery;
  * Python, .NET and TypeScript clients replay. A tail polls until it's cancelled, so its
  * cases take so many entries and then stop ({@link Conformance#take}).
  */
+@SuppressWarnings("deprecation")
 class LogServiceTest {
 
 	@RegisterExtension

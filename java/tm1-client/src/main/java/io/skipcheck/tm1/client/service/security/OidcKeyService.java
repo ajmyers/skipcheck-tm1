@@ -41,6 +41,8 @@ public final class OidcKeyService {
 	 * {@code GetOIDCKeys()}, streamed: the IDs of the cached keys.
 	 * @return the key IDs
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("FunctionImport GetOIDCKeys")
 	public Flux<String> keys() {
 		Tm1Operation operation = Tm1Operations.GET_OIDC_KEYS;
@@ -57,6 +59,8 @@ public final class OidcKeyService {
 	 * @param keyIds the keys' IDs
 	 * @return completes when they're dropped
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("ActionImport RemoveOIDCKeyFromCache")
 	public Mono<Void> remove(List<String> keyIds) {
 		Tm1Operation operation = Tm1Operations.REMOVE_OIDC_KEY_FROM_CACHE;

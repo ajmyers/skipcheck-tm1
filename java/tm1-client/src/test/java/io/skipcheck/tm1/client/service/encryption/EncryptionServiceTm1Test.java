@@ -38,6 +38,7 @@ import reactor.core.publisher.Mono;
  * ({@code TM1_INSTALL_VOLUME}), or the bundle cache, keeps the key TM1 made in its
  * {@code ibmtm1.kdb}.
  */
+@SuppressWarnings("deprecation")
 @RequiresTm1
 class EncryptionServiceTm1Test {
 

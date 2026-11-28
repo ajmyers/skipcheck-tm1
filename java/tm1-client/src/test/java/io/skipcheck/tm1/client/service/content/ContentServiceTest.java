@@ -140,21 +140,21 @@ class ContentServiceTest {
 
 	@Test
 	void findsAChildByTheIdOfTheEntryTmOneReturned() {
-		Entry made = new DocumentReference(null, "notes.txt.blob", "notes.txt", null, null, null, null);
+		Entry made = new DocumentReference(null, "notes.txt.blob", "notes.txt", null, null, null, null, null);
 		assertThat(PLANNING.child(made)).isEqualTo(NOTES);
 		assertThat(PLANNING.child(made, ContentScope.PRIVATE))
 			.isEqualTo(PLANNING.child("notes.txt.blob", ContentScope.PRIVATE));
 		// TM1 12 omits ID and keys entries by Name
-		Entry v12Entry = new DocumentReference(null, null, "notes.txt", null, null, null, null);
+		Entry v12Entry = new DocumentReference(null, null, "notes.txt", null, null, null, null, null);
 		assertThat(PLANNING.child(v12Entry)).isEqualTo(PLANNING.child("notes.txt"));
 		assertThat(PLANNING.child(v12Entry, ContentScope.PRIVATE))
 			.isEqualTo(PLANNING.child("notes.txt", ContentScope.PRIVATE));
-		Entry emptyIdEntry = new DocumentReference(null, "", "notes.txt", null, null, null, null);
+		Entry emptyIdEntry = new DocumentReference(null, "", "notes.txt", null, null, null, null, null);
 		assertThat(PLANNING.child(emptyIdEntry)).isEqualTo(PLANNING.child("notes.txt"));
-		for (Entry missing : List.of(new DocumentReference(null, null, null, null, null, null, null),
-				new DocumentReference(null, "", null, null, null, null, null),
-				new DocumentReference(null, null, "", null, null, null, null),
-				new DocumentReference(null, "", "", null, null, null, null))) {
+		for (Entry missing : List.of(new DocumentReference(null, null, null, null, null, null, null, null),
+				new DocumentReference(null, "", null, null, null, null, null, null),
+				new DocumentReference(null, null, "", null, null, null, null, null),
+				new DocumentReference(null, "", "", null, null, null, null, null))) {
 			assertThatThrownBy(() -> PLANNING.child(missing)).isInstanceOf(IllegalArgumentException.class);
 		}
 		assertThatThrownBy(() -> PLANNING.child((Entry) null)).isInstanceOf(NullPointerException.class);

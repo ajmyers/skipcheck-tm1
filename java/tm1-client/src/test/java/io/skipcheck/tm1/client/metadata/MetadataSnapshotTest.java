@@ -55,7 +55,7 @@ class MetadataSnapshotTest {
 				later.computeIfAbsent(name.substring(0, dash), v -> new TreeSet<>()).add(name.substring(dash + 1));
 			}
 		}
-		assertThat(versions).contains("11.8.20", "11.8.32", "11.8.34", MetadataSnapshot.VERSION);
+		assertThat(versions).contains("11.8.20", "11.8.32", "11.8.34", "11.8.35", MetadataSnapshot.VERSION);
 		for (String version : versions) {
 			assertThat(CsdlParser.parse(MetadataSnapshot.text(version).orElseThrow()).schemaVersion()).as(version)
 				.contains(version);
@@ -106,34 +106,36 @@ class MetadataSnapshotTest {
 
 	@Test
 	void hasTheWholeApiSurface() {
-		CsdlSchema tm1 = doc.schemas()
+		CsdlDocument merged = MetadataSnapshot.loadMerged();
+		CsdlSchema tm1 = merged.schemas()
 			.stream()
 			.filter(s -> "ibm.tm1.api.v1".equals(s.namespace()))
 			.findFirst()
 			.orElseThrow();
 		assertThat(tm1.alias()).isEqualTo("tm1");
-		assertThat(tm1.entityTypes()).hasSize(67);
-		assertThat(tm1.complexTypes()).hasSize(62);
-		assertThat(tm1.enumTypes()).hasSize(31);
-		assertThat(tm1.operations().stream().filter(o -> o.kind() == CsdlOperation.Kind.ACTION)).hasSize(91);
-		assertThat(tm1.operations().stream().filter(o -> o.kind() == CsdlOperation.Kind.FUNCTION)).hasSize(14);
+		assertThat(tm1.entityTypes()).hasSize(68);
+		assertThat(tm1.complexTypes()).hasSize(63);
+		assertThat(tm1.enumTypes()).hasSize(33);
+		assertThat(tm1.operations().stream().filter(o -> o.kind() == CsdlOperation.Kind.ACTION)).hasSize(97);
+		assertThat(tm1.operations().stream().filter(o -> o.kind() == CsdlOperation.Kind.FUNCTION)).hasSize(15);
 
-		CsdlEntityContainer api = doc.entityContainer().orElseThrow();
-		assertThat(api.entitySets()).hasSize(27);
+		CsdlEntityContainer api = merged.entityContainer().orElseThrow();
+		assertThat(api.entitySets()).hasSize(28);
 		assertThat(api.singletons()).hasSize(6);
-		assertThat(api.actionImports()).hasSize(30);
-		assertThat(api.functionImports()).hasSize(11);
+		assertThat(api.actionImports()).hasSize(31);
+		assertThat(api.functionImports()).hasSize(12);
 	}
 
 	@Test
 	void keepsTheRevisionHistory() {
-		assertThat(CsdlRevision.addedIn(doc.boundTo("tm1.Cube")
+		CsdlDocument merged = MetadataSnapshot.loadMerged();
+		assertThat(CsdlRevision.addedIn(merged.boundTo("tm1.Cube")
 			.stream()
 			.filter(o -> o.name().equals("Reserve"))
 			.findFirst()
 			.orElseThrow()
 			.annotations())).contains("11.8.34");
-		assertThat(CsdlRevision.deprecatedIn(doc.boundTo("tm1.Chore")
+		assertThat(CsdlRevision.deprecatedIn(merged.boundTo("tm1.Chore")
 			.stream()
 			.filter(o -> o.name().equals("Activate"))
 			.findFirst()
@@ -156,9 +158,9 @@ class MetadataSnapshotTest {
 
 	@Test
 	void signaturesCoverEveryKindOfElement() {
-		assertThat(Signatures.of(doc))
-			.contains("EntitySet Cubes: ibm.tm1.api.v1.Cube", "Singleton Server: ibm.tm1.api.v1.Server",
-					"Property ibm.tm1.api.v1.Cube/Name: Edm.String",
+		assertThat(Signatures.of(MetadataSnapshot.loadMerged()))
+			.contains("EntitySet Cubes: ibm.tm1.api.v1.Cube", "EntitySet Jobs: ibm.tm1.api.v1.Job",
+					"Singleton Server: ibm.tm1.api.v1.Server", "Property ibm.tm1.api.v1.Cube/Name: Edm.String",
 					"Navigation ibm.tm1.api.v1.Cube/Views: Collection(tm1.View)",
 					"EnumMember ibm.tm1.api.v1.ElementType/Numeric",
 					"EntityType ibm.tm1.api.v1.MDXView : ibm.tm1.api.v1.View")

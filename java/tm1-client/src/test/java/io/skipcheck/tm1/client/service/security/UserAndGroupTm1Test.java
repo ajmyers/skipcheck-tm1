@@ -31,6 +31,7 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /** UserService and GroupService, on a user and two groups of their own. */
+@SuppressWarnings("deprecation")
 @LiveTm1
 class UserAndGroupTm1Test {
 

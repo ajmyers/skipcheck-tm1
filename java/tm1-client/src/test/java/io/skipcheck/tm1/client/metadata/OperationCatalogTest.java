@@ -18,17 +18,17 @@ class OperationCatalogTest {
 
 	@Test
 	void hasOneDescriptorPerOperationEndpointOfTheCoverageGate() {
-		NavigableSet<String> operations = new TreeSet<>(Endpoints.of(MetadataSnapshot.load()));
+		NavigableSet<String> operations = new TreeSet<>(Endpoints.of(MetadataSnapshot.loadMerged()));
 		operations.removeIf(e -> !e.matches("(Action|Function|ActionImport|FunctionImport) .*"));
 		assertThat(Tm1Operations.ALL).extracting(Tm1Operation::endpoint)
 			.doesNotHaveDuplicates()
 			.containsExactlyInAnyOrderElementsOf(operations)
-			.hasSize(105);
+			.hasSize(112);
 	}
 
 	@Test
 	void everyCapabilityIsOneTheSnapshotHas() {
-		Tm1Capabilities snapshot = Tm1Capabilities.of(MetadataSnapshot.load(), null);
+		Tm1Capabilities snapshot = Tm1Capabilities.of(MetadataSnapshot.loadMerged(), null);
 		assertThat(Tm1Operations.ALL)
 			.allSatisfy(op -> assertThat(snapshot.supports(op.capability())).as("%s", op.endpoint()).isTrue());
 	}
@@ -40,7 +40,8 @@ class OperationCatalogTest {
 		assertThat(Tm1Operations.EXECUTE_MDX).satisfies(op -> {
 			assertThat(op.kind()).isEqualTo(Tm1Operation.Kind.ACTION);
 			assertThat(op.importName()).isEqualTo("ExecuteMDX");
-			assertThat(op.parameters()).containsExactly(new Tm1Operation.Parameter("MDX", "Edm.String", false));
+			assertThat(op.parameters()).containsExactly(new Tm1Operation.Parameter("MDX", "Edm.String", false),
+					new Tm1Operation.Parameter("Context", "Edm.Untyped", true));
 			assertThat(op.returnType()).isEqualTo("tm1.Cellset");
 			assertThat(op.addedIn()).isEqualTo("10.2.2.1");
 		});

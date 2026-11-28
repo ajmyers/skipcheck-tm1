@@ -25,13 +25,20 @@ sourceSets.main {
 	resources.include("tm1-overlay.json")
 }
 
-val snapshot = rootDir.resolve("java/tm1-client/src/model/metadata/tm1-schema-11.8.35.xml")
+val metadataDir = rootDir.resolve("java/tm1-client/src/model/metadata")
+val snapshots = listOf(
+	metadataDir.resolve("tm1-schema-11.8.35.xml"),
+	metadataDir.resolve("tm1-schema-12.6.0.xml"),
+)
 val spec = rootDir.resolve("spec/tm1-api.json")
 
 tasks.test {
-	// The snapshot the tests generate from, and the committed spec they compare with
-	systemProperty("tm1.snapshot", snapshot.path)
+	// The snapshots the tests generate from, and the committed spec they compare with
+	systemProperty("tm1.snapshots", snapshots.joinToString(",") { it.path })
 	systemProperty("tm1.spec", spec.path)
+	inputs.files(snapshots).withPathSensitivity(PathSensitivity.RELATIVE)
+	inputs.files(fileTree(metadataDir) { include("ibm.*.xml", "tm1-probe-*.json") })
+		.withPathSensitivity(PathSensitivity.RELATIVE)
 	inputs.file(spec).withPathSensitivity(PathSensitivity.RELATIVE)
 }
 
@@ -39,11 +46,11 @@ tasks.test {
 // ApiSpecTest fails when it's out of date
 tasks.register<JavaExec>("exportSpec") {
 	group = "build"
-	description = "Exports the language-neutral API spec (spec/tm1-api.json) from the \$metadata snapshot."
+	description = "Exports the language-neutral API spec (spec/tm1-api.json) from the \$metadata snapshots."
 	classpath = sourceSets.main.get().runtimeClasspath
 	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
-	args("spec", snapshot.path, spec.path)
-	inputs.file(snapshot)
-	inputs.files(fileTree(snapshot.parentFile) { include("tm1-probe-*.json") })
+	args(listOf("spec") + snapshots.map { it.path } + listOf(spec.path))
+	inputs.files(snapshots)
+	inputs.files(fileTree(metadataDir) { include("ibm.*.xml", "tm1-probe-*.json") })
 	outputs.file(spec)
 }

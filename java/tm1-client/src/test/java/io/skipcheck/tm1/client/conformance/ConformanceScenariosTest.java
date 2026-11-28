@@ -482,7 +482,7 @@ class ConformanceScenariosTest {
 		// An endpoint ID no server defines would skip its step everywhere unnoticed, and
 		// a
 		// string where a list belongs is read differently by each client
-		Set<String> known = Endpoints.of(MetadataSnapshot.load());
+		Set<String> known = Endpoints.of(MetadataSnapshot.loadMerged());
 		for (Path file : ConformanceScenarios.all()) {
 			JsonNode scenario = ConformanceScenarios.load(file);
 			List<JsonNode> nodes = new ArrayList<>();

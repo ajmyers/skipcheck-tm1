@@ -13,6 +13,7 @@ import java.util.Optional;
 
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlDocument;
+import io.skipcheck.tm1.csdl.CsdlMerger;
 import io.skipcheck.tm1.csdl.CsdlParser;
 
 /**
@@ -21,19 +22,26 @@ import io.skipcheck.tm1.csdl.CsdlParser;
  * byte. {@link MetadataSnapshotUpdateTest} writes it.
  *
  * <p>
- * The model is generated from the newest, {@link #VERSION}. Every document a supported
- * release serves is committed beside it, so {@link MetadataDriftTm1Test} can hold a
- * server of any of them to its own: {@code tm1-schema-<schema>.xml}, the first document
- * of each schema version, and {@code tm1-schema-<schema>-<build>.xml} for a later one
- * ({@link #LATER_DOCUMENTS}).
+ * The model is generated from the union of {@link #MODEL_VERSIONS} (with referenced
+ * schemas resolved), and {@link #VERSION} is the newest committed snapshot. Every
+ * document a supported release serves is committed beside it, so
+ * {@link MetadataDriftTm1Test} can hold a server of any of them to its own:
+ * {@code tm1-schema-<schema>.xml}, the first document of each schema version, and
+ * {@code tm1-schema-<schema>-<build>.xml} for a later one ({@link #LATER_DOCUMENTS}).
  */
 public final class MetadataSnapshot {
 
 	/**
-	 * The schema version of the newest committed snapshot, the one the model is generated
-	 * from. {@code MetadataSnapshotTest} checks it's the highest committed.
+	 * The schema version of the newest committed snapshot. {@code MetadataSnapshotTest}
+	 * checks it's the highest committed.
 	 */
-	public static final String VERSION = "11.8.35";
+	public static final String VERSION = "12.6.0";
+
+	/**
+	 * The schema versions merged to generate the model and export
+	 * {@code spec/tm1-api.json}, oldest-first.
+	 */
+	public static final List<String> MODEL_VERSIONS = List.of("11.8.35", "12.6.0");
 
 	/** The newest snapshot's location, as a test resource. */
 	public static final String RESOURCE = resource(VERSION);
@@ -55,9 +63,34 @@ public final class MetadataSnapshot {
 	private MetadataSnapshot() {
 	}
 
-	/** The committed snapshot, parsed. */
+	/** The newest committed snapshot, parsed. */
 	public static CsdlDocument load() {
 		return CsdlParser.parse(text());
+	}
+
+	/** A committed snapshot of {@code schemaVersion}, parsed. */
+	public static CsdlDocument load(String schemaVersion) {
+		return CsdlParser.parse(text(schemaVersion).orElseThrow(
+				() -> new IllegalStateException("The metadata snapshot " + resource(schemaVersion) + " is missing")));
+	}
+
+	/**
+	 * The merged multi-version document ({@link #MODEL_VERSIONS}), with local
+	 * {@code edmx:Reference} schemas resolved: what {@code tm1-codegen} generates the
+	 * model and {@code spec/tm1-api.json} from.
+	 */
+	public static CsdlDocument loadMerged() {
+		List<CsdlDocument> docs = MODEL_VERSIONS.stream().map(MetadataSnapshot::load).toList();
+		return CsdlMerger.resolveReferences(CsdlMerger.merge(docs), MetadataSnapshot::reference);
+	}
+
+	private static Optional<CsdlDocument> reference(String uri) {
+		try (InputStream in = MetadataSnapshot.class.getResourceAsStream("/metadata/" + uri)) {
+			return in == null ? Optional.empty() : Optional.of(CsdlParser.parse(in));
+		}
+		catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
 	}
 
 	/** The committed snapshot's text. */

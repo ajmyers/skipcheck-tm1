@@ -62,18 +62,23 @@ dependencies {
 	codegen(project(":tm1-codegen"))
 }
 val modelSources = layout.buildDirectory.dir("generated/sources/tm1-model/java/main")
-val snapshot = layout.projectDirectory.file("src/model/metadata/tm1-schema-11.8.35.xml")
+val metadataDir = layout.projectDirectory.dir("src/model/metadata")
+val snapshots = listOf(
+	metadataDir.file("tm1-schema-11.8.35.xml").asFile,
+	metadataDir.file("tm1-schema-12.6.0.xml").asFile,
+)
 val generateModel = tasks.register<JavaExec>("generateModel") {
 	group = "build"
-	description = "Generates the model from the \$metadata snapshot."
+	description = "Generates the model from the \$metadata snapshots."
 	classpath = codegen
 	mainClass = "io.skipcheck.tm1.codegen.Tm1Codegen"
-	inputs.file(snapshot).withPathSensitivity(PathSensitivity.RELATIVE)
-	// What a probe found that the snapshot doesn't declare (java/tools/tm1-probe)
-	inputs.files(fileTree(snapshot.asFile.parentFile) { include("tm1-probe-*.json") }).withPathSensitivity(PathSensitivity.RELATIVE)
+	inputs.files(snapshots).withPathSensitivity(PathSensitivity.RELATIVE)
+	// Referenced CSDL schemas and what a probe found that the snapshots don't declare
+	inputs.files(fileTree(metadataDir.asFile) { include("ibm.*.xml", "tm1-probe-*.json") })
+		.withPathSensitivity(PathSensitivity.RELATIVE)
 	outputs.dir(modelSources)
 	outputs.cacheIf { true }
-	args(snapshot.asFile.path, modelSources.get().asFile.path)
+	args(snapshots.map { it.path } + listOf(modelSources.get().asFile.path))
 	// Start from an empty folder: a type or package that's gone from the model mustn't stay
 	// behind from an earlier run, to be compiled and cached as if it were still generated
 	val output = modelSources.get().asFile

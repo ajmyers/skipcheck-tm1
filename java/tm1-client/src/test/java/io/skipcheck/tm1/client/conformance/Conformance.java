@@ -70,11 +70,19 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 
 	private static final boolean RECORD = Boolean.getBoolean("tm1.conformance.record");
 
+	private final String defaultSchema;
+
+	private final String defaultProductVersion;
+
 	private final List<ObjectNode> cases = new ArrayList<>();
 
 	private @Nullable ConformanceTm1 tm1;
 
 	private @Nullable Tm1Client client;
+
+	private @Nullable String clientSchema;
+
+	private @Nullable String clientProductVersion;
 
 	private String test = "";
 
@@ -89,14 +97,32 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 	/** How many items {@link #take} takes of the call's {@code Flux}; null for all. */
 	private @Nullable Integer taking;
 
+	/**
+	 * Default conformance fixture (schema {@code 11.8.35}, product {@code 11.8.03500.6}).
+	 */
+	public Conformance() {
+		this(ConformanceTm1.DEFAULT_SCHEMA, ConformanceTm1.PRODUCT_VERSION);
+	}
+
+	/**
+	 * Conformance fixture defaulting to a specific schema and product version (e.g.
+	 * {@code "12.6.0"}, {@code "12.6.7"}).
+	 */
+	public Conformance(String defaultSchema, String defaultProductVersion) {
+		this.defaultSchema = defaultSchema;
+		this.defaultProductVersion = defaultProductVersion;
+	}
+
 	@Override
 	public void beforeEach(ExtensionContext context) {
 		testClass = context.getRequiredTestClass();
 		test = context.getRequiredTestMethod().getName();
 		ran.add(test);
 		n = 0;
-		tm1 = new ConformanceTm1();
+		tm1 = new ConformanceTm1().schema(defaultSchema).productVersion(defaultProductVersion);
 		client = tm1.client();
+		clientSchema = tm1.schema();
+		clientProductVersion = tm1.productVersion();
 	}
 
 	/** This test's fake TM1: script its answers, read its requests. */
@@ -109,7 +135,13 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 
 	/** This test's client, for anything that isn't a recorded call. */
 	public Tm1Client client() {
-		tm1();
+		ConformanceTm1 server = tm1();
+		if (client == null || !server.schema().equals(clientSchema)
+				|| !server.productVersion().equals(clientProductVersion)) {
+			client = server.client();
+			clientSchema = server.schema();
+			clientProductVersion = server.productVersion();
+		}
 		return client;
 	}
 
@@ -162,7 +194,7 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		fake.takeExchanges();
 		Object target;
 		try {
-			target = Tm1Client.class.getMethod(service).invoke(client);
+			target = Tm1Client.class.getMethod(service).invoke(client());
 		}
 		catch (ReflectiveOperationException e) {
 			throw new IllegalArgumentException("Tm1Client has no service " + service, e);
@@ -265,6 +297,12 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		if (taking != null) {
 			c.put("take", taking);
 		}
+		if (!tm1().schema().equals(defaultSchema)) {
+			c.put("schema", tm1().schema());
+		}
+		if (!tm1().productVersion().equals(defaultProductVersion)) {
+			c.put("productVersion", tm1().productVersion());
+		}
 		ArrayNode exchanges = c.putArray("exchanges");
 		tm1().takeExchanges().forEach(exchanges::add);
 		if (error != null) {
@@ -302,7 +340,10 @@ public final class Conformance implements BeforeEachCallback, AfterAllCallback, 
 		ObjectNode fixture = ConformanceCodec.json().createObjectNode();
 		fixture.put("specVersion", SPEC_VERSION);
 		fixture.put("source", type.getName());
-		fixture.putObject("session").put("productVersion", ConformanceTm1.PRODUCT_VERSION);
+		ObjectNode session = fixture.putObject("session").put("productVersion", defaultProductVersion);
+		if (!defaultSchema.equals(ConformanceTm1.DEFAULT_SCHEMA)) {
+			session.put("schema", defaultSchema);
+		}
 		ArrayNode list = fixture.putArray("cases");
 		cases.stream().sorted(Comparator.comparing(c -> order(c.get("id").asString()))).forEach(list::add);
 		String text = write(fixture);

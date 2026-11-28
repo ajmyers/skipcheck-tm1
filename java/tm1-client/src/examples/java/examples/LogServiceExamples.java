@@ -15,6 +15,8 @@ import reactor.core.publisher.Mono;
  * Examples for {@link io.skipcheck.tm1.client.service.server.LogService}, quoted in its
  * Javadoc.
  */
+@SuppressWarnings("deprecation") // MessageLogEntry is deprecated in TM1 schema 12.0.0;
+									// active on TM1 11.8
 final class LogServiceExamples {
 
 	Flux<MessageLogEntry> newest(Tm1Client tm1) {

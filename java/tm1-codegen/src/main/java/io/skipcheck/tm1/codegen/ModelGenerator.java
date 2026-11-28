@@ -218,8 +218,7 @@ public final class ModelGenerator {
 		overlay.lenientDates()
 			.forEach((key, note) -> this.tags.put(key, new Departure("LENIENT_DATE", List.of(), plain(note))));
 		undeclared.properties()
-			.forEach((key, p) -> this.tags.put(key,
-					new Departure("UNDECLARED", List.of(undeclared.schemaVersion()), plain(p.note()))));
+			.forEach((key, p) -> this.tags.put(key, new Departure("UNDECLARED", p.observedIn(), plain(p.note()))));
 		this.departures = javadocs(overlay.departures());
 		this.lenientDates = javadocs(overlay.lenientDates());
 		metadata.structuredTypes().sorted(Comparator.comparing(CsdlStructuredType::name)).forEach(type -> {
@@ -1535,6 +1534,7 @@ public final class ModelGenerator {
 			case "Edm.DateTimeOffset" -> ClassName.get("java.time", "OffsetDateTime");
 			case "Edm.Duration" -> ClassName.get("java.time", "Duration");
 			case "Edm.Guid" -> ClassName.get("java.util", "UUID");
+			case "Edm.PrimitiveType", "Edm.Untyped" -> JSON_NODE;
 			default -> null;
 		};
 		if (edm != null) {
@@ -1551,8 +1551,7 @@ public final class ModelGenerator {
 		if (structured.isPresent()) {
 			return Optional.of(ClassName.get(PACKAGE, javaTypeName(structured.get().name())));
 		}
-		// Edm.PrimitiveType (a value of any type), anything
-		// unknown
+		// Any other unknown or unmapped type
 		return Optional.of(JSON_NODE);
 	}
 

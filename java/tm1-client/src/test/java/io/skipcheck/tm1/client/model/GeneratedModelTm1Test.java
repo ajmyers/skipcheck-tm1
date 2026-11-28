@@ -22,6 +22,7 @@ import io.skipcheck.tm1.client.session.Tm1Session;
 import io.skipcheck.tm1.client.version.Tm1Capabilities;
 
 /** The generated model, read straight from a real TM1 through the session. */
+@SuppressWarnings("deprecation")
 @LiveTm1
 class GeneratedModelTm1Test {
 

@@ -2,6 +2,7 @@
 
 package io.skipcheck.tm1.codegen;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -25,13 +26,17 @@ import tools.jackson.databind.json.JsonMapper;
  * property rejected only because one fixture's value didn't suit (code without regions)
  * counts as writable.
  *
- * @param schemaVersion the schema version the probe ran on
+ * @param schemaVersion the newest schema version the probe ran on
  * @param types by entity type's simple name
+ * @param observedIn all schema versions whose probe files contributed
  */
-public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
+public record Writes(String schemaVersion, Map<String, TypeWrites> types, List<String> observedIn) {
 
 	/** Outcomes, from the most a write does to the least. */
 	static final List<String> ORDER = List.of("applied", "transformed", "accepted", "ignored", "rejected", "untested");
+
+	/** Collection outcomes, from the most a PATCH does to the least. */
+	static final List<String> COLLECTION_ORDER = List.of("replaces", "appends", "ignored", "rejected", "untested");
 
 	/**
 	 * What a type's writes do.
@@ -43,9 +48,12 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 	 * @param rename what a PATCH of {@code Name} does, or null if not probed
 	 * @param collections per collection or navigation property, what a PATCH of it does:
 	 * {@code replaces}, {@code appends}, {@code ignored}, {@code rejected}...
+	 * @param observedIn the schema versions whose probe files observed writes for this
+	 * type
 	 */
 	public record TypeWrites(Map<String, String> create, List<String> required, Map<String, String> patch,
-			List<String> nullRefused, @Nullable String rename, Map<String, String> collections) {
+			List<String> nullRefused, @Nullable String rename, Map<String, String> collections,
+			List<String> observedIn) {
 
 		/** Copies the collections, sorted. */
 		public TypeWrites {
@@ -54,6 +62,13 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 			patch = Collections.unmodifiableMap(new TreeMap<>(patch));
 			nullRefused = List.copyOf(new TreeSet<>(nullRefused));
 			collections = Collections.unmodifiableMap(new TreeMap<>(collections));
+			observedIn = List.copyOf(observedIn);
+		}
+
+		/** Convenience constructor without explicit {@code observedIn}. */
+		public TypeWrites(Map<String, String> create, List<String> required, Map<String, String> patch,
+				List<String> nullRefused, @Nullable String rename, Map<String, String> collections) {
+			this(create, required, patch, nullRefused, rename, collections, List.of());
 		}
 
 		/**
@@ -93,10 +108,16 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 	/** Copies the map, sorted. */
 	public Writes {
 		types = Collections.unmodifiableMap(new TreeMap<>(types));
+		observedIn = List.copyOf(observedIn);
+	}
+
+	/** Creates a single-version {@code Writes}. */
+	public Writes(String schemaVersion, Map<String, TypeWrites> types) {
+		this(schemaVersion, types, schemaVersion.isEmpty() ? List.of() : List.of(schemaVersion));
 	}
 
 	/** None: every type writes every property. */
-	public static final Writes NONE = new Writes("", Map.of());
+	public static final Writes NONE = new Writes("", Map.of(), List.of());
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
@@ -119,36 +140,77 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 	 * probe has no writes for
 	 */
 	public static Writes read(String probeJson, Overlay overlay) {
-		JsonNode root = JSON.readTree(probeJson);
+		return read(List.of(probeJson), overlay);
+	}
+
+	/**
+	 * Reads and merges writes across multiple probe files, with the overlay's
+	 * {@code writeOnly} properties counted as written.
+	 * @param probeJsons the probe files' JSON contents, oldest-first
+	 * @param overlay the overlay
+	 * @return the merged writes
+	 * @throws IllegalArgumentException if the overlay names a write-only property no
+	 * probe has writes for
+	 */
+	public static Writes read(List<String> probeJsons, Overlay overlay) {
+		if (probeJsons.isEmpty()) {
+			return NONE;
+		}
 		Map<String, Map<String, String>> create = new TreeMap<>();
 		Map<String, Map<String, String>> patch = new TreeMap<>();
 		Map<String, TreeSet<String>> required = new TreeMap<>();
 		Map<String, TreeSet<String>> nullRefused = new TreeMap<>();
 		Map<String, String> rename = new TreeMap<>();
 		Map<String, Map<String, String>> collections = new TreeMap<>();
-		for (Map.Entry<String, JsonNode> c : root.path("writes").properties()) {
-			JsonNode w = c.getValue();
-			String type = w.path("type").asString(c.getKey().split("/", -1)[0]);
-			merge(create.computeIfAbsent(type, k -> new TreeMap<>()), w.path("post"));
-			merge(patch.computeIfAbsent(type, k -> new TreeMap<>()), w.path("patch"));
-			TreeSet<String> req = required.computeIfAbsent(type, k -> new TreeSet<>());
-			w.path("required").forEach(r -> req.add(r.asString()));
-			TreeSet<String> refused = nullRefused.computeIfAbsent(type, k -> new TreeSet<>());
-			for (Map.Entry<String, JsonNode> p : w.path("patchNull").properties()) {
-				if (p.getValue().path("outcome").asString("").equals("rejected")) {
-					refused.add(p.getKey());
+		Map<String, List<String>> typeObservedIn = new TreeMap<>();
+		List<String> observedIn = new ArrayList<>();
+		String latestVersion = "";
+		for (String probeJson : probeJsons) {
+			JsonNode root = JSON.readTree(probeJson);
+			String version = root.path("server").path("schemaVersion").asString("");
+			if (!version.isEmpty()) {
+				latestVersion = version;
+				if (!observedIn.contains(version)) {
+					observedIn.add(version);
 				}
 			}
-			String r = w.path("rename").path("outcome").asString(null);
-			if (r != null) {
-				rename.merge(type, r, Writes::most);
+			for (Map.Entry<String, JsonNode> c : root.path("writes").properties()) {
+				JsonNode w = c.getValue();
+				String type = w.path("type").asString(c.getKey().split("/", -1)[0]);
+				if (!version.isEmpty()) {
+					List<String> seen = typeObservedIn.computeIfAbsent(type, k -> new ArrayList<>());
+					if (!seen.contains(version)) {
+						seen.add(version);
+					}
+				}
+				merge(create.computeIfAbsent(type, k -> new TreeMap<>()), w.path("post"));
+				merge(patch.computeIfAbsent(type, k -> new TreeMap<>()), w.path("patch"));
+				TreeSet<String> req = required.computeIfAbsent(type, k -> new TreeSet<>());
+				w.path("required").forEach(r -> req.add(r.asString()));
+				TreeSet<String> refused = nullRefused.computeIfAbsent(type, k -> new TreeSet<>());
+				for (Map.Entry<String, JsonNode> p : w.path("patchNull").properties()) {
+					if (p.getValue().path("outcome").asString("").equals("rejected")) {
+						refused.add(p.getKey());
+					}
+				}
+				String r = w.path("rename").path("outcome").asString(null);
+				if (r != null) {
+					rename.merge(type, r, Writes::most);
+				}
 			}
-		}
-		for (Map.Entry<String, JsonNode> c : root.path("collections").properties()) {
-			String[] id = c.getKey().split("/", -1);
-			String property = id[1].replace("@odata.bind", "");
-			collections.computeIfAbsent(id[0], k -> new TreeMap<>())
-				.merge(property, c.getValue().path("outcome").asString(""), (a, b) -> a);
+			for (Map.Entry<String, JsonNode> c : root.path("collections").properties()) {
+				String[] id = c.getKey().split("/", -1);
+				String type = id[0];
+				String property = id[1].replace("@odata.bind", "");
+				if (!version.isEmpty()) {
+					List<String> seen = typeObservedIn.computeIfAbsent(type, k -> new ArrayList<>());
+					if (!seen.contains(version)) {
+						seen.add(version);
+					}
+				}
+				collections.computeIfAbsent(type, k -> new TreeMap<>())
+					.merge(property, c.getValue().path("outcome").asString(""), Writes::mostCollection);
+			}
 		}
 		for (String key : overlay.writeOnly().keySet()) {
 			String[] parts = key.split("/", -1);
@@ -164,13 +226,15 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		Map<String, TypeWrites> types = new TreeMap<>();
 		for (Map.Entry<String, Map<String, String>> e : create.entrySet()) {
 			String type = e.getKey();
-			types.put(type, new TypeWrites(e.getValue(), List.copyOf(required.getOrDefault(type, new TreeSet<>())),
-					patch.getOrDefault(type, Map.of()), List.copyOf(nullRefused.getOrDefault(type, new TreeSet<>())),
-					rename.get(type), collections.getOrDefault(type, Map.of())));
+			types.put(type,
+					new TypeWrites(e.getValue(), List.copyOf(required.getOrDefault(type, new TreeSet<>())),
+							patch.getOrDefault(type, Map.of()),
+							List.copyOf(nullRefused.getOrDefault(type, new TreeSet<>())), rename.get(type),
+							collections.getOrDefault(type, Map.of()), typeObservedIn.getOrDefault(type, List.of())));
 		}
-		collections.forEach((type, c) -> types.computeIfAbsent(type,
-				t -> new TypeWrites(Map.of(), List.of(), Map.of(), List.of(), null, c)));
-		return new Writes(root.path("server").path("schemaVersion").asString(""), types);
+		collections.forEach((type, c) -> types.computeIfAbsent(type, t -> new TypeWrites(Map.of(), List.of(), Map.of(),
+				List.of(), null, c, typeObservedIn.getOrDefault(type, List.of()))));
+		return new Writes(latestVersion, types, observedIn);
 	}
 
 	/**
@@ -199,6 +263,13 @@ public record Writes(String schemaVersion, Map<String, TypeWrites> types) {
 		int ia = ORDER.indexOf(a);
 		int ib = ORDER.indexOf(b);
 		return (ia < 0 ? ORDER.size() : ia) <= (ib < 0 ? ORDER.size() : ib) ? a : b;
+	}
+
+	/** The collection outcome that writes more. */
+	static String mostCollection(String a, String b) {
+		int ia = COLLECTION_ORDER.indexOf(a);
+		int ib = COLLECTION_ORDER.indexOf(b);
+		return (ia < 0 ? COLLECTION_ORDER.size() : ia) <= (ib < 0 ? COLLECTION_ORDER.size() : ib) ? a : b;
 	}
 
 }

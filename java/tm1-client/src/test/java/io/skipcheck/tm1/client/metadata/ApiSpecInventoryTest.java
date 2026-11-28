@@ -25,7 +25,7 @@ class ApiSpecInventoryTest {
 		JsonNode spec = JsonMapper.builder().build().readTree(Path.of(System.getProperty("tm1.spec")).toFile());
 		List<String> ids = new ArrayList<>();
 		spec.path("endpoints").forEach(e -> ids.add(e.path("id").asString()));
-		assertThat(ids).containsExactlyElementsOf(Endpoints.of(MetadataSnapshot.load()));
+		assertThat(ids).containsExactlyElementsOf(Endpoints.of(MetadataSnapshot.loadMerged()));
 		assertThat(spec.path("source").path("schemaVersion").asString()).isEqualTo(MetadataSnapshot.VERSION);
 	}
 

@@ -78,6 +78,8 @@ public final class LogService {
 	 * {@code TimeStamp}), order and how many
 	 * @return the entries
 	 */
+	@SuppressWarnings("deprecation") // Log entries are deprecated in TM1 schema 12.0.0;
+										// still active on TM1 11.8
 	@Tm1Endpoint("EntitySet MessageLogEntries")
 	public Flux<MessageLogEntry> messageLogEntries(ODataQuery query) {
 		return session.stream(Tm1Request.list(ODataPath.of("MessageLogEntries"), query, MessageLogEntry.class));
@@ -90,6 +92,8 @@ public final class LogService {
 	 * @param query what to select, filter and how many
 	 * @return the entries
 	 */
+	@SuppressWarnings("deprecation") // MessageLog is deprecated in TM1 schema 12.0.0;
+										// still active on TM1 11.8
 	@Tm1Endpoint("FunctionImport MessageLog")
 	public Flux<MessageLogEntry> messageLog(boolean reverse, ODataQuery query) {
 		Tm1Operation operation = Tm1Operations.MESSAGE_LOG;
@@ -113,6 +117,8 @@ public final class LogService {
 	 * @param query what to select, filter (such as on {@code Cube}), order and how many
 	 * @return the entries
 	 */
+	@SuppressWarnings("deprecation") // TransactionLogEntry is deprecated in TM1 schema
+										// 12.0.0; still active on TM1 11.8
 	@Tm1Endpoint("EntitySet TransactionLogEntries")
 	public Flux<TransactionLogEntry> transactionLogEntries(ODataQuery query) {
 		return session.stream(Tm1Request.list(ODataPath.of("TransactionLogEntries"), query, TransactionLogEntry.class));
@@ -126,6 +132,8 @@ public final class LogService {
 	 * @param query what to select, filter and how many
 	 * @return the entries
 	 */
+	@SuppressWarnings("deprecation") // TransactionLog is deprecated in TM1 schema 12.0.0;
+										// still active on TM1 11.8
 	@Tm1Endpoint("FunctionImport TransactionLog")
 	public Flux<TransactionLogEntry> transactionLog(boolean reverse, boolean ignoreStatusMessages, ODataQuery query) {
 		Tm1Operation operation = Tm1Operations.TRANSACTION_LOG;
@@ -143,6 +151,8 @@ public final class LogService {
 	 * entry's details)
 	 * @return the entries
 	 */
+	@SuppressWarnings("deprecation") // AuditLogEntry is deprecated in TM1 schema 12.0.0;
+										// still active on TM1 11.8
 	@Tm1Endpoint("EntitySet AuditLogEntries")
 	@Tm1Endpoint("Navigation AuditLogEntry/AuditDetails")
 	public Flux<AuditLogEntry> auditLogEntries(ODataQuery query) {
@@ -162,6 +172,8 @@ public final class LogService {
 	 * @param every how long to wait between polls
 	 * @return the new entries, as they come
 	 */
+	@SuppressWarnings("deprecation") // MessageLogEntry is deprecated in TM1 schema
+										// 12.0.0; still active on TM1 11.8
 	@Tm1Endpoint("FunctionImport TailMessageLog")
 	public Flux<MessageLogEntry> tailMessageLog(Duration every) {
 		return tail(Tm1Operations.TAIL_MESSAGE_LOG, MessageLogEntry.class, every);
@@ -173,6 +185,8 @@ public final class LogService {
 	 * @param every how long to wait between polls
 	 * @return the new entries, as they come
 	 */
+	@SuppressWarnings("deprecation") // TransactionLogEntry is deprecated in TM1 schema
+										// 12.0.0; still active on TM1 11.8
 	@Tm1Endpoint("FunctionImport TailTransactionLog")
 	public Flux<TransactionLogEntry> tailTransactionLog(Duration every) {
 		return tail(Tm1Operations.TAIL_TRANSACTION_LOG, TransactionLogEntry.class, every);
@@ -184,6 +198,8 @@ public final class LogService {
 	 * @param every how long to wait between polls
 	 * @return the new entries, as they come
 	 */
+	@SuppressWarnings("deprecation") // AuditLogEntry is deprecated in TM1 schema 12.0.0;
+										// still active on TM1 11.8
 	@Tm1Endpoint("FunctionImport TailAuditLog")
 	public Flux<AuditLogEntry> tailAuditLog(Duration every) {
 		return tail(Tm1Operations.TAIL_AUDIT_LOG, AuditLogEntry.class, every);

@@ -1,0 +1,1072 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Authorization.V1.xml">
+		<edmx:Include Namespace="Org.OData.Authorization.V1" Alias="Auth"/>
+	</edmx:Reference>
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Capabilities.V1.xml">
+		<edmx:Include Namespace="Org.OData.Capabilities.V1" Alias="Capabilities"/>
+	</edmx:Reference>
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Core.V1.xml">
+		<edmx:Include Namespace="Org.OData.Core.V1" Alias="Core"/>
+	</edmx:Reference>
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.JSON.V1.xml">
+		<edmx:Include Namespace="Org.OData.JSON.V1" Alias="JSON"/>
+	</edmx:Reference>
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Validation.V1.xml">
+		<edmx:Include Namespace="Org.OData.Validation.V1" Alias="Validation"/>
+	</edmx:Reference>
+	<edmx:DataServices>
+		<Schema Namespace="ibm.tm1s.api.v1" Alias="tm1s" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+			<Annotation Term="Core.SchemaVersion">
+				<String>12.6.0</String>
+			</Annotation>
+			<Action Name="Backup" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Creates a backup set of a Database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to create a backup set of.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="URL" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The destination URL of the backup set.</String>
+					</Annotation>
+					<Annotation Term="Core.IsURL" />
+				</Parameter>
+				<Parameter Name="Headers" Type="Collection(Edm.String)">
+					<Annotation Term="Core.Description">
+						<String>List of colon(:) separated key-value pairs.</String>
+					</Annotation>
+				</Parameter>
+				<ReturnType Type="tm1s.BackupResult" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The result of the backup operation.</String>
+					</Annotation>
+				</ReturnType>
+			</Action>
+			<ComplexType Name="BackupResult">
+				<Annotation Term="Core.Description">
+					<String>A backup operation return value.</String>
+				</Annotation>
+				<Property Name="URL" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The URL referencing the backup set created.</String>
+					</Annotation>
+					<Annotation Term="Core.IsURL" />
+				</Property>
+			</ComplexType>
+			<Action Name="BackupToAzure" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Creates a backup set on Azure Blob Storage using Service Principal authentication.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.5</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to create a backup set of.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Host" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Azure Blob Storage host URL.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Bucket" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the destination bucket/container for the backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Name" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the backup set to be created in Azure Blob Storage.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="TenantID" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>ID of the Application&#39;s Microsoft Entra tenant.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="ClientID" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Application ID of the Azure Service Principal.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="ClientSecret" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Password of the Azure Service Principal.</String>
+					</Annotation>
+				</Parameter>
+				<ReturnType Type="tm1s.BackupResult" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The result of the backup operation.</String>
+					</Annotation>
+				</ReturnType>
+			</Action>
+			<Action Name="BackupToS3" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Creates a backup set on an S3 server of a Database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.1.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to create a backup set of.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Host" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The destination S3 host of the backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Region" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The destination S3 region for the request.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Bucket" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the destination S3 bucket for the backupset.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Key" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the destination S3 key for the backupset.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="AccessKey" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 Access Key for authenticating the request.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="SecretKey" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 Secret Key for authenticating the request.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="SecurityToken" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>An optional S3 Security Token if using temporary credentials.</String>
+					</Annotation>
+				</Parameter>
+				<ReturnType Type="tm1s.BackupResult" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The result of the backup operation.</String>
+					</Annotation>
+				</ReturnType>
+			</Action>
+			<Action Name="Close" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Closes the session.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Session" Type="tm1s.Session" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The session being closed.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<EntityType Name="Database">
+				<Key>
+					<PropertyRef Name="Name"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>A representation of a TM1 Database.</String>
+				</Annotation>
+				<Property Name="ID" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The unique identifier of the database.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Name" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the database.</String>
+					</Annotation>
+				</Property>
+				<NavigationProperty Name="ProductVersion" Type="tm1s.ProductVersion">
+					<Annotation Term="Core.Description">
+						<String>The product version of the database. If not specified, the latest version is used.</String>
+					</Annotation>
+				</NavigationProperty>
+				<Property Name="ServiceRootURL" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The root URL of the database service.</String>
+					</Annotation>
+					<Annotation Term="Core.IsURL" />
+				</Property>
+				<Property Name="Replicas" Type="Edm.Int32" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The number of replicas requested.</String>
+					</Annotation>
+				</Property>
+				<NavigationProperty Name="ActiveReplicas" Type="Collection(tm1s.DatabaseReplica)" ContainsTarget="true">
+					<Annotation Term="Core.Description">
+						<String>List of active database replicas.</String>
+					</Annotation>
+				</NavigationProperty>
+				<Property Name="Resources" Type="tm1s.Resources">
+					<Annotation Term="Core.Description">
+						<String>Database resource specification such as Storage and per replica CPU, Memory.</String>
+					</Annotation>
+				</Property>
+				<Property Name="CollectDiagnostics" Type="Edm.Boolean" Nullable="false" DefaultValue="true">
+					<Annotation Term="Core.Description">
+						<String>A Boolean that indicates whether diagnostic collection is enabled.</String>
+					</Annotation>
+					<Annotation Term="Core.LongDescription">
+						<String>Setting determining whether diagnostics files, such as coredumps, are being collected. Default value is true.</String>
+					</Annotation>
+				</Property>
+			</EntityType>
+			<EntityType Name="DatabaseReplica">
+				<Key>
+					<PropertyRef Name="ID"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>Represents a database replica.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="ID" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The unique identifier of the database replica.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Fingerprint" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The unique fingerprint of the replica.</String>
+					</Annotation>
+					<Annotation Term="Core.Revisions">
+						<Collection>
+							<Record>
+								<PropertyValue Property="Version">
+									<String>12.2.0</String>
+								</PropertyValue>
+								<PropertyValue Property="Kind">
+									<EnumMember>Core.RevisionKind/Added</EnumMember>
+								</PropertyValue>
+							</Record>
+						</Collection>
+					</Annotation>
+				</Property>
+				<Property Name="State" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>String value that denotes the state that the database replica is in.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Commit" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The tag that represents the last applied commit.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Role" Type="tm1s.ReplicaRole" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The current role of the replica, e.g.: Follower, Leader, etc.</String>
+					</Annotation>
+					<Annotation Term="Core.Revisions">
+						<Collection>
+							<Record>
+								<PropertyValue Property="Version">
+									<String>12.2.0</String>
+								</PropertyValue>
+								<PropertyValue Property="Kind">
+									<EnumMember>Core.RevisionKind/Added</EnumMember>
+								</PropertyValue>
+							</Record>
+						</Collection>
+					</Annotation>
+				</Property>
+				<NavigationProperty Name="ProductVersion" Type="tm1s.ProductVersion">
+					<Annotation Term="Core.Description">
+						<String>The product version of this replica.</String>
+					</Annotation>
+				</NavigationProperty>
+			</EntityType>
+			<Action Name="DisableMaintenanceMode" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Disables maintenance mode for a database, allowing all sessions to access it.</String>
+				</Annotation>
+				<Annotation Term="Core.LongDescription">
+					<String>Disables maintenance mode for the specified database. This mode can be disabled by the session that enabled it or by a member of Admin or OperationsAdmin groups. Once disabled, all sessions can access the database normally.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.6.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to disable maintenance mode for.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="EnableMaintenanceMode" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Enables maintenance mode for a database, restricting access to only the session that enabled it.</String>
+				</Annotation>
+				<Annotation Term="Core.LongDescription">
+					<String>Enables maintenance mode for the specified database. Only the session that enables maintenance mode can access the database while it is in this state. All other sessions will receive a 503 Service Unavailable response. The operation requires Admin or OperationsAdmin group membership. Maintenance mode is automatically disabled if the session that enabled it is closed or times out.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.6.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to enable maintenance mode for.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<ComplexType Name="Metric">
+				<Annotation Term="Core.Description">
+					<String>Represents a metric on a specific database replica.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.5.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="Name" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the metric.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Value" Type="Edm.Int64" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The value of the metric.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Unit" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The unit of the metric.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Timestamp" Type="Edm.DateTimeOffset" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The last updated time of the metric.</String>
+					</Annotation>
+				</Property>
+				<Property Name="ReplicaID" Type="Edm.Int32">
+					<Annotation Term="Core.Description">
+						<String>The ID of the database replica from which the metric was collected.</String>
+					</Annotation>
+				</Property>
+				<Property Name="DatabaseID" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The ID of the database from which the metric was collected.</String>
+					</Annotation>
+				</Property>
+				<Property Name="DatabaseName" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The name of the database from which the metric was collected.</String>
+					</Annotation>
+				</Property>
+				<Property Name="CubeName" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The name of the Cube from which the metric was collected.</String>
+					</Annotation>
+					<Annotation Term="Core.Revisions">
+						<Collection>
+							<Record>
+								<PropertyValue Property="Version">
+									<String>12.5.6</String>
+								</PropertyValue>
+								<PropertyValue Property="Kind">
+									<EnumMember>Core.RevisionKind/Added</EnumMember>
+								</PropertyValue>
+							</Record>
+						</Collection>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<EntityType Name="ProductVersion">
+				<Key>
+					<PropertyRef Name="SemVer"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>Represents the release version of a TM1 Database.</String>
+				</Annotation>
+				<Property Name="SemVer" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The version number identifier that follows semantic versioning rules.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Revision" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Current revision for this version.</String>
+					</Annotation>
+				</Property>
+			</EntityType>
+			<ComplexType Name="ReplicaResources">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="CPU" Type="tm1s.SystemResources">
+					<Annotation Term="Core.Description">
+						<String>Contains CPU request and limit values.</String>
+					</Annotation>
+					<Annotation Term="Core.LongDescription">
+						<String>Supported formats: 0.1, 500m, 16</String>
+					</Annotation>
+				</Property>
+				<Property Name="Memory" Type="tm1s.SystemResources">
+					<Annotation Term="Core.Description">
+						<String>Contains Memory request and limit values.</String>
+					</Annotation>
+					<Annotation Term="Core.LongDescription">
+						<String>Supported formats: 500Ki, 512K, 128Mi, 134M, 500Gi, 536G, 500Ti, 550T</String>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<EnumType Name="ReplicaRole">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.2.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Member Name="Leader" Value="0"/>
+				<Member Name="Follower" Value="1"/>
+			</EnumType>
+			<ComplexType Name="Resources">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="Replica" Type="tm1s.ReplicaResources">
+					<Annotation Term="Core.Description">
+						<String>Contains per replica resource specifications.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Storage" Type="tm1s.Storage">
+					<Annotation Term="Core.Description">
+						<String>Contains database storage specifications.</String>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<Action Name="Restore" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Restores an existing Database from a backup set URL.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be overwritten by a backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="URL" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The URL referencing the backup set to be restored.</String>
+					</Annotation>
+					<Annotation Term="Core.IsURL" />
+				</Parameter>
+				<Parameter Name="Headers" Type="Collection(Edm.String)">
+					<Annotation Term="Core.Description">
+						<String>List of colon(:) separated key-value pairs.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="RestoreFromAzure" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Restores an existing Database from a backup set on Azure Blob Storage using Service Principal authentication.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.5</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be overwritten by a backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Host" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The Azure Blob Storage URL from which backup set is to be retrieved.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Bucket" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the bucket/container containing the backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Name" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the backup set to be retrieved from the Azure Blob Storage.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="TenantID" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>ID of the Application&#39;s Microsoft Entra tenant.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="ClientID" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Application ID of the Azure Service Principal.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="ClientSecret" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>Password of the Azure Service Principal.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="RestoreFromS3" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Restores an existing Database from a backup set on an S3 service.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.1.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be overwritten by a backup set.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Host" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 host from which backup set is to be retrieved.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Region" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 region for the S3 host.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Bucket" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the S3 bucket containing the backupset.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Key" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The name of the S3 key for the backupset.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="AccessKey" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 Access Key for authenticating the request.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="SecretKey" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The S3 Secret Key for authenticating the request.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="SecurityToken" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>An optional S3 Security Token if using temporary credentials.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<EntityType Name="Session">
+				<Key>
+					<PropertyRef Name="ID"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>Represents a unique user session registered in an instance.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="ID" Type="Edm.Int64" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The ID uniquely identifying the session.</String>
+					</Annotation>
+				</Property>
+				<Property Name="UserName" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The user name that is associated with this session.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Variables" Type="tm1s.SessionVariables">
+					<Annotation Term="Core.Description">
+						<String>The session scoped variables that can be used in TI processes.</String>
+					</Annotation>
+					<Annotation Term="Core.LongDescription">
+						<String>Only string typed key-value pairs are supported.</String>
+					</Annotation>
+					<Annotation Term="Core.Revisions">
+						<Collection>
+							<Record>
+								<PropertyValue Property="Version">
+									<String>12.4.0</String>
+								</PropertyValue>
+								<PropertyValue Property="Kind">
+									<EnumMember>Core.RevisionKind/Added</EnumMember>
+								</PropertyValue>
+							</Record>
+						</Collection>
+					</Annotation>
+				</Property>
+			</EntityType>
+			<ComplexType Name="SessionVariables" OpenType="true">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+			</ComplexType>
+			<Action Name="SimulateCrash" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Allows to crash one or all replicas of the database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to which simulation to be applied.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Replica" Type="Edm.Int32">
+					<Annotation Term="Core.Description">
+						<String>The database replica to be crashed. If not specified, all replicas are taken down.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="SimulateElection" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Starts an election to elect a different follower replica as the leader.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to which election is simulated.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="SimulateFollowerDelay" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Delays the followers for the given duration.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to which simulation to be applied.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Duration" Type="Edm.Duration" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The duration to which the followers needs to be kept in outage state.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="SimulateOutage" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Allows us to simulate an outage of one or all replicas of the database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.4.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to which simulation to be applied.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Duration" Type="Edm.Duration" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The duration to which the replica needs to be kept in outage state.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Replica" Type="Edm.Int32">
+					<Annotation Term="Core.Description">
+						<String>The database replica to which outage to be simulated. If not specified, all replicas are made to not be available.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<ComplexType Name="Storage">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="Size" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>The specified size of the storage.</String>
+					</Annotation>
+					<Annotation Term="Core.LongDescription">
+						<String>Supported formats: 20Gi, 100G, 1Ti, 2T</String>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<Action Name="Subscribe" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Creates a subscription to receive transaction logs of a Database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.3.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be subscribed to.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="URL" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The destination URL which will receive the transaction log entries.</String>
+					</Annotation>
+					<Annotation Term="Core.IsURL" />
+				</Parameter>
+				<Parameter Name="AdditionalProperties" Type="JSON.JSON">
+					<Annotation Term="Core.Description">
+						<String>A dynamic property that allows any valid JSON object to be injected into log entries.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<ComplexType Name="SystemResources">
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Property Name="Requests" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>Represents the requested size of a specific system resource.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Limits" Type="Edm.String">
+					<Annotation Term="Core.Description">
+						<String>Represents the upper limit of a specific system resource.</String>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<Action Name="Unsubscribe" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Removes an existing subscription from the Database.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.3.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be unsubscribed from.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<Action Name="Upgrade" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Upgrades a database to a newer version.</String>
+				</Annotation>
+				<Annotation Term="Core.Revisions">
+					<Collection>
+						<Record>
+							<PropertyValue Property="Version">
+								<String>12.0.0</String>
+							</PropertyValue>
+							<PropertyValue Property="Kind">
+								<EnumMember>Core.RevisionKind/Added</EnumMember>
+							</PropertyValue>
+						</Record>
+					</Collection>
+				</Annotation>
+				<Parameter Name="Database" Type="tm1s.Database" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The database to be upgraded.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="ProductVersion" Type="tm1s.ProductVersion">
+					<Annotation Term="Core.Description">
+						<String>The product version to be upgraded to. If not specified, the latest version is used.</String>
+					</Annotation>
+				</Parameter>
+			</Action>
+			<EntityContainer Name="API">
+				<Annotation Term="Capabilities.AsynchronousRequestsSupported" />
+				<Annotation Term="Capabilities.BatchSupport">
+					<Record>
+						<PropertyValue Property="ContinueOnErrorSupported">
+							<Bool>false</Bool>
+						</PropertyValue>
+						<PropertyValue Property="EtagReferencesSupported">
+							<Bool>true</Bool>
+						</PropertyValue>
+						<PropertyValue Property="ReferencesAcrossChangeSetsSupported">
+							<Bool>true</Bool>
+						</PropertyValue>
+						<PropertyValue Property="ReferencesInRequestBodiesSupported">
+							<Bool>false</Bool>
+						</PropertyValue>
+						<PropertyValue Property="RequestDependencyConditionsSupported">
+							<Bool>true</Bool>
+						</PropertyValue>
+						<PropertyValue Property="Supported">
+							<Bool>true</Bool>
+						</PropertyValue>
+						<PropertyValue Property="SupportedFormats">
+							<Collection>
+								<String>application/json</String>
+							</Collection>
+						</PropertyValue>
+					</Record>
+				</Annotation>
+				<Annotation Term="Capabilities.ConformanceLevel">
+					<EnumMember>Capabilities.ConformanceLevelType/Minimal</EnumMember>
+				</Annotation>
+				<Annotation Term="Capabilities.SupportedFormats">
+					<Collection>
+						<String>application/json</String>
+						<String>application/json;odata.metadata=full</String>
+						<String>application/json;odata.metadata=minimal</String>
+						<String>application/json;odata.metadata=none</String>
+						<String>application/json;IEEE754Compatible=false</String>
+						<String>application/json;IEEE754Compatible=true</String>
+						<String>application/json;odata.streaming=true</String>
+						<String>application/json;IEEE754Compatible=false;odata.streaming=true</String>
+						<String>application/json;IEEE754Compatible=true;odata.streaming=true</String>
+						<String>application/json;odata.metadata=full;IEEE754Compatible=false</String>
+						<String>application/json;odata.metadata=minimal;IEEE754Compatible=false</String>
+						<String>application/json;odata.metadata=none;IEEE754Compatible=false</String>
+						<String>application/json;odata.metadata=full;IEEE754Compatible=true</String>
+						<String>application/json;odata.metadata=minimal;IEEE754Compatible=true</String>
+						<String>application/json;odata.metadata=none;IEEE754Compatible=true</String>
+						<String>application/json;odata.metadata=full;odata.streaming=true</String>
+						<String>application/json;odata.metadata=minimal;odata.streaming=true</String>
+						<String>application/json;odata.metadata=none;odata.streaming=true</String>
+						<String>application/json;odata.metadata=full;odata.streaming=true</String>
+						<String>application/json;odata.metadata=minimal;odata.streaming=true</String>
+						<String>application/json;odata.metadata=none;odata.streaming=true</String>
+						<String>application/json;odata.metadata=full;IEEE754Compatible=false;odata.streaming=true</String>
+						<String>application/json;odata.metadata=minimal;IEEE754Compatible=false;odata.streaming=true</String>
+						<String>application/json;odata.metadata=none;IEEE754Compatible=false;odata.streaming=true</String>
+						<String>application/json;odata.metadata=full;IEEE754Compatible=true;odata.streaming=true</String>
+						<String>application/json;odata.metadata=minimal;IEEE754Compatible=true;odata.streaming=true</String>
+						<String>application/json;odata.metadata=none;IEEE754Compatible=true;odata.streaming=true</String>
+					</Collection>
+				</Annotation>
+				<Annotation Term="Capabilities.SupportedMetadataFormats">
+					<Collection>
+						<String>application/json</String>
+						<String>application/xml</String>
+					</Collection>
+				</Annotation>
+				<Annotation Term="Core.ConventionalIDs" />
+				<Annotation Term="Core.DereferenceableIDs" />
+				<Annotation Term="Core.Description">
+					<String>Top-level container for the EDM that defines the resources that comprise the API, including entity sets, singletons, actions, and functions. If an item is defined in the EDM but is not defined within the API entity container, it is bound to another resource defined within the model.</String>
+				</Annotation>
+				<Annotation Term="Core.ODataVersions">
+					<String>4.0</String>
+				</Annotation>
+				<Singleton Name="ActiveSession" Type="tm1s.Session"/>
+				<EntitySet Name="Databases" EntityType="tm1s.Database"/>
+				<EntitySet Name="ProductVersions" EntityType="tm1s.ProductVersion"/>
+				<EntitySet Name="Sessions" EntityType="tm1s.Session"/>
+			</EntityContainer>
+		</Schema>
+	</edmx:DataServices>
+</edmx:Edmx>

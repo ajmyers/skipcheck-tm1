@@ -48,8 +48,25 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 	 * @param edmType its type, such as {@code Edm.String}, or null when it isn't known
 	 * and it's read as JSON
 	 * @param note what's known of it, in Markdown
+	 * @param observedIn the schema versions whose probes found it undeclared
 	 */
-	public record Property(String type, String name, @Nullable String edmType, String note) {
+	public record Property(String type, String name, @Nullable String edmType, String note, List<String> observedIn) {
+
+		/** Copies the list. */
+		public Property {
+			observedIn = List.copyOf(observedIn);
+		}
+
+	}
+
+	/**
+	 * One probe file paired with the {@code $metadata} snapshot of its own schema version
+	 * (used to catch stale probes whose properties are already declared in that version).
+	 *
+	 * @param json the probe file's JSON content
+	 * @param snapshot the probe's own {@code $metadata} snapshot, or {@code null}
+	 */
+	public record Probe(String json, @Nullable CsdlDocument snapshot) {
 	}
 
 	/** Copies the map, sorted. */
@@ -66,7 +83,7 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
 	/**
-	 * Reads the undeclared properties from a probe file.
+	 * Reads the undeclared properties from a single probe file.
 	 * @param probeJson the probe file's content
 	 * @param overlay the overlay, for types
 	 * @param metadata the {@code $metadata} they're undeclared in
@@ -75,39 +92,87 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 	 * find, or the probe found one {@code $metadata} declares
 	 */
 	public static Undeclared read(String probeJson, Overlay overlay, CsdlDocument metadata) {
-		JsonNode root = JSON.readTree(probeJson);
-		String version = root.path("server").path("schemaVersion").asString("");
-		Map<String, Property> properties = new LinkedHashMap<>();
+		return read(List.of(new Probe(probeJson, metadata)), overlay, metadata);
+	}
+
+	/**
+	 * Reads and merges undeclared properties across multiple probe files against a
+	 * (possibly multi-version merged) {@code $metadata} document.
+	 *
+	 * <p>
+	 * Each probe is checked against its own snapshot so stale probes still fail. A
+	 * property that was undeclared in an older version's probe but is declared in
+	 * {@code mergedMetadata} (by a newer merged snapshot) is skipped in favor of the
+	 * newer snapshot's CSDL declaration.
+	 * @param probes the probe files, oldest-first
+	 * @param overlay the overlay, for types
+	 * @param mergedMetadata the merged {@code $metadata} document
+	 * @return the merged undeclared properties
+	 * @throws IllegalArgumentException if the overlay types a property no probe found (or
+	 * that is already declared), or a probe names a property its own snapshot declares
+	 */
+	public static Undeclared read(List<Probe> probes, Overlay overlay, CsdlDocument mergedMetadata) {
+		if (probes.isEmpty()) {
+			return NONE;
+		}
+		record Acc(String type, String name, @Nullable String edmType, @Nullable String overlayNote,
+				List<String> versions) {
+		}
+		Map<String, Acc> acc = new LinkedHashMap<>();
 		Set<String> typed = new TreeSet<>();
-		for (Map.Entry<String, JsonNode> type : root.path("undeclared").properties()) {
-			for (Map.Entry<String, JsonNode> property : type.getValue().properties()) {
-				String key = type.getKey() + "/" + property.getKey();
-				String kind = property.getValue().path("json").asString("");
-				if (kind.equals("navigation")) {
-					continue;
+		String latestVersion = "";
+		for (Probe probe : probes) {
+			JsonNode root = JSON.readTree(probe.json());
+			String version = root.path("server").path("schemaVersion").asString("");
+			if (!version.isEmpty()) {
+				latestVersion = version;
+			}
+			for (Map.Entry<String, JsonNode> type : root.path("undeclared").properties()) {
+				for (Map.Entry<String, JsonNode> property : type.getValue().properties()) {
+					String key = type.getKey() + "/" + property.getKey();
+					String kind = property.getValue().path("json").asString("");
+					if (kind.equals("navigation")) {
+						continue;
+					}
+					if (probe.snapshot() != null && declared(probe.snapshot(), type.getKey(), property.getKey())) {
+						throw new IllegalArgumentException(
+								key + " is in the probe file but $metadata declares it: run ./gradlew probeTm1 again");
+					}
+					if (declared(mergedMetadata, type.getKey(), property.getKey())) {
+						// Declared by another merged snapshot (e.g. a newer TM1 version):
+						// use the real CSDL declaration instead of an undeclared
+						// departure
+						continue;
+					}
+					Overlay.UndeclaredType given = overlay.undeclared().get(key);
+					String edm = given != null ? given.type() : switch (kind) {
+						case "string" -> "Edm.String";
+						case "boolean" -> "Edm.Boolean";
+						case "number" -> "Edm.Double";
+						default -> null;
+					};
+					if (given != null) {
+						typed.add(key);
+					}
+					Acc existing = acc.get(key);
+					if (existing == null) {
+						List<String> versions = new ArrayList<>();
+						if (!version.isEmpty()) {
+							versions.add(version);
+						}
+						acc.put(key, new Acc(type.getKey(), property.getKey(), edm, given != null ? given.note() : null,
+								versions));
+					}
+					else {
+						if (!version.isEmpty() && !existing.versions().contains(version)) {
+							existing.versions().add(version);
+						}
+						if (existing.edmType() == null && edm != null) {
+							acc.put(key, new Acc(existing.type(), existing.name(), edm, existing.overlayNote(),
+									existing.versions()));
+						}
+					}
 				}
-				if (declared(metadata, type.getKey(), property.getKey())) {
-					throw new IllegalArgumentException(
-							key + " is in the probe file but $metadata declares it: run ./gradlew probeTm1 again");
-				}
-				Overlay.UndeclaredType given = overlay.undeclared().get(key);
-				String edm = given != null ? given.type() : switch (kind) {
-					case "string" -> "Edm.String";
-					case "boolean" -> "Edm.Boolean";
-					case "number" -> "Edm.Double";
-					default -> null;
-				};
-				if (given != null) {
-					typed.add(key);
-				}
-				StringBuilder note = new StringBuilder(
-						"TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema ")
-					.append(version)
-					.append('.');
-				if (given != null && given.note() != null) {
-					note.append(' ').append(given.note());
-				}
-				properties.put(key, new Property(type.getKey(), property.getKey(), edm, note.toString()));
 			}
 		}
 		Set<String> unknown = new TreeSet<>(overlay.undeclared().keySet());
@@ -116,7 +181,20 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 			throw new IllegalArgumentException(
 					"The overlay's undeclared section names properties the probe didn't find: " + unknown);
 		}
-		return new Undeclared(version, properties);
+		Map<String, Property> properties = new LinkedHashMap<>();
+		for (Map.Entry<String, Acc> entry : acc.entrySet()) {
+			Acc a = entry.getValue();
+			StringBuilder note = new StringBuilder(
+					"TM1 sends it, though $metadata doesn't declare it: found by probing TM1 schema ")
+				.append(String.join(", ", a.versions()))
+				.append('.');
+			if (a.overlayNote() != null) {
+				note.append(' ').append(a.overlayNote());
+			}
+			properties.put(entry.getKey(),
+					new Property(a.type(), a.name(), a.edmType(), note.toString(), a.versions()));
+		}
+		return new Undeclared(latestVersion, properties);
 	}
 
 	private static boolean declared(CsdlDocument metadata, String type, String property) {
@@ -158,7 +236,7 @@ public record Undeclared(String schemaVersion, Map<String, Property> properties)
 			schemas.add(new CsdlSchema(s.namespace(), s.alias(), types, s.complexTypes(), s.enumTypes(), s.operations(),
 					s.entityContainer(), s.annotations(), s.externalAnnotations()));
 		}
-		return new CsdlDocument(metadata.version(), schemas);
+		return new CsdlDocument(metadata.version(), schemas, metadata.references());
 	}
 
 	/**

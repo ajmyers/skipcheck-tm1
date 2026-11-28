@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -90,6 +91,33 @@ class UndeclaredTest {
 	void noneChangesNothing() {
 		assertThat(Undeclared.NONE.applyTo(METADATA)).isSameAs(METADATA);
 		assertThat(Undeclared.NONE.applyTo(Overlay.NONE).departures()).isEqualTo(Map.of());
+	}
+
+	@Test
+	void mergesMultipleProbesAndSkipsPropertiesDeclaredInNewerSnapshot() {
+		CsdlDocument v12 = CsdlParser.parse("""
+				<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+				 <edmx:DataServices>
+				  <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="ibm.tm1.api.v1" Alias="tm1">
+				   <EntityType Name="Process"><Key><PropertyRef Name="Name"/></Key>
+				    <Property Name="Name" Type="Edm.String" Nullable="false"/>
+				    <Property Name="Locked" Type="Edm.Boolean"/>
+				   </EntityType>
+				  </Schema>
+				 </edmx:DataServices>
+				</edmx:Edmx>""");
+		String probeV11 = """
+				{"probeVersion": 2, "server": {"schemaVersion": "11.8.35"},
+				 "undeclared": {"Process": {"UIData": {"json": "string"}, "Locked": {"json": "boolean"}}}}""";
+		String probeV12 = """
+				{"probeVersion": 2, "server": {"schemaVersion": "12.6.0"},
+				 "undeclared": {"Process": {"UIData": {"json": "string"}}}}""";
+		Undeclared u = Undeclared.read(
+				List.of(new Undeclared.Probe(probeV11, METADATA), new Undeclared.Probe(probeV12, v12)), Overlay.NONE,
+				v12);
+		assertThat(u.schemaVersion()).isEqualTo("12.6.0");
+		assertThat(u.properties()).containsOnlyKeys("Process/UIData");
+		assertThat(u.get("Process", "UIData").observedIn()).containsExactly("11.8.35", "12.6.0");
 	}
 
 }

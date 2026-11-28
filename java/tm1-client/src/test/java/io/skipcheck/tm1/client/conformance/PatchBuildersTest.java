@@ -26,6 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
  * A scenario's {@code $patch} goes through the generated setters (#354): what a caller
  * can't build, a scenario can't send.
  */
+@SuppressWarnings("deprecation")
 class PatchBuildersTest {
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();

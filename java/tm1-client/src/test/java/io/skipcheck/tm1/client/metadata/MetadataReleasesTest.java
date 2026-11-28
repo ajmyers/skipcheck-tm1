@@ -104,7 +104,7 @@ class MetadataReleasesTest {
 				<!-- Written by MetadataReleasesTest from java/tm1-client/src/model/metadata/tm1-releases.json
 				     and the $metadata snapshots beside it; rewrite it with TM1_UPDATE_VERSIONS_DOC=true. -->
 
-				Every Planning Analytics 2.1 release from the oldest supported, with the TM1 build it installs, the \
+				Every Planning Analytics release from the oldest supported, with the TM1 build it installs, the \
 				schema version its `$metadata` reports, and the document it serves, committed as \
 				`java/tm1-client/src/model/metadata/tm1-schema-<document>.xml`. Several releases can share a build, \
 				and builds can share a schema version yet serve different documents. How the clients fare on each \

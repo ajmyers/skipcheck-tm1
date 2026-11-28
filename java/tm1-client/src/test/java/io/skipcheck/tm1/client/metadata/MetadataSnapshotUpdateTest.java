@@ -54,11 +54,11 @@ class MetadataSnapshotUpdateTest {
 
 	@Test
 	void writesTheSnapshot(LiveServer tm1) throws Exception {
-		String live = tm1.httpClient()
-			.build()
-			.send(HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata")).build(),
-					HttpResponse.BodyHandlers.ofString())
-			.body();
+		HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(tm1.getRestUrl() + "$metadata"));
+		if (tm1.isEngine()) {
+			tm1.authorize(request);
+		}
+		String live = tm1.httpClient().build().send(request.build(), HttpResponse.BodyHandlers.ofString()).body();
 		String version = CsdlParser.parse(live).schemaVersion().orElseThrow();
 
 		Tm1Version build = tm1.getTm1Version();
@@ -89,6 +89,27 @@ class MetadataSnapshotUpdateTest {
 		Files.createDirectories(file.getParent());
 		Files.writeString(file, live, StandardCharsets.UTF_8);
 		assertThat(file).exists();
+
+		// Also save local edmx:Reference schemas (e.g. ibm.odata.mpu.v1.xml, and
+		// ibm.tm1s.api.v1.xml from the instance-level ../$metadata on TM1 v12)
+		if (tm1.isEngine()) {
+			URI base = URI.create(tm1.getRestUrl());
+			for (var ref : CsdlParser.parse(live).references()) {
+				String uri = ref.uri();
+				if (uri.startsWith("http://") || uri.startsWith("https://")) {
+					continue;
+				}
+				URI target = uri.equals("ibm.tm1s.api.v1.xml") ? base.resolve("../$metadata") : base.resolve(uri);
+				HttpRequest.Builder req = HttpRequest.newBuilder(target);
+				tm1.authorize(req);
+				HttpResponse<String> resp = tm1.httpClient()
+					.build()
+					.send(req.build(), HttpResponse.BodyHandlers.ofString());
+				if (resp.statusCode() == 200) {
+					Files.writeString(Path.of("src/model/metadata/" + uri), resp.body(), StandardCharsets.UTF_8);
+				}
+			}
+		}
 	}
 
 }

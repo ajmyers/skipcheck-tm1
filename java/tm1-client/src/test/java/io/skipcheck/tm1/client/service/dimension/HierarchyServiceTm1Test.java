@@ -32,6 +32,7 @@ import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.model.Member;
+import io.skipcheck.tm1.client.model.SortType;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
@@ -108,7 +109,8 @@ class HierarchyServiceTm1Test {
 	@Test
 	void updatesOnlyWhenTheEtagIsCurrentAndIgnoresVisible() {
 		String etag = hierarchies.get(dimension, dimension, ODataQuery.none()).block(WAIT).etag();
-		hierarchies.update(dimension, dimension, HierarchyPatch.builder().elementsSortType("ByInput").build(), etag)
+		hierarchies
+			.update(dimension, dimension, HierarchyPatch.builder().elementsSortType(SortType.BY_INPUT).build(), etag)
 			.block(WAIT);
 		// HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin
 		// it

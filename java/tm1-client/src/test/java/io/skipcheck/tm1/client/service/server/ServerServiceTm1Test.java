@@ -28,6 +28,7 @@ import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /** ServerService: the server, its configurations and loggers. */
+@SuppressWarnings("deprecation")
 @LiveTm1
 class ServerServiceTm1Test {
 

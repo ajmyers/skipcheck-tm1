@@ -15,7 +15,7 @@ class ApproximateSchemasTest {
 	@Test
 	void theSnapshotsOwnVersionChangesNothing() {
 		CsdlDocument same = ApproximateSchemas.snapshotAsOf(MetadataSnapshot.VERSION);
-		assertThat(Signatures.of(same)).isEqualTo(Signatures.of(MetadataSnapshot.load()));
+		assertThat(Signatures.of(same)).isEqualTo(Signatures.of(MetadataSnapshot.loadMerged()));
 	}
 
 	@Test

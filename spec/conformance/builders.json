@@ -126,7 +126,7 @@
     },
     "ChoreReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.ChoreReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "Chore" ],
       "setters" : [ "Chore@odata.bind", "Name" ],
       "values" : { }
@@ -182,7 +182,7 @@
     },
     "CubeReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.CubeReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "Cube" ],
       "setters" : [ "Cube@odata.bind", "Name" ],
       "values" : { }
@@ -222,7 +222,7 @@
     },
     "DimensionReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.DimensionReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "Dimension" ],
       "setters" : [ "Dimension@odata.bind", "Name" ],
       "values" : { }
@@ -384,7 +384,7 @@
     },
     "LinkCreate" : {
       "odataType" : "#ibm.tm1.api.v1.Link",
-      "open" : false,
+      "open" : true,
       "required" : [ "URL" ],
       "setters" : [ "Name", "URL" ],
       "values" : { }
@@ -521,7 +521,7 @@
     },
     "ProcessCreate" : {
       "odataType" : null,
-      "open" : false,
+      "open" : true,
       "required" : [ ],
       "setters" : [ "Code", "DataProcedure", "DataSource", "EpilogProcedure", "HasSecurityAccess", "MetadataProcedure", "Name", "Parameters", "PrologProcedure", "UIData", "Variables", "VariablesUIData" ],
       "values" : {
@@ -602,7 +602,7 @@
     },
     "ProcessPatch" : {
       "odataType" : null,
-      "open" : false,
+      "open" : true,
       "required" : [ ],
       "setters" : [ "Code", "DataProcedure", "DataSource", "EpilogProcedure", "HasSecurityAccess", "MetadataProcedure", "Parameters", "PrologProcedure", "UIData", "Variables", "VariablesUIData" ],
       "values" : {
@@ -613,7 +613,7 @@
     },
     "ProcessReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.ProcessReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "Process" ],
       "setters" : [ "Name", "Process@odata.bind" ],
       "values" : { }
@@ -710,7 +710,7 @@
     },
     "SubsetReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.SubsetReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "Subset" ],
       "setters" : [ "Name", "Subset@odata.bind" ],
       "values" : { }
@@ -798,7 +798,7 @@
     },
     "ViewReferenceCreate" : {
       "odataType" : "#ibm.tm1.api.v1.ViewReference",
-      "open" : false,
+      "open" : true,
       "required" : [ "View" ],
       "setters" : [ "Name", "View@odata.bind" ],
       "values" : { }

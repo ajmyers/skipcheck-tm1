@@ -19,10 +19,11 @@ class Tm1CapabilitiesTest {
 	private static final Tm1Capability RESERVE = Tm1Capability.boundOperation("tm1.Cube", "tm1.Reserve")
 		.since("11.8.34");
 
-	private final Tm1Capabilities current = Tm1Capabilities.of(MetadataSnapshot.load(),
+	private final Tm1Capabilities current = Tm1Capabilities.of(MetadataSnapshot.load("11.8.35"),
 			Tm1Version.parse("11.8.03500.6"));
 
-	private final Tm1Capabilities older = Tm1Capabilities.of(ApproximateSchemas.snapshotAsOf("11.8.20"), null);
+	private final Tm1Capabilities older = Tm1Capabilities
+		.of(ApproximateSchemas.asOf(MetadataSnapshot.load("11.8.35"), "11.8.20"), null);
 
 	@Test
 	void findsEachKindOfElement() {

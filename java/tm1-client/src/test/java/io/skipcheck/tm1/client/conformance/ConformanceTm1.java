@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.Nullable;
@@ -57,8 +58,11 @@ public final class ConformanceTm1 implements ExchangeFunction {
 
 	public static final String ROOT = "http://tm1.test/api/v1/";
 
-	/** The version every runner's fake reports. */
+	/** The version every runner's fake reports by default. */
 	public static final String PRODUCT_VERSION = "11.8.03500.6";
+
+	/** The schema snapshot every runner's fake serves by default. */
+	public static final String DEFAULT_SCHEMA = "11.8.35";
 
 	/**
 	 * The request headers a fixture records and every runner compares: lower-case names.
@@ -70,7 +74,11 @@ public final class ConformanceTm1 implements ExchangeFunction {
 
 	private static final JsonMapper JSON = JsonMapper.builder().build();
 
-	private static final byte[] SNAPSHOT = snapshot();
+	private static final Map<String, byte[]> SNAPSHOTS = new ConcurrentHashMap<>();
+
+	private String schema = DEFAULT_SCHEMA;
+
+	private String productVersion = PRODUCT_VERSION;
 
 	/** Each an {@link Answer}, or an {@link Unordered} group of them. */
 	private final Deque<Object> answers = new ArrayDeque<>();
@@ -106,6 +114,31 @@ public final class ConformanceTm1 implements ExchangeFunction {
 		public String key() {
 			return method + " " + target;
 		}
+	}
+
+	/**
+	 * Switches the {@code $metadata} snapshot this fake serves (e.g. {@code "12.6.0"}).
+	 */
+	public ConformanceTm1 schema(String schema) {
+		snapshot(schema);
+		this.schema = schema;
+		return this;
+	}
+
+	/** The schema version of the {@code $metadata} snapshot this fake serves. */
+	public String schema() {
+		return schema;
+	}
+
+	/** Switches the {@code ProductVersion} this fake reports (e.g. {@code "12.6.7"}). */
+	public ConformanceTm1 productVersion(String productVersion) {
+		this.productVersion = productVersion;
+		return this;
+	}
+
+	/** The {@code ProductVersion} this fake reports. */
+	public String productVersion() {
+		return productVersion;
 	}
 
 	public Tm1Session session() {
@@ -270,11 +303,11 @@ public final class ConformanceTm1 implements ExchangeFunction {
 			case "POST ActiveSession/tm1.Close" -> Mono.just(ClientResponse.create(HttpStatus.NO_CONTENT).build());
 			case "GET Server?$select=ProductVersion" -> Mono.just(ClientResponse.create(HttpStatus.OK)
 				.header(HttpHeaders.CONTENT_TYPE, "application/json")
-				.body("{\"ProductVersion\":\"" + PRODUCT_VERSION + "\"}")
+				.body("{\"ProductVersion\":\"" + productVersion + "\"}")
 				.build());
 			case "GET $metadata" -> Mono.just(ClientResponse.create(HttpStatus.OK)
 				.header(HttpHeaders.CONTENT_TYPE, "application/xml")
-				.body(new String(SNAPSHOT, StandardCharsets.UTF_8))
+				.body(new String(snapshot(schema), StandardCharsets.UTF_8))
 				.build());
 			default -> body(request).map(body -> answer(request, target, body));
 		};
@@ -401,16 +434,19 @@ public final class ConformanceTm1 implements ExchangeFunction {
 		}))).defaultIfEmpty(new byte[0]);
 	}
 
-	private static byte[] snapshot() {
-		try (InputStream in = ConformanceTm1.class.getResourceAsStream("/metadata/tm1-schema-11.8.35.xml")) {
-			if (in == null) {
-				throw new IllegalStateException("The $metadata snapshot isn't on the test classpath");
+	private static byte[] snapshot(String schema) {
+		return SNAPSHOTS.computeIfAbsent(schema, s -> {
+			String path = "/metadata/tm1-schema-" + s + ".xml";
+			try (InputStream in = ConformanceTm1.class.getResourceAsStream(path)) {
+				if (in == null) {
+					throw new IllegalStateException("The $metadata snapshot " + path + " isn't on the test classpath");
+				}
+				return in.readAllBytes();
 			}
-			return in.readAllBytes();
-		}
-		catch (IOException e) {
-			throw new IllegalStateException(e);
-		}
+			catch (IOException e) {
+				throw new IllegalStateException(e);
+			}
+		});
 	}
 
 }

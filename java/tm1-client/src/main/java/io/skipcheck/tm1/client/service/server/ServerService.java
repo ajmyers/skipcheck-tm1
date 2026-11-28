@@ -59,6 +59,8 @@ public final class ServerService {
 	 * @param query what to select
 	 * @return the server
 	 */
+	@SuppressWarnings("deprecation") // Server is deprecated in TM1 schema 12.0.0; still
+										// used on TM1 11.8 and 12
 	@Tm1Endpoint("Singleton Server")
 	public Mono<Server> server(ODataQuery query) {
 		return session.execute(Tm1Request.get(ODataPath.of("Server"), query, Server.class));

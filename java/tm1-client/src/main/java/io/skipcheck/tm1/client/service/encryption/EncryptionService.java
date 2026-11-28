@@ -119,6 +119,8 @@ public final class EncryptionService {
 	 * {@code RotateDataModelKey}: rotates the model key.
 	 * @return completes when it's done
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("ActionImport RotateDataModelKey")
 	public Mono<Void> rotateDataModelKey() {
 		return call(Tm1Operations.ROTATE_DATA_MODEL_KEY, Map.of());
@@ -132,6 +134,8 @@ public final class EncryptionService {
 	 * @param type what the file is: a model object, a transaction log or an audit log
 	 * @return completes when it's written
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("ActionImport EncryptDataFile")
 	public Mono<Void> encryptFile(String source, String destination, EncryptionFileType type) {
 		return call(Tm1Operations.ENCRYPT_DATA_FILE, file(source, destination, type));
@@ -144,6 +148,8 @@ public final class EncryptionService {
 	 * @param type what the file is
 	 * @return completes when it's written
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("ActionImport DecryptDataFile")
 	public Mono<Void> decryptFile(String source, String destination, EncryptionFileType type) {
 		return call(Tm1Operations.DECRYPT_DATA_FILE, file(source, destination, type));

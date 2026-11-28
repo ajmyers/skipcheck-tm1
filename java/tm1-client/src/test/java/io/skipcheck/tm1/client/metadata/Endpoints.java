@@ -2,6 +2,7 @@
 
 package io.skipcheck.tm1.client.metadata;
 
+import java.util.List;
 import java.util.NavigableSet;
 import java.util.TreeSet;
 
@@ -42,7 +43,11 @@ public final class Endpoints {
 	public static NavigableSet<String> of(CsdlDocument doc) {
 		NavigableSet<String> out = new TreeSet<>();
 		doc.entityContainer().ifPresent(c -> container(out, c));
-		for (CsdlSchema schema : doc.schemas()) {
+		List<CsdlSchema> primary = doc.schemas().stream().filter(s -> s.entityContainer() != null).toList();
+		if (primary.isEmpty()) {
+			primary = doc.schemas();
+		}
+		for (CsdlSchema schema : primary) {
 			for (CsdlOperation op : schema.operations()) {
 				if (op.bound()) {
 					CsdlTypeRef binding = op.bindingType().orElseThrow();
@@ -51,8 +56,9 @@ public final class Endpoints {
 							+ (binding.collection() ? "Collection(" + type + ")" : type) + "/" + op.name());
 				}
 			}
+			schema.entityTypes().forEach(t -> navigation(out, t));
+			schema.complexTypes().forEach(t -> navigation(out, t));
 		}
-		doc.structuredTypes().forEach(t -> navigation(out, t));
 		return out;
 	}
 

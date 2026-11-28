@@ -36,6 +36,7 @@ import io.skipcheck.tm1.testcontainers.Tm1Source;
  * client sends {@code Authorization: Basic} to the v12 engine, which checks the password
  * with TM1 11 and authorizes the user in its own database.
  */
+@SuppressWarnings("deprecation")
 @RequiresTm1
 @RequiresTm1Engine
 class Tm1EnginePassThroughAuthTm1Test {

@@ -15,6 +15,8 @@ import reactor.core.publisher.Mono;
  * Examples for {@link io.skipcheck.tm1.client.service.security.UserService}, quoted in
  * its Javadoc.
  */
+@SuppressWarnings("deprecation") // User.Password/Enabled are deprecated in TM1 schema
+									// 12.0.0; active on TM1 11.8
 final class UserServiceExamples {
 
 	Mono<User> create(Tm1Client tm1) {

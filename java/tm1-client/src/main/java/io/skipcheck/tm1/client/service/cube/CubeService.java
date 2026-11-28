@@ -207,6 +207,8 @@ public final class CubeService {
 	 * @param name the cube's name
 	 * @return completes when the cube is loaded
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("Action Cube/Load")
 	public Mono<Void> load(String name) {
 		return session.execute(action(Tm1Operations.CUBE_LOAD, name, Map.of(), Void.class));
@@ -218,6 +220,8 @@ public final class CubeService {
 	 * @param name the cube's name
 	 * @return completes when the cube is unloaded
 	 */
+	@SuppressWarnings("deprecation") // Deprecated in TM1 schema 12.0.0; still active on
+										// TM1 11.8
 	@Tm1Endpoint("Action Cube/Unload")
 	public Mono<Void> unload(String name) {
 		return session.execute(action(Tm1Operations.CUBE_UNLOAD, name, Map.of(), Void.class));

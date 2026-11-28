@@ -14,6 +14,8 @@ import reactor.core.publisher.Mono;
  * Examples for {@link io.skipcheck.tm1.client.service.server.ServerService}, quoted in
  * its Javadoc.
  */
+@SuppressWarnings("deprecation") // Server is deprecated in TM1 schema 12.0.0; active on
+									// TM1 11.8 and 12
 final class ServerServiceExamples {
 
 	Mono<String> version(Tm1Client tm1) {

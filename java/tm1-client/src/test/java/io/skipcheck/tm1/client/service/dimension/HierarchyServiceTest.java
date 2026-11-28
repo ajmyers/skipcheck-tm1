@@ -25,6 +25,8 @@ import io.skipcheck.tm1.client.model.Hierarchy;
 import io.skipcheck.tm1.client.model.HierarchyCreate;
 import io.skipcheck.tm1.client.model.HierarchyPatch;
 import io.skipcheck.tm1.client.model.Member;
+import io.skipcheck.tm1.client.model.SortSense;
+import io.skipcheck.tm1.client.model.SortType;
 import io.skipcheck.tm1.client.odata.ODataQuery;
 
 /**
@@ -117,7 +119,7 @@ class HierarchyServiceTest {
 	void updatesWithAndWithoutAnEtag() {
 		tm1().status(204);
 		Object none = conformance.call("hierarchies", "update", "Region", "Region",
-				HierarchyPatch.builder().elementsSortType("ByName").build());
+				HierarchyPatch.builder().elementsSortType(SortType.BY_NAME).build());
 		assertThat(none).isNull();
 		assertThat(tm1().last().key()).isEqualTo("PATCH " + H);
 		assertThat(tm1().last().text()).isEqualTo("{\"ElementsSortType\":\"ByName\"}");
@@ -125,7 +127,7 @@ class HierarchyServiceTest {
 
 		tm1().status(204);
 		conformance.call("hierarchies", "update", "Region", "Region",
-				HierarchyPatch.builder().elementsSortSense("Descending").build(), "W/\"2\"");
+				HierarchyPatch.builder().elementsSortSense(SortSense.DESCENDING).build(), "W/\"2\"");
 		assertThat(tm1().last().header("If-Match")).isEqualTo("W/\"2\"");
 		assertThat(tm1().last().text()).isEqualTo("{\"ElementsSortSense\":\"Descending\"}");
 	}

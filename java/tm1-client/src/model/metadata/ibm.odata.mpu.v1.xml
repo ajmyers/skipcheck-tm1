@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx Version="4.0" xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx">
+	<edmx:Reference Uri="https://oasis-tcs.github.io/odata-vocabularies/vocabularies/Org.OData.Core.V1.xml">
+		<edmx:Include Namespace="Org.OData.Core.V1" Alias="Core"/>
+	</edmx:Reference>
+	<edmx:DataServices>
+		<Schema Namespace="ibm.odata.mpu.v1" Alias="mpu" xmlns="http://docs.oasis-open.org/odata/ns/edm">
+			<Annotation Term="Core.SchemaVersion">
+				<String>1.0.0</String>
+			</Annotation>
+			<Action Name="Complete" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>Completes a multipart upload by assembling the new contents of the targetted stream based on previously uploaded parts.</String>
+				</Annotation>
+				<Parameter Name="MultipartUpload" Type="mpu.MultipartUpload" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The multipart upload to be completed.</String>
+					</Annotation>
+				</Parameter>
+				<Parameter Name="Parts" Type="Collection(mpu.CompleteMultipartUploadPart)">
+					<Annotation Term="Core.Description">
+						<String>The list of, previously uploaded, parts to be concatenated to create the new object&#39;s stream.</String>
+					</Annotation>
+				</Parameter>
+				<ReturnType Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The SHA1 hash of the new content of the targetted stream.</String>
+					</Annotation>
+				</ReturnType>
+			</Action>
+			<ComplexType Name="CompleteMultipartUploadPart">
+				<Annotation Term="Core.Description">
+					<String>A part in a multipart upload.</String>
+				</Annotation>
+				<Property Name="PartNumber" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The part number, read: unique ID, of the part to be used to complete the upload.</String>
+					</Annotation>
+				</Property>
+				<Property Name="ETag" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The ETag of the part, returned after the part was uploaded.</String>
+					</Annotation>
+				</Property>
+			</ComplexType>
+			<Action Name="CreateMultipartUpload" IsBound="true">
+				<Annotation Term="Core.Description">
+					<String>CreateMultipartUpload initiates a multipart upload for uploading the data of the targetted stream.</String>
+				</Annotation>
+				<Parameter Name="Object" Type="Edm.Stream" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The stream to which the object&#39;s data is to be uploaded.</String>
+					</Annotation>
+				</Parameter>
+				<ReturnType Type="mpu.MultipartUpload" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The object representing the newly initiated multipart upload.</String>
+					</Annotation>
+				</ReturnType>
+			</Action>
+			<EntityType Name="MultipartUpload">
+				<Key>
+					<PropertyRef Name="UploadID"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>An active multipart upload of an object&#39;s stream.</String>
+				</Annotation>
+				<Property Name="UploadID" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The upload ID identifying the multipart upload.</String>
+					</Annotation>
+				</Property>
+				<NavigationProperty Name="Parts" Type="Collection(mpu.MultipartUploadPart)" ContainsTarget="true">
+					<Annotation Term="Core.Description">
+						<String>The collection of parts uploaded as part of this multipart upload.</String>
+					</Annotation>
+				</NavigationProperty>
+			</EntityType>
+			<EntityType Name="MultipartUploadPart" HasStream="true">
+				<Key>
+					<PropertyRef Name="PartNumber"/>
+				</Key>
+				<Annotation Term="Core.Description">
+					<String>A part in a multipart upload.</String>
+				</Annotation>
+				<Property Name="PartNumber" Type="Edm.String" Nullable="false">
+					<Annotation Term="Core.Description">
+						<String>The part number, read: unique ID, of the part in the multipart upload.</String>
+					</Annotation>
+				</Property>
+				<Property Name="Size" Type="Edm.Int64">
+					<Annotation Term="Core.Description">
+						<String>The size of the part.</String>
+					</Annotation>
+				</Property>
+			</EntityType>
+		</Schema>
+	</edmx:DataServices>
+</edmx:Edmx>

@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -197,6 +198,17 @@ class OffersTest {
 		assertThatThrownBy(() -> Offers.of(PROBE, METADATA, overlay("{\"CubePatch\": {\"withheld\": \"x\"}}")))
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("withhold a setter");
+	}
+
+	@Test
+	void unionsVerifiedOffersAcrossMultipleProbes() {
+		String probe2 = """
+				{"writes": {
+				  "Settings": {"type": "Settings", "patch": {"Admin/Language": {"outcome": "applied"}}}},
+				 "collections": {}}""";
+		Offers offers = Offers.of(List.of(PROBE, probe2), METADATA, NONE);
+		assertThat(offers.get("AdminSettingsPatch")).containsOnlyKeys("Port", "Language");
+		assertThat(offers.get("CubeCreate")).containsOnlyKeys("Name", "Rules", "Dimensions@odata.bind");
 	}
 
 }

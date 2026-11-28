@@ -28,6 +28,7 @@ import io.skipcheck.tm1.client.odata.ODataQuery;
 import reactor.core.publisher.Mono;
 
 /** LogService: the message, transaction, audit and error logs, and following them. */
+@SuppressWarnings("deprecation")
 @LiveTm1
 class LogServiceTm1Test {
 

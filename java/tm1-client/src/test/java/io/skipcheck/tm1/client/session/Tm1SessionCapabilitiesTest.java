@@ -44,9 +44,11 @@ class Tm1SessionCapabilitiesTest {
 
 	private static final String METADATA = "GET $metadata";
 
+	private static final String SNAPSHOT_11_8 = MetadataSnapshot.text("11.8.35").orElseThrow();
+
 	private final FakeTm1 tm1 = new FakeTm1()
 		.on(VERSION, r -> Mono.just(FakeTm1.json(200, "{\"ProductVersion\":\"11.8.03500.6\"}")))
-		.on(METADATA, r -> Mono.just(xml(MetadataSnapshot.text())))
+		.on(METADATA, r -> Mono.just(xml(SNAPSHOT_11_8)))
 		.on("GET Cubes('Sales')/tm1.DimensionsStorageOrder()", r -> Mono.just(FakeTm1.json(200, "{}")));
 
 	@Test
@@ -214,9 +216,9 @@ class Tm1SessionCapabilitiesTest {
 		// A server whose CheckFeeders has no Tuple either: a binding is refused, default
 		// or
 		// not, and the body is checked as written, here a JSON tree rather than a Map
-		String metadata = MetadataSnapshot.text()
+		String metadata = SNAPSHOT_11_8
 			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Tuple\".*?</Parameter>", "$1");
-		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		assertThat(metadata).isNotEqualTo(SNAPSHOT_11_8);
 		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
 		ObjectNode body = JsonNodeFactory.instance.objectNode();
 		body.putArray("Tuple@odata.bind").add("Dimensions('Region')/Hierarchies('Region')/Elements('Total')");
@@ -263,9 +265,9 @@ class Tm1SessionCapabilitiesTest {
 
 	/** A server whose CheckFeeders has no Selection, as before schema 11.8.32. */
 	private void withoutSelection() {
-		String metadata = MetadataSnapshot.text()
+		String metadata = SNAPSHOT_11_8
 			.replaceFirst("(?s)(<Action Name=\"CheckFeeders\".*?)<Parameter Name=\"Selection\".*?</Parameter>", "$1");
-		assertThat(metadata).isNotEqualTo(MetadataSnapshot.text());
+		assertThat(metadata).isNotEqualTo(SNAPSHOT_11_8);
 		tm1.on(METADATA, r -> Mono.just(xml(metadata)));
 	}
 

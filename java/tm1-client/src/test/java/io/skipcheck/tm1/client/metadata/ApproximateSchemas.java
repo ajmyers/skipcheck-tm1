@@ -37,11 +37,11 @@ public final class ApproximateSchemas {
 	}
 
 	/**
-	 * The snapshot as an approximate server of schema {@code version}, e.g.
+	 * The merged snapshot as an approximate server of schema {@code version}, e.g.
 	 * {@code 11.8.20}.
 	 */
 	public static CsdlDocument snapshotAsOf(String version) {
-		return asOf(MetadataSnapshot.load(), version);
+		return asOf(MetadataSnapshot.loadMerged(), version);
 	}
 
 	/** {@code doc} without the elements added after schema {@code version}. */
@@ -76,7 +76,7 @@ public final class ApproximateSchemas {
 			schemas.add(new CsdlSchema(s.namespace(), s.alias(), entityTypes, complexTypes, enumTypes, operations,
 					container, withSchemaVersion(s.annotations(), version), s.externalAnnotations()));
 		}
-		return new CsdlDocument(doc.version(), schemas);
+		return new CsdlDocument(doc.version(), schemas, doc.references());
 	}
 
 	private static List<CsdlParameter> keepParameters(CsdlOperation o, Tm1Version target) {

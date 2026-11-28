@@ -105,7 +105,24 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 	 * subtype's doesn't, which a generated subtype can't take away
 	 */
 	public static Offers of(String probeJson, CsdlDocument metadata, Overlay overlay) {
-		return new Builder(JSON.readTree(probeJson), metadata, overlay).offers();
+		return of(List.of(probeJson), metadata, overlay);
+	}
+
+	/**
+	 * Works out the write types across multiple probe files: a setter verified by any
+	 * probe file counts as verified.
+	 * @param probeJsons the probe files' JSON contents
+	 * @param metadata the merged {@code $metadata} document, with undeclared properties
+	 * added
+	 * @param overlay the overlay, for its {@code writes}
+	 * @return the write types
+	 */
+	public static Offers of(List<String> probeJsons, CsdlDocument metadata, Overlay overlay) {
+		if (probeJsons.isEmpty()) {
+			return NONE;
+		}
+		List<JsonNode> nodes = probeJsons.stream().map(JSON::readTree).toList();
+		return new Builder(nodes, metadata, overlay).offers();
 	}
 
 	private static final class Builder {
@@ -123,10 +140,12 @@ public record Offers(Map<String, Map<String, Offer>> builders) {
 		 */
 		private final Set<String> appendingBinds = new TreeSet<>();
 
-		Builder(JsonNode probe, CsdlDocument metadata, Overlay overlay) {
+		Builder(List<JsonNode> probes, CsdlDocument metadata, Overlay overlay) {
 			metadata.structuredTypes().forEach(t -> types.putIfAbsent(t.name(), t));
 			this.exceptions = overlay.writes();
-			collect(probe);
+			for (JsonNode probe : probes) {
+				collect(probe);
+			}
 		}
 
 		private void collect(JsonNode probe) {

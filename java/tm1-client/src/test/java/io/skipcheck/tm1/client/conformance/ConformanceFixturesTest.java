@@ -14,6 +14,7 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
+import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -48,6 +49,19 @@ class ConformanceFixturesTest {
 				.map(Field::getName)
 				.toList()).as(source + " registers a Conformance extension").isNotEmpty();
 		}
+	}
+
+	@Test
+	void conformanceTm1ServesRequestedSchemaVersion() {
+		ConformanceTm1 tm1 = new ConformanceTm1();
+		assertThat(tm1.schema()).isEqualTo("11.8.35");
+		Tm1Capabilities v11 = tm1.session().capabilities().block();
+		assertThat(v11.schemaVersion()).hasValue("11.8.35");
+
+		tm1.schema("12.6.0");
+		assertThat(tm1.schema()).isEqualTo("12.6.0");
+		Tm1Capabilities v12 = tm1.session().capabilities().block();
+		assertThat(v12.schemaVersion()).hasValue("12.6.0");
 	}
 
 }
