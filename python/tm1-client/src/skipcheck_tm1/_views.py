@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import functools
 import json
+import math
 from dataclasses import replace
 from datetime import timedelta
 from typing import Any
@@ -20,6 +21,29 @@ def poll_interval(every: float | timedelta) -> float:
     if seconds <= 0:
         raise ValueError(f"The poll interval must be positive: {every}")
     return seconds
+
+
+def async_wait_seconds(wait: int | float | timedelta | None) -> int | None:
+    """Whole seconds for OData's ``Prefer: respond-async, wait=<N>``, or ``None`` if omitted."""
+    if wait is None:
+        return None
+    if isinstance(wait, bool):
+        raise ValueError(f"The async wait duration must be whole seconds: {wait}")
+    if isinstance(wait, timedelta):
+        if wait < timedelta(0):
+            raise ValueError(f"The async wait duration must not be negative: {wait}")
+        if wait.microseconds != 0:
+            raise ValueError(f"The async wait duration must be whole seconds: {wait}")
+        return wait.days * 86400 + wait.seconds
+    if isinstance(wait, int):
+        if wait < 0:
+            raise ValueError(f"The async wait duration must not be negative: {wait}")
+        return wait
+    if isinstance(wait, float):
+        if not math.isfinite(wait) or wait < 0 or not wait.is_integer():
+            raise ValueError(f"The async wait duration must be non-negative whole seconds: {wait}")
+        return int(wait)
+    raise ValueError(f"The async wait duration must be whole seconds: {wait}")
 
 
 CAPABILITIES: dict[tuple[str, str], Any] = {}

@@ -297,9 +297,10 @@ class AsyncTm1Client:
         """A JSON ``$batch``: calls through ``batch.client`` are queued, and ``run`` sends them."""
         return AsyncTm1Batch(self._session.batch())
 
-    def with_async(self, every: float | timedelta = 1.0) -> AsyncTm1Client:
-        """A client whose requests TM1 runs asynchronously, polled every ``every`` seconds."""
-        return AsyncTm1Client(self._session.with_async(every))
+    def with_async(self, every: float | timedelta = 1.0, wait: int | float | timedelta | None = None) -> AsyncTm1Client:
+        """A client whose requests TM1 runs asynchronously, polled every ``every`` seconds (and
+        optionally asking TM1 to wait up to ``wait`` whole seconds before returning 202)."""
+        return AsyncTm1Client(self._session.with_async(every, wait))
 
     def without_async(self) -> AsyncTm1Client:
         """A client on a synchronous view of this client's session

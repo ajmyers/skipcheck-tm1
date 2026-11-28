@@ -206,6 +206,88 @@ def check(method: str, url: str, reply: Reply, classifier: Any = None) -> Reply:
 
 # OData async (Prefer: respond-async)
 
+ASYNC_RESULT_HEADER = "asyncresult"
+
+
+def async_reply(reply: Reply) -> tuple[Reply, bool]:
+    """Unwraps a completed async monitor response.
+
+    TM1 11 wraps the inner HTTP response in an ``application/http`` message and drops the monitor
+    once read. TM1 12 returns the raw body directly with an ``Asyncresult`` status header and
+    keeps the monitor cached until explicitly deleted (returned as ``should_delete=True``).
+    """
+    content_type = reply.headers.get("content-type", "")
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    header = reply.headers.get(ASYNC_RESULT_HEADER)
+    if media_type != "application/http" and header is not None:
+        trimmed = header.strip()
+        if len(trimmed) != 3 or not trimmed.isascii() or not trimmed.isdigit() or not ("1" <= trimmed[0] <= "5"):
+            raise Tm1ProtocolError(f"TM1's async monitor sent an invalid Asyncresult status: {header!r}")
+        return Reply(int(trimmed), reply.headers, reply.content), True
+    return async_result(reply.content), False
+
+
+def _split_prefer_tokens(header: str) -> list[str]:
+    tokens: list[str] = []
+    current: list[str] = []
+    in_quotes = False
+    escaped = False
+    for ch in header:
+        if escaped:
+            current.append(ch)
+            escaped = False
+        elif ch == "\\" and in_quotes:
+            current.append(ch)
+            escaped = True
+        elif ch == '"':
+            current.append(ch)
+            in_quotes = not in_quotes
+        elif ch == "," and not in_quotes:
+            token = "".join(current).strip()
+            if token:
+                tokens.append(token)
+            current.clear()
+        else:
+            current.append(ch)
+    last = "".join(current).strip()
+    if last:
+        tokens.append(last)
+    return tokens
+
+
+def merge_prefer(headers: Mapping[str, str], wait: int | None) -> dict[str, str]:
+    """Merges ``respond-async`` (and ``wait=<N>`` when given) into ``headers`` without losing
+    other ``Prefer`` tokens or sending duplicate ``Prefer`` headers."""
+    out: dict[str, str] = {}
+    kept: list[str] = []
+    for k, v in headers.items():
+        if k.lower() == "prefer":
+            for raw in _split_prefer_tokens(v):
+                main = raw.split(";", 1)[0].strip()
+                name = main.split("=", 1)[0].strip().lower()
+                if name and name not in ("respond-async", "wait"):
+                    kept.append(raw)
+        else:
+            out[k] = v
+    kept.append("respond-async")
+    if wait is not None:
+        kept.append(f"wait={wait}")
+    out["Prefer"] = ", ".join(kept)
+    return out
+
+
+def has_wait_applied(header: str | None) -> bool:
+    """Whether a ``Preference-Applied`` header includes a ``wait=<value>`` preference token."""
+    if not header:
+        return False
+    for raw in _split_prefer_tokens(header):
+        main = raw.split(";", 1)[0].strip()
+        if "=" in main:
+            name, _, val = main.partition("=")
+            if name.strip().lower() == "wait" and val.strip():
+                return True
+    return False
+
 
 def async_result(message: bytes) -> Reply:
     """The response an async monitor holds once done: an ``application/http`` message, whose

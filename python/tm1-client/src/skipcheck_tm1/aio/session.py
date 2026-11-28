@@ -42,7 +42,7 @@ import httpx2
 from .. import _protocol as p
 from .._compat import AsyncIO as runtime
 from .._compat import Expired
-from .._views import CAPABILITIES, Queue, as_call, capability_of, poll_interval, settle
+from .._views import CAPABILITIES, Queue, as_call, async_wait_seconds, capability_of, poll_interval, settle
 from ..auth import Authenticator, basic
 from ..base import to_odata
 from ..errors import (
@@ -186,6 +186,20 @@ class _AsyncConnection:
         self.running = 0
         """Requests running now: see :meth:`busy`."""
         self._counting = threading.Lock()
+        self._logged_ignored_async_wait = False
+
+    def note_ignored_async_wait(self, wait: int, applied: str | None) -> None:
+        """Logs once per connection when TM1 answers 202 without applying ``wait=``."""
+        with self._counting:
+            if self._logged_ignored_async_wait:
+                return
+            self._logged_ignored_async_wait = True
+        log.debug(
+            "TM1 at %s did not apply Prefer wait=%ss (Preference-Applied: %s); continuing with async polling",
+            self.base_url,
+            wait,
+            applied if applied else "<absent>",
+        )
 
     @contextlib.contextmanager
     def busy(self) -> Iterator[None]:
@@ -549,13 +563,15 @@ class AsyncTm1Session:
         )
         self._context = p.Context(sandbox=sandbox)
         self._async_every: float | None = None
+        self._async_wait: int | None = None
         self._queue: Queue | None = None
 
-    def _view(self, context: p.Context, async_every: float | None, queue: Queue | None) -> AsyncTm1Session:
+    def _view(self, context: p.Context, async_every: float | None, async_wait: int | None, queue: Queue | None) -> AsyncTm1Session:
         view = object.__new__(type(self))
         view._connection = self._connection
         view._context = context
         view._async_every = async_every
+        view._async_wait = async_wait
         view._queue = queue
         return view
 
@@ -569,11 +585,11 @@ class AsyncTm1Session:
         that for free. A ValueError if ``name`` is blank."""
         if not name or not name.strip():
             raise ValueError("sandbox name is blank")
-        return self._view(p.Context(name, self._context.change_set), self._async_every, self._queue)
+        return self._view(p.Context(name, self._context.change_set), self._async_every, self._async_wait, self._queue)
 
     def without_sandbox(self) -> AsyncTm1Session:
         """A view of this session whose requests run outside any sandbox, in base data."""
-        return self._view(p.Context(None, self._context.change_set), self._async_every, self._queue)
+        return self._view(p.Context(None, self._context.change_set), self._async_every, self._async_wait, self._queue)
 
     def with_change_set(self, change_set: str) -> AsyncTm1Session:
         """A view of this session whose writes are recorded in change set ``change_set`` (its ID,
@@ -583,38 +599,46 @@ class AsyncTm1Session:
         if the ID is blank."""
         if not change_set or not change_set.strip():
             raise ValueError("change set ID is blank")
-        return self._view(p.Context(self._context.sandbox, change_set), self._async_every, self._queue)
+        return self._view(p.Context(self._context.sandbox, change_set), self._async_every, self._async_wait, self._queue)
 
     def without_change_set(self) -> AsyncTm1Session:
         """A view of this session whose writes go into no change set."""
-        return self._view(p.Context(self._context.sandbox, None), self._async_every, self._queue)
+        return self._view(p.Context(self._context.sandbox, None), self._async_every, self._async_wait, self._queue)
 
-    def with_async(self, every: float | timedelta = 1.0) -> AsyncTm1Session:
+    def with_async(self, every: float | timedelta = 1.0, wait: int | float | timedelta | None = None) -> AsyncTm1Session:
         """A view of this session whose requests TM1 runs asynchronously (OData's ``Prefer:
-        respond-async``): each returns at once with a monitor, which the client polls every
-        ``every`` seconds until the result is there, so a long process or chore never holds a
-        request open for its whole run. Methods return what they always do. Cancelling the call
-        before the result deletes the monitor, which stops the work on TM1: a process run ends as
-        ``TM1UserException: Cancel``. Raw byte requests (document content) aren't sent async. TM1
-        (11.8) sends no ``Retry-After``, so ``every`` is the only pace. A ValueError if ``every``
-        isn't positive."""
-        return self._view(self._context, poll_interval(every), self._queue)
+        respond-async``, and ``wait=<N>`` when ``wait`` is given): if the work doesn't finish
+        within ``wait``, TM1 answers 202 with a monitor, which the client polls every ``every``
+        seconds until the result is there, so a long process or chore never holds a request open
+        for its whole run. Methods return what they always do. Cancelling the call before the
+        result deletes the monitor, which stops the work on TM1: a process run ends as
+        ``TM1UserException: Cancel``. On TM1 12, completed monitors return the body directly with
+        an ``Asyncresult`` status header and are deleted on a best-effort basis once read; TM1 11
+        ignores ``wait`` and answers 202 at once, which degrades silently. Raw byte requests
+        (document content) aren't sent async. A ValueError if ``every`` isn't positive or ``wait``
+        isn't non-negative whole seconds."""
+        return self._view(self._context, poll_interval(every), async_wait_seconds(wait), self._queue)
 
     def without_async(self) -> AsyncTm1Session:
         """A view of this session whose requests run synchronously, as usual."""
-        return self._view(self._context, None, self._queue)
+        return self._view(self._context, None, None, self._queue)
 
     def batch(self) -> AsyncTm1SessionBatch:
         """Starts a JSON ``$batch``: its :attr:`~AsyncTm1SessionBatch.session` is a view of this
         one (same sandbox and change set) whose requests are queued, and
         :meth:`~AsyncTm1SessionBatch.run` sends them together."""
         queue = Queue()
-        return AsyncTm1SessionBatch(queue, self._view(self._context, None, None), self._view(self._context, None, queue))
+        return AsyncTm1SessionBatch(queue, self._view(self._context, None, None, None), self._view(self._context, None, None, queue))
 
     @property
     def async_every(self) -> float | None:
         """How often this view polls an async request's monitor (Java's ``async()``), or None."""
         return self._async_every
+
+    @property
+    def async_wait(self) -> int | None:
+        """Whole seconds this view asks TM1 to wait before returning 202 (``Prefer: wait=<N>``), or None."""
+        return self._async_wait
 
     @staticmethod
     def builder() -> AsyncTm1SessionBuilder:
@@ -763,7 +787,7 @@ class AsyncTm1Session:
             url = self._connection.url(p.target(call, self._context))
             content, headers = call.body()
             if self._async_every is not None and not call.raw:
-                reply = await self._send_async(call.method, url, content, headers, call.accept)
+                reply = await self._send_async(call.method, url, content, headers, call.accept, call.timeout)
             else:
                 reply = await self._connection.send(call.method, url, content, headers, call.accept, call.timeout)
             return call.read(self._connection.check(call.method, url, reply))
@@ -807,12 +831,32 @@ class AsyncTm1Session:
                     return
                 page = await pages.execute(p.Call("GET", page.next_link, read=call.read, contextual=False))
 
-    async def _send_async(self, method: str, url: str, content: bytes | None, headers: dict[str, str], accept: str) -> p.Reply:
+    async def _delete_monitor(self, monitor: str, *, check_status: bool = False) -> None:
+        try:
+            reply = await self._connection.send("DELETE", monitor, None, {}, p.JSON)
+            if check_status:
+                self._connection.check("DELETE", monitor, reply)
+        except Exception as e:  # noqa: BLE001
+            log.debug("Couldn't delete the async monitor %s: %s", monitor, e)
+
+    async def _send_async(
+        self,
+        method: str,
+        url: str,
+        content: bytes | None,
+        headers: dict[str, str],
+        accept: str,
+        timeout: float | None = None,
+    ) -> p.Reply:
         assert self._async_every is not None
         connection = self._connection
-        reply = await connection.send(method, url, content, {**headers, "Prefer": "respond-async"}, accept)
+        reply = await connection.send(method, url, content, p.merge_prefer(headers, self._async_wait), accept, timeout)
         if reply.status != 202:
             return reply
+        if self._async_wait is not None:
+            applied = reply.headers.get("preference-applied")
+            if not p.has_wait_applied(applied):
+                connection.note_ignored_async_wait(self._async_wait, applied)
         location = reply.headers.get("location")
         if not location:
             raise Tm1ProtocolError(f"TM1 accepted {method} {url} async without a Location")
@@ -824,14 +868,14 @@ class AsyncTm1Session:
                 polled = connection.check("GET", monitor, await connection.send("GET", monitor, None, {}, "*/*"))
                 if polled.status != 202:
                     finished = True
-                    return p.async_result(polled.content)
+                    result, should_delete = p.async_reply(polled)
+                    if should_delete:
+                        await runtime.shield(self._delete_monitor(monitor, check_status=True))
+                    return result
         finally:
             if not finished:
                 # Deleting the monitor is what stops the work on TM1 (also when the task is cancelled)
-                try:
-                    await runtime.shield(connection.send("DELETE", monitor, None, {}, p.JSON))
-                except BaseException as e:  # noqa: BLE001
-                    log.debug("Couldn't delete the async monitor %s: %s", monitor, e)
+                await runtime.shield(self._delete_monitor(monitor))
 
     async def request(
         self,
