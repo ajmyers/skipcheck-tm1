@@ -9,27 +9,34 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.zip.GZIPInputStream;
 
+import org.jspecify.annotations.Nullable;
+
 import io.skipcheck.tm1.client.error.Tm1ProtocolException;
 
 /**
- * The result an OData async monitor holds once the work is done: an
- * {@code application/http} message, {@code HTTP/1.1 201 Created}, headers, a blank line
- * and the body. Only the status and body matter here; the body's type is the request's.
+ * The result an OData async monitor holds once the work is done.
  *
  * <p>
- * TM1 (11.8) compresses the inner body when the request accepted gzip
- * ({@code Content-Encoding: gzip} among the inner headers), though the monitor's own
- * response isn't compressed; the body is decompressed here.
+ * TM1 11 wraps the result in an {@code application/http} message
+ * ({@code HTTP/1.1 201 Created}, headers, a blank line and the body) and may gzip the
+ * inner body ({@code Content-Encoding: gzip}). TM1 12 returns the body directly with
+ * outer HTTP {@code 200} and the inner status in the {@code Asyncresult} response header,
+ * keeping completed monitors cached until deleted.
  */
 final class AsyncResult {
+
+	static final String ASYNC_RESULT_HEADER = "Asyncresult";
 
 	private final int status;
 
 	private final byte[] body;
 
-	private AsyncResult(int status, byte[] body) {
+	private final boolean shouldDeleteMonitor;
+
+	private AsyncResult(int status, byte[] body, boolean shouldDeleteMonitor) {
 		this.status = status;
 		this.body = body;
+		this.shouldDeleteMonitor = shouldDeleteMonitor;
 	}
 
 	/** The status of the response the work produced. */
@@ -42,10 +49,55 @@ final class AsyncResult {
 		return body.clone();
 	}
 
+	/**
+	 * Whether the monitor should be deleted after reading this result: true for TM1 12
+	 * responses carrying an {@code Asyncresult} header, which otherwise remain cached on
+	 * the server.
+	 */
+	boolean shouldDeleteMonitor() {
+		return shouldDeleteMonitor;
+	}
+
 	private static final byte[] BLANK_LINE = "\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
 
 	/**
-	 * Reads a monitor's result.
+	 * Reads a completed monitor response: TM1 11's {@code application/http} envelope, or
+	 * TM1 12's direct body with an {@code Asyncresult} header.
+	 * @param contentType the poll's {@code Content-Type} header, or {@code null}
+	 * @param asyncResultHeader the poll's {@code Asyncresult} header, or {@code null}
+	 * @param body the poll's response bytes
+	 * @return the unwrapped status, body and whether the monitor needs cleanup
+	 * @throws Tm1ProtocolException if the envelope or {@code Asyncresult} header is
+	 * invalid
+	 */
+	static AsyncResult fromResponse(@Nullable String contentType, @Nullable String asyncResultHeader, byte[] body) {
+		if (!isApplicationHttp(contentType) && asyncResultHeader != null) {
+			return new AsyncResult(parseAsyncResultHeader(asyncResultHeader), body, true);
+		}
+		return parse(body);
+	}
+
+	private static boolean isApplicationHttp(@Nullable String contentType) {
+		if (contentType == null) {
+			return false;
+		}
+		int semi = contentType.indexOf(';');
+		String mediaType = (semi < 0 ? contentType : contentType.substring(0, semi)).trim();
+		return mediaType.equalsIgnoreCase("application/http");
+	}
+
+	private static int parseAsyncResultHeader(String value) {
+		String trimmed = value.trim();
+		if (trimmed.length() != 3 || trimmed.charAt(0) < '1' || trimmed.charAt(0) > '5' || trimmed.charAt(1) < '0'
+				|| trimmed.charAt(1) > '9' || trimmed.charAt(2) < '0' || trimmed.charAt(2) > '9') {
+			throw new Tm1ProtocolException("TM1 sent an invalid Asyncresult header: " + value, null, "GET", "_async",
+					null);
+		}
+		return Integer.parseInt(trimmed);
+	}
+
+	/**
+	 * Reads a monitor's {@code application/http} result.
 	 * @param message the {@code application/http} message
 	 * @return its status and body
 	 * @throws Tm1ProtocolException if it doesn't start with a status line
@@ -67,11 +119,11 @@ final class AsyncResult {
 		}
 		int headersEnd = indexOf(message, BLANK_LINE, 0);
 		if (headersEnd < 0) {
-			return new AsyncResult(status, new byte[0]);
+			return new AsyncResult(status, new byte[0], false);
 		}
 		String headers = new String(message, 0, headersEnd, StandardCharsets.US_ASCII).toLowerCase(Locale.ROOT);
 		byte[] body = Arrays.copyOfRange(message, headersEnd + BLANK_LINE.length, message.length);
-		return new AsyncResult(status, headers.contains("\ncontent-encoding: gzip") ? gunzip(body) : body);
+		return new AsyncResult(status, headers.contains("\ncontent-encoding: gzip") ? gunzip(body) : body, false);
 	}
 
 	private static byte[] gunzip(byte[] body) {

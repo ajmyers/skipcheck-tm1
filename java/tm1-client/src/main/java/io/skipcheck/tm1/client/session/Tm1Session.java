@@ -75,18 +75,21 @@ public final class Tm1Session {
 
 	private final @Nullable Duration async;
 
+	private final @Nullable Duration asyncWait;
+
 	private final @Nullable BatchQueue batch;
 
 	Tm1Session(Connection connection) {
-		this(connection, null, null, null, null);
+		this(connection, null, null, null, null, null);
 	}
 
 	private Tm1Session(Connection connection, @Nullable String sandbox, @Nullable String changeSet,
-			@Nullable Duration async, @Nullable BatchQueue batch) {
+			@Nullable Duration async, @Nullable Duration asyncWait, @Nullable BatchQueue batch) {
 		this.connection = Objects.requireNonNull(connection, "connection");
 		this.sandbox = sandbox;
 		this.changeSet = changeSet;
 		this.async = async;
+		this.asyncWait = asyncWait;
 		this.batch = batch;
 	}
 
@@ -125,7 +128,8 @@ public final class Tm1Session {
 		// means
 		return connection.prepare(request)
 			.flatMap(ready -> async != null && ready.response() != Tm1Request.Response.BYTES
-					? connection.async(inSandbox(ready), async).next() : connection.execute(inSandbox(ready)));
+					? connection.async(inSandbox(ready), async, asyncWait).next()
+					: connection.execute(inSandbox(ready)));
 	}
 
 	/**
@@ -149,7 +153,7 @@ public final class Tm1Session {
 		}
 		return connection.prepare(request)
 			.flatMapMany(ready -> async != null && ready.response() == Tm1Request.Response.COLLECTION
-					? connection.async(inSandbox(ready), async) : connection.stream(inSandbox(ready)));
+					? connection.async(inSandbox(ready), async, asyncWait) : connection.stream(inSandbox(ready)));
 	}
 
 	/**
@@ -192,7 +196,7 @@ public final class Tm1Session {
 		if (name.isBlank()) {
 			throw new IllegalArgumentException("sandbox name is blank");
 		}
-		return new Tm1Session(connection, name, changeSet, async, batch);
+		return new Tm1Session(connection, name, changeSet, async, asyncWait, batch);
 	}
 
 	/**
@@ -200,7 +204,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no sandbox
 	 */
 	public Tm1Session withoutSandbox() {
-		return sandbox == null ? this : new Tm1Session(connection, null, changeSet, async, batch);
+		return sandbox == null ? this : new Tm1Session(connection, null, changeSet, async, asyncWait, batch);
 	}
 
 	/**
@@ -211,7 +215,7 @@ public final class Tm1Session {
 	 */
 	public Tm1SessionBatch batch() {
 		BatchQueue queue = new BatchQueue(connection, connection.mapper());
-		return new Tm1SessionBatch(queue, new Tm1Session(connection, sandbox, changeSet, null, queue));
+		return new Tm1SessionBatch(queue, new Tm1Session(connection, sandbox, changeSet, null, null, queue));
 	}
 
 	/**
@@ -234,7 +238,36 @@ public final class Tm1Session {
 		if (every.isNegative() || every.isZero()) {
 			throw new IllegalArgumentException("The poll interval must be positive: " + every);
 		}
-		return new Tm1Session(connection, sandbox, changeSet, every, batch);
+		return new Tm1Session(connection, sandbox, changeSet, every, null, batch);
+	}
+
+	/**
+	 * A view of this session whose requests TM1 runs asynchronously with an OData
+	 * {@code wait} preference ({@code Prefer: respond-async, wait=<seconds>}). TM1 12
+	 * holds the initial request up to {@code wait} seconds so fast work completes
+	 * synchronously without polling, and returns a {@code 202} monitor only if the work
+	 * takes longer. TM1 11 ignores {@code wait} and returns {@code 202} immediately, so
+	 * polling continues as usual.
+	 * @param every how long to wait between polls of the monitor
+	 * @param wait how long TM1 may hold the initial request before returning a monitor,
+	 * in whole seconds ({@code 0} or at least {@code 1} second)
+	 * @return the view
+	 * @throws IllegalArgumentException if {@code every} isn't positive, or if
+	 * {@code wait} is negative or isn't a whole number of seconds
+	 */
+	public Tm1Session withAsync(Duration every, Duration wait) {
+		Objects.requireNonNull(every, "every");
+		Objects.requireNonNull(wait, "wait");
+		if (every.isNegative() || every.isZero()) {
+			throw new IllegalArgumentException("The poll interval must be positive: " + every);
+		}
+		if (wait.isNegative()) {
+			throw new IllegalArgumentException("The async wait must not be negative: " + wait);
+		}
+		if (wait.toNanosPart() != 0) {
+			throw new IllegalArgumentException("The async wait must be whole seconds: " + wait);
+		}
+		return new Tm1Session(connection, sandbox, changeSet, every, wait, batch);
 	}
 
 	/**
@@ -242,7 +275,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it isn't async
 	 */
 	public Tm1Session withoutAsync() {
-		return async == null ? this : new Tm1Session(connection, sandbox, changeSet, null, batch);
+		return async == null ? this : new Tm1Session(connection, sandbox, changeSet, null, null, batch);
 	}
 
 	/**
@@ -251,6 +284,15 @@ public final class Tm1Session {
 	 */
 	public Optional<Duration> async() {
 		return Optional.ofNullable(async);
+	}
+
+	/**
+	 * How long TM1 may hold an initial async request before returning a monitor
+	 * ({@code Prefer: respond-async, wait=<seconds>}), if set.
+	 * @return the wait duration, or empty if no wait preference is sent
+	 */
+	public Optional<Duration> asyncWait() {
+		return Optional.ofNullable(asyncWait);
 	}
 
 	/**
@@ -275,7 +317,7 @@ public final class Tm1Session {
 		if (id.isBlank()) {
 			throw new IllegalArgumentException("change set ID is blank");
 		}
-		return new Tm1Session(connection, sandbox, id, async, batch);
+		return new Tm1Session(connection, sandbox, id, async, asyncWait, batch);
 	}
 
 	/**
@@ -283,7 +325,7 @@ public final class Tm1Session {
 	 * @return the view, or this session if it has no change set
 	 */
 	public Tm1Session withoutChangeSet() {
-		return changeSet == null ? this : new Tm1Session(connection, sandbox, null, async, batch);
+		return changeSet == null ? this : new Tm1Session(connection, sandbox, null, async, asyncWait, batch);
 	}
 
 	/**

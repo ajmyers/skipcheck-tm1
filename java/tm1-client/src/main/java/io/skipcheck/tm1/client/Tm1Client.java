@@ -457,15 +457,28 @@ public final class Tm1Client {
 	}
 
 	/**
-	 * A client on an async view of this client's session ({@link Tm1Session#withAsync}):
-	 * every service's methods work as usual, but TM1 runs each request asynchronously and
-	 * the client polls for the result, so a long process or chore holds no request open.
-	 * Cancelling a subscription before its result stops the work on TM1.
+	 * A client on an async view of this client's session
+	 * ({@link Tm1Session#withAsync(Duration)}): every service's methods work as usual,
+	 * but TM1 runs each request asynchronously and the client polls for the result, so a
+	 * long process or chore holds no request open. Cancelling a subscription before its
+	 * result stops the work on TM1.
 	 * @param every how long to wait between polls
 	 * @return the client
 	 */
 	public Tm1Client withAsync(Duration every) {
 		return new Tm1Client(session.withAsync(every));
+	}
+
+	/**
+	 * A client on an async view of this client's session that also sends
+	 * {@code Prefer: respond-async, wait=<N>}
+	 * ({@link Tm1Session#withAsync(Duration, Duration)}).
+	 * @param every how long to wait between polls if TM1 answers 202
+	 * @param wait non-negative whole seconds to ask TM1 to wait before answering 202
+	 * @return the client
+	 */
+	public Tm1Client withAsync(Duration every, Duration wait) {
+		return new Tm1Client(session.withAsync(every, wait));
 	}
 
 	/**
