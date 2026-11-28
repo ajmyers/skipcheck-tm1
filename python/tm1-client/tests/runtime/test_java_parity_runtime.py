@@ -157,13 +157,19 @@ def test_the_authenticators_are_javas() -> None:
     ``camPassport(String)`` and ``camPassport(Supplier)`` are both ``cam_passport``."""
     source = (JAVA / "auth" / "Tm1Authenticator.java").read_text(encoding="utf-8")
     factories = re.findall(r"^\tstatic Tm1Authenticator (\w+)\(([^)]*)\)", source, re.M)
-    assert {name for name, _ in factories} >= {"basic", "camNamespace", "camPassport", "cognosLogon", "cognosIdToken"}, "the factories weren't found"
+    assert {name for name, _ in factories} >= {"basic", "bearer", "application", "camNamespace", "camPassport", "cognosLogon", "cognosIdToken"}, (
+        "the factories weren't found"
+    )
     for name, _ in factories:
         assert callable(getattr(auth, snake(name), None)), f"{name} → {snake(name)}"
     given = sorted(parameters.split()[0] for name, parameters in factories if name == "camPassport")
     assert given == ["String", "Supplier<Mono<String>>"], "Java's camPassport overloads changed: cam_passport takes each of them"
+    bearer_given = sorted(parameters.split()[0] for name, parameters in factories if name == "bearer")
+    assert bearer_given == ["String", "Supplier<Mono<String>>"], "Java's bearer overloads changed: bearer takes each of them"
     assert auth.cam_passport("p").authorization() == "CAMPassport p"
     assert auth.cam_passport(lambda: "p").authorization() == "CAMPassport p"
+    assert auth.bearer("t").authorization() == "Bearer t"
+    assert auth.bearer(lambda: "t").authorization() == "Bearer t"
     basic = auth.basic("a", "b")
     assert callable(basic.authorization) and callable(basic.describe)
 

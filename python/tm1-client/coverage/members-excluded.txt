@@ -20,7 +20,10 @@ ODataLiterals.Raw.odataLiteral | literal() writes a Raw by its literal field; Py
 Tm1Session.async -> async_every | async is a Python keyword
 Tm1Version.compareTo | Python compares versions with <, <= and the rest (functools.total_ordering)
 Tm1Authenticator -> Authenticator | a Protocol in skipcheck_tm1.auth, whose ready-made authenticators are the module's functions
+Tm1Authenticator.applicationUser | optional method on authenticators read dynamically so custom Authenticator implementations don't need to define it
 Tm1Authenticator.basic | a function of skipcheck_tm1.auth: auth.basic(user, password)
+Tm1Authenticator.bearer | a function of skipcheck_tm1.auth: auth.bearer(token), given the token or a function that returns one
+Tm1Authenticator.application | a function of skipcheck_tm1.auth: auth.application(client_id, client_secret, user)
 Tm1Authenticator.camNamespace | a function of skipcheck_tm1.auth: auth.cam_namespace(user, password, namespace)
 Tm1Authenticator.camPassport | a function of skipcheck_tm1.auth: auth.cam_passport(passport), given the passport or a function that returns one
 Tm1Authenticator.cognosLogon | a function of skipcheck_tm1.auth: auth.cognos_logon(dispatcher, namespace, user, password)
