@@ -173,9 +173,10 @@ export class Tm1Client implements AsyncDisposable {
     return new Tm1Batch(this.session.batch());
   }
 
-  /** A client whose requests TM1 runs asynchronously, polled every `every` milliseconds. */
-  withAsync(every: number): Tm1Client {
-    return new Tm1Client(this.session.withAsync(every));
+  /** A client whose requests TM1 runs asynchronously, polled every `every` milliseconds (and
+   * optionally asking TM1 to wait up to `wait` milliseconds — whole seconds — before returning 202). */
+  withAsync(every: number, wait?: number): Tm1Client {
+    return new Tm1Client(this.session.withAsync(every, wait));
   }
 
   /** A client on a synchronous view of this client's session ({@link Tm1Session.withoutAsync}). */

@@ -10,7 +10,7 @@ import { Tm1Request } from "../request.js";
 import { Tm1Stream } from "../stream.js";
 import { delay } from "../util.js";
 import { Tm1Dialect, type Tm1Capabilities, type Tm1Capability, type Tm1Version } from "../version/index.js";
-import { asyncResult, CapabilitiesCache, Connection, JSON_ACCEPT, textOf, type Reply } from "./connection.js";
+import { asyncReply, CapabilitiesCache, Connection, JSON_ACCEPT, mergePrefer, textOf, type Reply } from "./connection.js";
 import { Tm1Timeouts } from "./timeouts.js";
 import { fetchTransport, type Tm1Transport } from "./transport.js";
 
@@ -42,6 +42,7 @@ export class Tm1Session implements AsyncDisposable {
     private readonly changeSetId: string | undefined,
     private readonly asyncEvery: number | undefined,
     private readonly queue: BatchQueue | undefined,
+    private readonly asyncWaitMs: number | undefined = undefined,
   ) {}
 
   /** The settings one by one, as the Java client's `Tm1Session.builder()`. */
@@ -69,6 +70,12 @@ export class Tm1Session implements AsyncDisposable {
     return this.asyncEvery;
   }
 
+  /** How long this view asks TM1 to wait before returning 202 (`Prefer: wait=<N>`), in
+   * milliseconds (whole seconds), or undefined. */
+  asyncWait(): number | undefined {
+    return this.asyncWaitMs;
+  }
+
   /** Whether {@link close} has been called. */
   isClosed(): boolean {
     return this.connection.isClosed;
@@ -90,13 +97,13 @@ export class Tm1Session implements AsyncDisposable {
    * RangeError if `name` is blank */
   withSandbox(name: string): Tm1Session {
     if (typeof name !== "string" || !name.trim()) throw new RangeError("sandbox name is blank");
-    return new Tm1Session(this.connection, name, this.changeSetId, this.asyncEvery, this.queue);
+    return new Tm1Session(this.connection, name, this.changeSetId, this.asyncEvery, this.queue, this.asyncWaitMs);
   }
 
   /** A view of this session whose requests run outside any sandbox, in base data: this session if
    * it has no sandbox. */
   withoutSandbox(): Tm1Session {
-    return this.sandboxName === undefined ? this : new Tm1Session(this.connection, undefined, this.changeSetId, this.asyncEvery, this.queue);
+    return this.sandboxName === undefined ? this : new Tm1Session(this.connection, undefined, this.changeSetId, this.asyncEvery, this.queue, this.asyncWaitMs);
   }
 
   /** A view of this session whose writes are recorded in change set `id` (from `BeginChangeSet`):
@@ -105,24 +112,35 @@ export class Tm1Session implements AsyncDisposable {
    * connections; it keeps the sandbox, if any. @throws RangeError if `id` is blank */
   withChangeSet(id: string): Tm1Session {
     if (typeof id !== "string" || !id.trim()) throw new RangeError("change set ID is blank");
-    return new Tm1Session(this.connection, this.sandboxName, id, this.asyncEvery, this.queue);
+    return new Tm1Session(this.connection, this.sandboxName, id, this.asyncEvery, this.queue, this.asyncWaitMs);
   }
 
   /** A view of this session whose writes go into no change set: this session if it has none. */
   withoutChangeSet(): Tm1Session {
-    return this.changeSetId === undefined ? this : new Tm1Session(this.connection, this.sandboxName, undefined, this.asyncEvery, this.queue);
+    return this.changeSetId === undefined ? this : new Tm1Session(this.connection, this.sandboxName, undefined, this.asyncEvery, this.queue, this.asyncWaitMs);
   }
 
-  /** @param every how often to poll, in milliseconds */
-  withAsync(every: number): Tm1Session {
+  /** A view of this session whose requests TM1 runs asynchronously (OData's `Prefer: respond-async`,
+   * and `wait=<N>` when `wait` is given). On TM1 12, completed monitors return the body directly
+   * with an `Asyncresult` status header and are deleted on a best-effort basis once read; TM1 11
+   * ignores `wait` and answers 202 at once, which degrades silently.
+   * @param every how often to poll, in milliseconds
+   * @param wait optional non-negative whole-second wait duration in milliseconds (`0`, `1000`, `2000`, ...) */
+  withAsync(every: number, wait?: number): Tm1Session {
     if (!(every > 0)) throw new RangeError("The poll interval must be positive: " + every);
-    return new Tm1Session(this.connection, this.sandboxName, this.changeSetId, every, this.queue);
+    if (wait !== undefined && (!Number.isSafeInteger(wait) || wait < 0 || wait % 1000 !== 0)) {
+      throw new RangeError("The async wait duration must be non-negative whole seconds (in milliseconds): " + wait);
+    }
+    const normalizedWait = wait === 0 ? 0 : wait;
+    return new Tm1Session(this.connection, this.sandboxName, this.changeSetId, every, this.queue, normalizedWait);
   }
 
   /** A view of this session whose requests run synchronously, as usual: this session if it isn't
    * async. */
   withoutAsync(): Tm1Session {
-    return this.asyncEvery === undefined ? this : new Tm1Session(this.connection, this.sandboxName, this.changeSetId, undefined, this.queue);
+    return this.asyncEvery === undefined && this.asyncWaitMs === undefined
+      ? this
+      : new Tm1Session(this.connection, this.sandboxName, this.changeSetId, undefined, this.queue);
   }
 
   /** Starts a JSON `$batch`: its {@link Tm1SessionBatch.session} is a view of this one whose
@@ -279,8 +297,9 @@ export class Tm1Session implements AsyncDisposable {
     if (!ordinary && this.asyncEvery !== undefined && request.response !== "Bytes" && !(request.body instanceof Uint8Array)) {
       // Running until its result is read, the waits between polls included
       const every = this.asyncEvery;
+      const wait = this.asyncWaitMs;
       reply = await this.connection.busy(() =>
-        this.sendRespondAsync(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, every, signal),
+        this.sendRespondAsync(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, every, wait, signal),
       );
     } else {
       reply = await this.connection.send(request.method, url, content, contentType, request.headers, request.accept(), request.timeout, signal);
@@ -297,24 +316,37 @@ export class Tm1Session implements AsyncDisposable {
     accept: string,
     timeout: number | undefined,
     every: number,
+    wait: number | undefined,
     signal: AbortSignal | undefined,
   ): Promise<Reply> {
-    const reply = await this.connection.send(method, url, content, contentType, { ...headers, Prefer: "respond-async" }, accept, timeout, signal);
+    const reply = await this.connection.send(method, url, content, contentType, mergePrefer(headers, wait), accept, timeout, signal);
     if (reply.status !== 202) return reply; // TM1 answered at once
     const location = reply.headers["location"];
     if (!location) throw new Tm1ProtocolException("TM1 accepted an async request without a Location", undefined, method, url);
     // The Location is relative to the request's URL: ../_async('id')
     const monitor = new URL(location, url).toString();
+    let finished = false;
     try {
       // The first poll at once, then one every `every` until the result is there
       for (let first = true; ; first = false) {
         if (!first) await delay(every, signal);
         const polled = this.connection.check("GET", monitor, await this.connection.send("GET", monitor, undefined, undefined, {}, "*/*", undefined, signal));
-        if (polled.status !== 202) return await asyncResult(polled.body);
+        if (polled.status !== 202) {
+          finished = true;
+          const { result, shouldDeleteMonitor } = await asyncReply(polled);
+          if (shouldDeleteMonitor) {
+            try {
+              await this.connection.send("DELETE", monitor, undefined, undefined, {}, JSON_ACCEPT, undefined, undefined);
+            } catch {
+              // Best-effort cleanup of completed TM1 12 monitor
+            }
+          }
+          return result;
+        }
       }
     } catch (e) {
       // Cancelled before the result: deleting the monitor is what stops the work on TM1
-      if (signal?.aborted) {
+      if (!finished && signal?.aborted) {
         try {
           await this.connection.send("DELETE", monitor, undefined, undefined, {}, JSON_ACCEPT, undefined, undefined);
         } catch {
