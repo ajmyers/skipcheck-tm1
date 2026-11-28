@@ -1,2 +1,3 @@
 org.springframework.boot.autoconfigure.service.connection.ConnectionDetailsFactory=\
-io.skipcheck.tm1.spring.boot.testcontainers.Tm1ContainerConnectionDetailsFactory
+io.skipcheck.tm1.spring.boot.testcontainers.Tm1ContainerConnectionDetailsFactory,\
+io.skipcheck.tm1.spring.boot.testcontainers.Tm1EngineContainerConnectionDetailsFactory

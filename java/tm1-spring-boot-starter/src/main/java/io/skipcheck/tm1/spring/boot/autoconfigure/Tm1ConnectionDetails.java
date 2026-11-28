@@ -7,14 +7,16 @@ import org.springframework.boot.autoconfigure.service.connection.ConnectionDetai
 import org.springframework.boot.ssl.SslBundle;
 
 import io.skipcheck.tm1.client.auth.Tm1Authenticator;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 
 /**
  * How to connect to a TM1 server: the source of truth for the server's auto-configured
  * session and pool. By default it comes from the server's properties, {@code tm1.*} or
  * {@code tm1.servers.<name>.*}. A bean of yours named {@code <name>Tm1ConnectionDetails}
  * takes its place, for any server. For the default server, so does a bean of yours under
- * any other name, or {@code @ServiceConnection} on a {@code Tm1ServerContainer} (with
- * {@code tm1-spring-boot-testcontainers}); see {@link Tm1AutoConfiguration}.
+ * any other name, or {@code @ServiceConnection} on a {@code Tm1ServerContainer} or
+ * {@code Tm1EngineContainer} (with {@code tm1-spring-boot-testcontainers}); see
+ * {@link Tm1AutoConfiguration}.
  *
  * <p>
  * A bean of your own for the default server, for credentials the properties can't
@@ -35,6 +37,15 @@ public interface Tm1ConnectionDetails extends ConnectionDetails {
 	 * @return the authenticator
 	 */
 	Tm1Authenticator getAuthenticator();
+
+	/**
+	 * The deployment dialect: {@link Tm1Dialect#V11} by default, or
+	 * {@link Tm1Dialect#v12(String, String)} for TM1 12 (Planning Analytics Engine).
+	 * @return the dialect
+	 */
+	default Tm1Dialect getDialect() {
+		return Tm1Dialect.V11;
+	}
 
 	/**
 	 * The SSL bundle to connect with, for a server on HTTPS with certificates the JVM
