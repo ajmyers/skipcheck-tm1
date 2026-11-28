@@ -93,12 +93,31 @@ def test_runs_each_version_with_its_tm1_and_no_other() -> None:
         "TM1_URL": "http://mine",
         "TM1_HOME_DIR": "/old",
         "TM1_BUNDLE": "old.tar.gz",
+        "TM1_ENGINE_BUNDLE_DIR": "/old-v12",
+        "TM1_ENGINE_BUNDLE": "old-v12.tgz",
         "TM1_PASSWORD": "x",
     }
     env = versions.environment(
         base, versions.Version("2.1.25", {"TM1_BUNDLE_DIR": "/ibm/25"})
     )
     assert env == {"PATH": "/bin", "TM1_BUNDLE_DIR": "/ibm/25"}
+
+
+def test_accepts_tm1_v12_engine_sources_and_resolves_paths_and_redacts_urls(
+    tmp_path: Path,
+) -> None:
+    listed = versions.parse(
+        "3.1.13 TM1_ENGINE_BUNDLE_DIR=ibm/pa-3.1.13 TM1_ENGINE_BUNDLE=tm1-v12.6.7-standalone-linux.tgz\n"
+        "3.1.9  TM1_ENGINE_BUNDLE_URL=https://user:tok@bucket.s3:443/v12.tgz?X-Amz-Signature=abc\n",
+        tmp_path,
+    )
+    assert listed[0].variables == {
+        "TM1_ENGINE_BUNDLE_DIR": str((tmp_path / "ibm/pa-3.1.13").resolve()),
+        "TM1_ENGINE_BUNDLE": "tm1-v12.6.7-standalone-linux.tgz",
+    }
+    shown = versions.shown(listed[1])
+    assert "abc" not in shown and "tok" not in shown
+    assert "TM1_ENGINE_BUNDLE_URL=https://bucket.s3:443/v12.tgz" in shown
 
 
 def test_runs_the_suites_asked_for_then_the_comparison(tmp_path: Path) -> None:
