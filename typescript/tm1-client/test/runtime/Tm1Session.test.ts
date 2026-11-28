@@ -15,6 +15,7 @@ import {
   Tm1BadRequestException,
   Tm1Capabilities,
   Tm1Capability,
+  Tm1Client,
   Tm1Dialect,
   Tm1ForbiddenException,
   Tm1NotFoundException,
@@ -1229,6 +1230,171 @@ describe("Tm1Session async", () => {
     message.set(head);
     message.set(zipped, head.length);
     expect(new TextDecoder().decode((await asyncResult(message)).body)).toBe('{"Name":"tm1"}');
+  });
+
+  const doneV12 = (asyncResultHeader: string, body?: string) =>
+    body === undefined
+      ? { status: 200, headers: { asyncresult: asyncResultHeader }, body: new Uint8Array() }
+      : ScriptedTm1.bytes(200, new TextEncoder().encode(body), "application/json; charset=utf-8", { asyncresult: asyncResultHeader });
+
+  it("reads TM1 12 Asyncresult header and deletes monitor", async () => {
+    const tm1 = new ScriptedTm1()
+      .on(RUN, accepted)
+      .onEach(
+        MONITOR,
+        () => ScriptedTm1.status(202),
+        () => doneV12(" 201 ", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+      )
+      .on("DELETE _async('a1')", () => ScriptedTm1.status(204));
+    const result = await tm1.session().withAsync(10).execute(REQUEST);
+    expect(result.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    expect(tm1.requests(MONITOR)).toHaveLength(2);
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(1);
+  });
+
+  it("reads TM1 12 async no content result", async () => {
+    const runNoContent = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.Execute"), null);
+    const tm1 = new ScriptedTm1()
+      .on("POST Processes('p')/tm1.Execute", accepted)
+      .on(MONITOR, () => doneV12("204"))
+      .on("DELETE _async('a1')", () => ScriptedTm1.status(204));
+    expect(await tm1.session().withAsync(10).execute(runNoContent)).toBeUndefined();
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(1);
+  });
+
+  it("raises TM1 12 async error from Asyncresult header", async () => {
+    const tm1 = new ScriptedTm1()
+      .on(RUN, accepted)
+      .on(MONITOR, () => doneV12("400", '{"error":{"code":"501","message":"Bad MDX"}}'))
+      .on("DELETE _async('a1')", () => ScriptedTm1.status(204));
+    const e = await failure(tm1.session().withAsync(10).execute(REQUEST));
+    expect(e).toBeInstanceOf(Tm1BadRequestException);
+    const bad = e as Tm1BadRequestException;
+    expect(bad.error?.code).toBe("501");
+    expect(bad.error?.message).toBe("Bad MDX");
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(1);
+  });
+
+  it("ignores cleanup failure after reading TM1 12 async result", async () => {
+    const tm1 = new ScriptedTm1()
+      .on(RUN, accepted)
+      .on(MONITOR, () => doneV12("201", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'))
+      .onEach(
+        "DELETE _async('a1')",
+        () => ScriptedTm1.status(500),
+        () => {
+          throw Object.assign(new Error("connection reset"), { code: "ECONNRESET" });
+        },
+      );
+    const session = tm1.session().withAsync(10);
+    expect((await session.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    expect((await session.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(2);
+  });
+
+  it("rejects invalid Asyncresult header", async () => {
+    for (const bad of ["", "   ", "not-a-status", "+200", "-200", "99", "600", "0200", "99999999999999999999"]) {
+      const tm1 = new ScriptedTm1().on(RUN, accepted).on(MONITOR, () => doneV12(bad, "{}"));
+      const e = await failure(tm1.session().withAsync(10).execute(REQUEST));
+      expect(e, `bad Asyncresult '${bad}'`).toBeInstanceOf(Tm1ProtocolException);
+      expect(tm1.requests("DELETE _async('a1')")).toHaveLength(0);
+    }
+  });
+
+  it("sends Prefer wait and handles immediate or deferred completion", async () => {
+    const acceptedWithApplied = (applied: string) =>
+      ScriptedTm1.bytes(202, new Uint8Array(), "text/plain", { location: "../_async('a1')", "preference-applied": applied });
+    const tm1 = new ScriptedTm1()
+      .onEach(
+        RUN,
+        () => ScriptedTm1.json(201, '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+        () => ScriptedTm1.json(201, '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+        () => acceptedWithApplied("respond-async, wait=2"),
+        () => acceptedWithApplied("respond-async"),
+      )
+      .onEach(
+        MONITOR,
+        () => doneV12("201", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+        () => done("201 Created", '{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'),
+      )
+      .on("DELETE _async('a1')", () => ScriptedTm1.status(204));
+
+    const base = tm1.session();
+    expect(() => base.withAsync(0, 1000)).toThrow(RangeError);
+    expect(() => base.withAsync(10, -1000)).toThrow(RangeError);
+    expect(() => base.withAsync(10, 500)).toThrow(RangeError);
+    expect(() => base.withAsync(10, 1500)).toThrow(RangeError);
+    expect(() => base.withAsync(10, Number.NaN)).toThrow(RangeError);
+    expect(() => base.withAsync(10, Number.POSITIVE_INFINITY)).toThrow(RangeError);
+    expect(() => base.withAsync(10, 1e24)).toThrow(RangeError);
+
+    const zeroWait = base.withAsync(10, -0);
+    expect(Object.is(zeroWait.asyncWait(), 0)).toBe(true);
+    expect(zeroWait.withSandbox("sb").asyncWait()).toBe(0);
+    expect(zeroWait.withSandbox("sb").withoutSandbox().asyncWait()).toBe(0);
+    expect(zeroWait.withChangeSet("cs1").asyncWait()).toBe(0);
+    expect(zeroWait.withChangeSet("cs1").withoutChangeSet().asyncWait()).toBe(0);
+    expect(zeroWait.batch().session.asyncWait()).toBeUndefined();
+    expect(zeroWait.withAsync(10).asyncWait()).toBeUndefined();
+    expect(zeroWait.withoutAsync().asyncWait()).toBeUndefined();
+
+    const waited = Tm1Client.of(base).withAsync(10, 2000).session;
+    expect(waited.asyncWait()).toBe(2000);
+
+    // wait=0 on the wire
+    expect((await zeroWait.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    // Immediate completion within wait: zero polls
+    expect((await waited.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    // Deferred completion on TM1 12 (Preference-Applied includes wait=2)
+    expect((await waited.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    // Graceful degradation on TM1 11 (Preference-Applied omits wait=)
+    expect((await waited.execute(REQUEST)).ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+
+    expect(tm1.requests(RUN).map((r) => r.header("Prefer"))).toEqual([
+      "respond-async, wait=0",
+      "respond-async, wait=2",
+      "respond-async, wait=2",
+      "respond-async, wait=2",
+    ]);
+    expect(tm1.requests(MONITOR)).toHaveLength(2);
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(1);
+  });
+
+  it("streams TM1 12 async collection with wait and follows next link", async () => {
+    const tm1 = new ScriptedTm1()
+      .on("GET Cubes", () =>
+        ScriptedTm1.bytes(202, new Uint8Array(), "text/plain", { location: "_async('a1')", "preference-applied": "respond-async, wait=2" }),
+      )
+      .on(MONITOR, () => doneV12("200", '{"value":[{"Name":"a"}],"@odata.nextLink":"Cubes?$skiptoken=2"}'))
+      .on("DELETE _async('a1')", () => ScriptedTm1.status(204))
+      .on("GET Cubes?$skiptoken=2", () => ScriptedTm1.json(200, '{"value":[{"Name":"b"}]}'));
+
+    const names = await tm1
+      .session()
+      .withAsync(10, 2000)
+      .stream(Tm1Request.list<{ Name: string }>(ODataPath.of("Cubes"), ODataQuery.none()))
+      .map((cube) => cube.Name)
+      .toArray();
+
+    expect(names).toEqual(["a", "b"]);
+    expect(tm1.requests("GET Cubes")[0]!.header("Prefer")).toBe("respond-async, wait=2");
+    expect(tm1.requests("GET Cubes?$skiptoken=2")[0]!.header("Prefer")).toBeUndefined();
+    expect(tm1.requests("DELETE _async('a1')")).toHaveLength(1);
+  });
+
+  it("merges Prefer header and respects application/http Content-Type", async () => {
+    const message = new TextEncoder().encode(
+      'HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n\r\n{"ProcessExecuteStatusCode":"CompletedSuccessfully"}',
+    );
+    const tm1 = new ScriptedTm1()
+      .on(RUN, accepted)
+      .on(MONITOR, () => ScriptedTm1.bytes(200, message, "application/http; msgtype=response", { asyncresult: "201" }));
+
+    const withExisting = REQUEST.withHeader("prefer", "odata.maxpagesize=50, wait=9");
+    const result = await tm1.session().withAsync(10, 2000).execute(withExisting);
+    expect(result.ProcessExecuteStatusCode).toBe("CompletedSuccessfully");
+    expect(tm1.requests(RUN)[0]!.header("Prefer")).toBe("odata.maxpagesize=50, respond-async, wait=2");
+    expect(tm1.requests("DELETE _async('a1')"), "application/http monitor is not deleted").toHaveLength(0);
   });
 });
 

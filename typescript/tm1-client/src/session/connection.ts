@@ -602,6 +602,77 @@ export function sessionCookie(reply: Tm1HttpResponse): string | undefined {
   return undefined;
 }
 
+/** Unwraps a completed async monitor response: TM1 11 wraps the inner HTTP response in an
+ * `application/http` message and drops the monitor once read, while TM1 12 returns the raw body
+ * directly with an `Asyncresult` status header and keeps the monitor cached until explicitly
+ * deleted (`shouldDeleteMonitor: true`). */
+export async function asyncReply(polled: Reply): Promise<{ result: Reply; shouldDeleteMonitor: boolean }> {
+  const ct = polled.headers["content-type"] ?? "";
+  const mediaType = ct.split(";", 1)[0]!.trim().toLowerCase();
+  const header = polled.headers["asyncresult"];
+  if (mediaType !== "application/http" && header !== undefined) {
+    const trimmed = header.trim();
+    if (!/^[1-5]\d\d$/.test(trimmed)) {
+      throw new Tm1ProtocolException("TM1's async monitor sent an invalid Asyncresult status: " + header, undefined, "GET", "_async");
+    }
+    return { result: { status: Number(trimmed), headers: polled.headers, body: polled.body }, shouldDeleteMonitor: true };
+  }
+  return { result: await asyncResult(polled.body), shouldDeleteMonitor: false };
+}
+
+/** Merges `respond-async` (and `wait=<N>` when given) into `headers`, preserving unrelated `Prefer`
+ * tokens and avoiding duplicate case-variant `Prefer` keys. */
+export function mergePrefer(headers: Readonly<Record<string, string>>, waitMs: number | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  const kept: string[] = [];
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === "prefer") {
+      for (const raw of splitPreferTokens(v)) {
+        const semi = raw.indexOf(";");
+        const main = (semi < 0 ? raw : raw.slice(0, semi)).trim();
+        const eq = main.indexOf("=");
+        const name = (eq < 0 ? main : main.slice(0, eq)).trim().toLowerCase();
+        if (name && name !== "respond-async" && name !== "wait") kept.push(raw);
+      }
+    } else {
+      out[k] = v;
+    }
+  }
+  kept.push("respond-async");
+  if (waitMs !== undefined) kept.push(`wait=${waitMs / 1000}`);
+  out["Prefer"] = kept.join(", ");
+  return out;
+}
+
+function splitPreferTokens(header: string): string[] {
+  const tokens: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  let escaped = false;
+  for (let i = 0; i < header.length; i++) {
+    const c = header[i]!;
+    if (escaped) {
+      current += c;
+      escaped = false;
+    } else if (c === "\\" && inQuotes) {
+      current += c;
+      escaped = true;
+    } else if (c === '"') {
+      current += c;
+      inQuotes = !inQuotes;
+    } else if (c === "," && !inQuotes) {
+      const token = current.trim();
+      if (token) tokens.push(token);
+      current = "";
+    } else {
+      current += c;
+    }
+  }
+  const last = current.trim();
+  if (last) tokens.push(last);
+  return tokens;
+}
+
 /** The response an async monitor holds once done: an `application/http` message, whose body TM1
  * gzips when the request accepted gzip. */
 export async function asyncResult(message: Uint8Array): Promise<Reply> {

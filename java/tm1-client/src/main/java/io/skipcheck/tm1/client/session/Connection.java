@@ -5,7 +5,9 @@ package io.skipcheck.tm1.client.session;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -132,6 +134,9 @@ final class Connection {
 
 	/** Requests running now: see {@link #isBusy()}. */
 	private final AtomicInteger running = new AtomicInteger();
+
+	/** Logged once per connection if TM1 ignores {@code Prefer: wait=<N>}. */
+	private final AtomicBoolean loggedIgnoredAsyncWait = new AtomicBoolean();
 
 	/** Set once by {@link #close()}. Guarded by this. */
 	private boolean closed;
@@ -636,20 +641,30 @@ final class Connection {
 	}
 
 	/**
-	 * Sends {@code request} with {@code Prefer: respond-async}. If TM1 accepts it (202,
-	 * with the monitor's {@code Location}), polls the monitor every {@code every} until
-	 * it holds the result, an {@code application/http} message, and reads that as the
-	 * request's response. If TM1 answers at once, reads that. Cancelling before the
-	 * result deletes the monitor, which stops the work on TM1.
+	 * Sends {@code request} with {@code Prefer: respond-async} (and {@code wait=<N>} when
+	 * requested). If TM1 accepts it (202, with the monitor's {@code Location}), polls the
+	 * monitor every {@code every} until it holds the result — an {@code application/http}
+	 * message on TM1 11, or a direct body with an {@code Asyncresult} header on TM1 12 —
+	 * and reads that as the request's response. If TM1 answers at once, reads that.
+	 * Cancelling before the result deletes the monitor, which stops the work on TM1.
+	 * Completed TM1 12 monitors are also deleted on a best-effort basis after reading.
 	 */
-	<T> Flux<T> async(Tm1Request<T> request, Duration every) {
+	<T> Flux<T> async(Tm1Request<T> request, Duration every, @Nullable Duration wait) {
 		URI uri = uri(request.relativeUri());
-		return exchange(request.withHeader("Prefer", "respond-async"), uri, response -> {
+		return exchange(withPrefer(request, wait), uri, response -> {
 			if (response.statusCode().value() != 202) {
 				// TM1 answered at once: read it as an ordinary response
 				return request.response() == Tm1Request.Response.COLLECTION
 						? bytes(response).flatMapMany(body -> decode(request, uri, response.statusCode().value(), body))
 						: read(request, uri, response).flux();
+			}
+			if (wait != null) {
+				List<String> applied = response.headers().header("Preference-Applied");
+				if (!hasWaitApplied(applied) && loggedIgnoredAsyncWait.compareAndSet(false, true)) {
+					log.debug(
+							"TM1 at {} did not apply Prefer wait={}s (Preference-Applied: {}); continuing with async polling",
+							root, wait.toSeconds(), applied.isEmpty() ? "<absent>" : String.join(", ", applied));
+				}
 			}
 			String location = response.headers().asHttpHeaders().getFirst(HttpHeaders.LOCATION);
 			if (location == null) {
@@ -662,32 +677,127 @@ final class Connection {
 		});
 	}
 
+	private static <T> Tm1Request<T> withPrefer(Tm1Request<T> request, @Nullable Duration wait) {
+		List<String> kept = new ArrayList<>();
+		List<String> preferKeys = new ArrayList<>();
+		for (var entry : request.headers().entrySet()) {
+			if (!entry.getKey().equalsIgnoreCase("Prefer")) {
+				continue;
+			}
+			preferKeys.add(entry.getKey());
+			for (String rawToken : splitPreferTokens(entry.getValue())) {
+				String name = preferTokenName(rawToken);
+				if (!name.isEmpty() && !name.equals("respond-async") && !name.equals("wait")) {
+					kept.add(rawToken);
+				}
+			}
+		}
+		kept.add("respond-async");
+		if (wait != null) {
+			kept.add("wait=" + wait.toSeconds());
+		}
+		String merged = String.join(", ", kept);
+		if (preferKeys.isEmpty()) {
+			return request.withHeader("Prefer", merged);
+		}
+		Tm1Request<T> updated = request;
+		for (String key : preferKeys) {
+			updated = updated.withHeader(key, merged);
+		}
+		return updated;
+	}
+
+	static boolean hasWaitApplied(List<String> headers) {
+		for (String header : headers) {
+			for (String rawToken : splitPreferTokens(header)) {
+				int semi = rawToken.indexOf(';');
+				String main = (semi < 0 ? rawToken : rawToken.substring(0, semi)).trim();
+				int eq = main.indexOf('=');
+				if (eq > 0 && main.substring(0, eq).trim().equalsIgnoreCase("wait")
+						&& !main.substring(eq + 1).trim().isEmpty()) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static List<String> splitPreferTokens(String header) {
+		List<String> tokens = new ArrayList<>();
+		StringBuilder current = new StringBuilder();
+		boolean inQuotes = false;
+		boolean escaped = false;
+		for (int i = 0; i < header.length(); i++) {
+			char c = header.charAt(i);
+			if (escaped) {
+				current.append(c);
+				escaped = false;
+			}
+			else if (c == '\\' && inQuotes) {
+				current.append(c);
+				escaped = true;
+			}
+			else if (c == '"') {
+				current.append(c);
+				inQuotes = !inQuotes;
+			}
+			else if (c == ',' && !inQuotes) {
+				String token = current.toString().trim();
+				if (!token.isEmpty()) {
+					tokens.add(token);
+				}
+				current.setLength(0);
+			}
+			else {
+				current.append(c);
+			}
+		}
+		String last = current.toString().trim();
+		if (!last.isEmpty()) {
+			tokens.add(last);
+		}
+		return tokens;
+	}
+
+	private static String preferTokenName(String rawToken) {
+		int semi = rawToken.indexOf(';');
+		String main = (semi < 0 ? rawToken : rawToken.substring(0, semi)).trim();
+		int eq = main.indexOf('=');
+		return (eq < 0 ? main : main.substring(0, eq)).trim().toLowerCase(Locale.ROOT);
+	}
+
 	private <T> Flux<T> monitor(Tm1Request<T> request, URI uri, URI monitor, Duration every) {
 		Tm1Request<DataBuffer> poll = Tm1Request.bytes(ODataPath.link(URI.create(root).relativize(monitor).getPath()));
 		AtomicBoolean finished = new AtomicBoolean();
-		Mono<byte[]> once = exchange(poll, monitor, response -> {
-			if (response.statusCode().value() == 202) {
-				return response.releaseBody().thenMany(Flux.<byte[]>empty());
+		Mono<AsyncResult> once = exchange(poll, monitor, response -> {
+			int status = response.statusCode().value();
+			if (status == 202) {
+				return response.releaseBody().thenMany(Flux.<AsyncResult>empty());
 			}
-			return bytes(response).flux();
+			HttpHeaders headers = response.headers().asHttpHeaders();
+			String contentType = headers.getFirst(HttpHeaders.CONTENT_TYPE);
+			String asyncResultHeader = headers.getFirst(AsyncResult.ASYNC_RESULT_HEADER);
+			return bytes(response).map(body -> AsyncResult.fromResponse(contentType, asyncResultHeader, body)).flux();
 		}).next();
 		Flux<T> result = Mono.defer(() -> once)
 			.repeatWhenEmpty(Integer.MAX_VALUE, polls -> polls.concatMap(n -> Mono.delay(every)))
-			.doOnNext(message -> finished.set(true))
-			.flatMapMany(message -> {
-				AsyncResult unwrapped = AsyncResult.parse(message);
-				return decode(request, uri, unwrapped.status(), unwrapped.body());
-			});
+			.doOnNext(unwrapped -> finished.set(true))
+			.flatMap(unwrapped -> unwrapped.shouldDeleteMonitor() ? deleteMonitor(poll, monitor).thenReturn(unwrapped)
+					: Mono.just(unwrapped))
+			.flatMapMany(unwrapped -> decode(request, uri, unwrapped.status(), unwrapped.body()));
 		// Deleting the monitor before the result is what stops the work on TM1
 		return Flux.usingWhen(Mono.just(monitor), m -> result, m -> Mono.empty(), (m, e) -> Mono.empty(),
-				m -> finished.get() ? Mono.empty()
-						: exchange(Tm1Request.delete(poll.path()), m,
-								response -> response.releaseBody().<Void>thenMany(Flux.empty()))
-							.then()
-							.onErrorResume(e -> {
-								log.debug("Couldn't delete the async monitor {}", m, e);
-								return Mono.empty();
-							}));
+				m -> finished.get() ? Mono.empty() : deleteMonitor(poll, m));
+	}
+
+	private Mono<Void> deleteMonitor(Tm1Request<?> poll, URI monitor) {
+		return exchange(Tm1Request.delete(poll.path()), monitor,
+				response -> response.releaseBody().<Void>thenMany(Flux.empty()))
+			.then()
+			.onErrorResume(e -> {
+				log.debug("Couldn't delete the async monitor {}", monitor, e);
+				return Mono.empty();
+			});
 	}
 
 	private <R> Mono<R> error(ClientResponse response, String method, URI uri) {

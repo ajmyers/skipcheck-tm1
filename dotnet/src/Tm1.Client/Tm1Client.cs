@@ -175,6 +175,10 @@ public sealed class Tm1Client : IAsyncDisposable
     /// <summary>A client whose requests TM1 runs asynchronously, polled every <paramref name="every"/>.</summary>
     public Tm1Client WithAsync(TimeSpan every) => new(Session.WithAsync(every));
 
+    /// <summary>A client whose requests TM1 runs asynchronously with <c>Prefer: respond-async, wait=&lt;N&gt;</c>,
+    /// polled every <paramref name="every"/> if work exceeds <paramref name="wait"/>.</summary>
+    public Tm1Client WithAsync(TimeSpan every, TimeSpan wait) => new(Session.WithAsync(every, wait));
+
     /// <summary>A client on a synchronous view of this client's session
     /// (<see cref="Tm1Session.WithoutAsync"/>).</summary>
     public Tm1Client WithoutAsync() => new(Session.WithoutAsync());

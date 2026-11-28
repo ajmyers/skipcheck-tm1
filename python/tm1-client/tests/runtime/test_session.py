@@ -18,6 +18,7 @@ import re
 import threading
 import time
 from collections.abc import Callable, Iterator
+from datetime import timedelta
 from typing import Any
 
 import httpx2
@@ -48,8 +49,10 @@ from skipcheck_tm1 import (
 )
 from skipcheck_tm1._generated.model import CheckFeedersSelection
 from skipcheck_tm1._generated.operations import Tm1Operations
-from skipcheck_tm1._protocol import Call, async_result
+from skipcheck_tm1._protocol import Call, async_result, has_wait_applied
+from skipcheck_tm1.aio import AsyncTm1Client
 from skipcheck_tm1.aio import cognos as aio_cognos
+from skipcheck_tm1.client import Tm1Client
 
 from ..conftest import BASE, SNAPSHOT, target
 from .conftest import SERVER, Clock, Runtime, each, json_response, text_response
@@ -1272,6 +1275,218 @@ def test_unwraps_an_application_http_message() -> None:
 def test_decompresses_a_gzipped_inner_body() -> None:
     head = b"HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Type: application/json\r\n\r\n"
     assert async_result(head + gzip.compress(b'{"Name":"tm1"}')).content == b'{"Name":"tm1"}'
+
+
+def test_reads_tm112_async_result_header_and_deletes_monitor(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: each(
+                httpx2.Response(202),
+                httpx2.Response(
+                    200,
+                    content=b'{"ProcessExecuteStatusCode":"CompletedSuccessfully"}',
+                    headers={"Content-Type": "application/json; charset=utf-8", "Asyncresult": " 201 "},
+                ),
+            ),
+            "DELETE _async('a1')": httpx2.Response(204),
+        },
+    )
+    result = rt.run(rt.session().with_async(0.01).execute(REQUEST))
+    assert result["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert len(requests_to(rt, MONITOR)) == 2
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_reads_tm112_async_no_content_result(rt: Runtime) -> None:
+    run_no_content = Tm1Request.post(ODataPath.of("Processes").key("p").action("tm1.Execute"), None)
+    answers(
+        rt,
+        {
+            "POST Processes('p')/tm1.Execute": accepted(),
+            MONITOR: httpx2.Response(200, headers={"Asyncresult": "204"}),
+            "DELETE _async('a1')": httpx2.Response(204),
+        },
+    )
+    assert rt.run(rt.session().with_async(0.01).execute(run_no_content)) is None
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_raises_tm112_async_error_from_asyncresult_header(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: httpx2.Response(
+                200,
+                content=b'{"error":{"code":"501","message":"Bad MDX"}}',
+                headers={"Content-Type": "application/json; charset=utf-8", "Asyncresult": "400"},
+            ),
+            "DELETE _async('a1')": httpx2.Response(204),
+        },
+    )
+    error = rt.raises(Tm1BadRequestError, lambda: rt.session().with_async(0.01).execute(REQUEST))
+    assert error.error is not None
+    assert (error.error.code, error.error.message) == ("501", "Bad MDX")
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_ignores_cleanup_failure_after_reading_tm112_async_result(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger="skipcheck_tm1")
+
+    def reset(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadError("connection reset", request=request)
+
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: httpx2.Response(
+                200,
+                content=b'{"ProcessExecuteStatusCode":"CompletedSuccessfully"}',
+                headers={"Content-Type": "application/json", "Asyncresult": "201"},
+            ),
+            "DELETE _async('a1')": each(httpx2.Response(500), reset),
+        },
+    )
+    session = rt.session().with_async(0.01)
+    assert rt.run(session.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert rt.run(session.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 2
+    cleanup_logs = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1" and "Couldn't delete the async monitor" in r.getMessage()]
+    assert len(cleanup_logs) == 2
+
+
+def test_rejects_invalid_asyncresult_header(rt: Runtime) -> None:
+    for bad in ("", "   ", "not-a-status", "+200", "-200", "99", "600", "0200", "99999999999999999999"):
+        rt.fake.requests.clear()
+        answers(
+            rt,
+            {
+                RUN: accepted(),
+                MONITOR: httpx2.Response(200, content=b"{}", headers={"Content-Type": "application/json", "Asyncresult": bad}),
+            },
+        )
+        rt.raises(Tm1ProtocolError, lambda: rt.session().with_async(0.01).execute(REQUEST))
+        assert requests_to(rt, "DELETE _async('a1')") == [], f"bad Asyncresult {bad!r}"
+
+
+def test_sends_prefer_wait_and_handles_immediate_or_deferred_completion(rt: Runtime, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger="skipcheck_tm1")
+    answers(
+        rt,
+        {
+            RUN: each(
+                json_response(201, {"ProcessExecuteStatusCode": "CompletedSuccessfully"}),
+                json_response(201, {"ProcessExecuteStatusCode": "CompletedSuccessfully"}),
+                httpx2.Response(202, headers={"Location": "../_async('a1')", "Preference-Applied": "respond-async, wait=2"}),
+                httpx2.Response(202, headers={"Location": "../_async('a1')", "Preference-Applied": "respond-async"}),
+                httpx2.Response(202, headers={"Location": "../_async('a1')", "Preference-Applied": "respond-async"}),
+            ),
+            MONITOR: each(
+                httpx2.Response(
+                    200,
+                    content=b'{"ProcessExecuteStatusCode":"CompletedSuccessfully"}',
+                    headers={"Content-Type": "application/json", "Asyncresult": "201"},
+                ),
+                done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"})),
+                done("201 Created", json.dumps({"ProcessExecuteStatusCode": "CompletedSuccessfully"})),
+            ),
+            "DELETE _async('a1')": httpx2.Response(204),
+        },
+    )
+    base = rt.session()
+    with pytest.raises(ValueError):
+        base.with_async(0, 1)
+    for bad in (-1, 0.5, 1.5, float("inf"), float("nan"), timedelta(milliseconds=500), True):
+        with pytest.raises(ValueError):
+            base.with_async(0.01, bad)
+
+    zero_wait = base.with_async(0.01, 0)
+    assert zero_wait.async_wait == 0
+    assert zero_wait.with_sandbox("sb").async_wait == 0
+    assert zero_wait.with_sandbox("sb").without_sandbox().async_wait == 0
+    assert zero_wait.with_change_set("cs1").async_wait == 0
+    assert zero_wait.with_change_set("cs1").without_change_set().async_wait == 0
+    assert zero_wait.batch().session.async_wait is None
+    assert zero_wait.with_async(0.01).async_wait is None
+    assert zero_wait.without_async().async_wait is None
+
+    client_cls: Any = Tm1Client if rt.flavor == "sync" else AsyncTm1Client
+    waited = client_cls(base).with_async(0.01, timedelta(seconds=2)).session
+    assert waited.async_wait == 2
+
+    # wait=0 on the wire, plus per-request timeout forwarded on async requests
+    assert rt.run(zero_wait.execute(REQUEST.with_timeout(45)))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    # Immediate completion within wait: zero polls
+    assert rt.run(waited.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    # Deferred completion on TM1 12 (Preference-Applied includes wait=2)
+    assert rt.run(waited.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    # Graceful degradation on TM1 11 (Preference-Applied omits wait=): logged once per connection
+    assert rt.run(waited.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert rt.run(waited.execute(REQUEST))["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+
+    assert [r.headers.get("Prefer") for r in requests_to(rt, RUN)] == [
+        "respond-async, wait=0",
+        "respond-async, wait=2",
+        "respond-async, wait=2",
+        "respond-async, wait=2",
+        "respond-async, wait=2",
+    ]
+    assert requests_to(rt, RUN)[0].extensions.get("timeout", {}).get("read") == 45.0
+    assert len(requests_to(rt, MONITOR)) == 3
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+    ignored_logs = [r.getMessage() for r in caplog.records if r.name == "skipcheck_tm1" and "did not apply Prefer wait=" in r.getMessage()]
+    assert len(ignored_logs) == 1
+
+    # Preference-Applied parsing edge cases
+    assert has_wait_applied("respond-async, wait=2")
+    assert has_wait_applied("respond-async, wait = 5; foo=bar")
+    assert not has_wait_applied("respond-async, wait=")
+    assert not has_wait_applied('respond-async, foo="a, wait=1"')
+    assert not has_wait_applied(None)
+
+
+def test_streams_tm112_async_collection_with_wait_and_follows_next_link(rt: Runtime) -> None:
+    answers(
+        rt,
+        {
+            "GET Cubes": httpx2.Response(202, headers={"Location": "_async('a1')", "Preference-Applied": "respond-async, wait=2"}),
+            MONITOR: httpx2.Response(
+                200,
+                content=json.dumps({"value": [{"Name": "a"}], "@odata.nextLink": "Cubes?$skiptoken=2"}).encode(),
+                headers={"Content-Type": "application/json", "Asyncresult": "200"},
+            ),
+            "DELETE _async('a1')": httpx2.Response(204),
+            "GET Cubes?$skiptoken=2": {"value": [{"Name": "b"}]},
+        },
+    )
+    cubes = streamed(rt, rt.session().with_async(0.01, 2), CUBES)
+    assert [cube["Name"] for cube in cubes] == ["a", "b"]
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes")] == ["respond-async, wait=2"]
+    assert [r.headers.get("Prefer") for r in requests_to(rt, "GET Cubes?$skiptoken=2")] == [None]
+    assert len(requests_to(rt, "DELETE _async('a1')")) == 1
+
+
+def test_merges_prefer_header_and_respects_application_http_content_type(rt: Runtime) -> None:
+    message = b'HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n\r\n{"ProcessExecuteStatusCode":"CompletedSuccessfully"}'
+    answers(
+        rt,
+        {
+            RUN: accepted(),
+            MONITOR: httpx2.Response(
+                200,
+                content=message,
+                headers={"Content-Type": "application/http; msgtype=response", "Asyncresult": "201"},
+            ),
+        },
+    )
+    with_existing = REQUEST.with_header("prefer", "odata.maxpagesize=50, wait=9")
+    result = rt.run(rt.session().with_async(0.01, 2).execute(with_existing))
+    assert result["ProcessExecuteStatusCode"] == "CompletedSuccessfully"
+    assert requests_to(rt, RUN)[0].headers.get_list("prefer") == ["odata.maxpagesize=50, respond-async, wait=2"]
+    assert requests_to(rt, "DELETE _async('a1')") == [], "application/http monitor is not deleted"
 
 
 def test_reads_a_big_error_body(rt: Runtime) -> None:
