@@ -41,17 +41,29 @@ public record ODataError(String code, String message, @Nullable String target, L
 	}
 
 	/**
-	 * Reads an error from a response body, if it is one: either {@code {"error":{...}}}
-	 * or the inner object.
+	 * Reads an error from a response body, if it is one: an OData error object
+	 * ({@code {"error":{...}}} or the inner object), or a TM1 12 auth/gateway error
+	 * ({@code {"error":"invalid_token","error_details":"..."}} or OAuth 2.0
+	 * {@code error_description}).
 	 * @param body a response body, or {@code null}
-	 * @return the error, or {@code null} if the body isn't an object with a {@code code}
-	 * or {@code message}
+	 * @return the error, or {@code null} if the body isn't a recognized error object
 	 */
 	public static @Nullable ODataError from(@Nullable JsonNode body) {
 		if (body == null || !body.isObject()) {
 			return null;
 		}
 		JsonNode error = body.has("error") ? body.get("error") : body;
+		if (error.isString()) {
+			String code = error.asString();
+			String message = text(body, "error_details");
+			if (message == null || message.isEmpty()) {
+				message = text(body, "error_description");
+			}
+			if (code.isEmpty() && (message == null || message.isEmpty())) {
+				return null;
+			}
+			return new ODataError(code, Objects.requireNonNullElse(message, ""), null, List.of(), null);
+		}
 		if (!error.isObject() || !(error.has("code") || error.has("message"))) {
 			return null;
 		}
@@ -96,6 +108,9 @@ public record ODataError(String code, String message, @Nullable String target, L
 
 	private static @Nullable String text(JsonNode node, String field) {
 		JsonNode value = node.get(field);
-		return value == null || value.isNull() ? null : value.asString();
+		if (value == null || value.isNull()) {
+			return null;
+		}
+		return value.isValueNode() ? value.asString() : value.toString();
 	}
 }

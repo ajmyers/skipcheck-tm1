@@ -28,6 +28,42 @@ class Tm1ErrorsTest {
 		assertThat(ODataError.from(MAPPER.readTree("[]"))).isNull();
 	}
 
+	@Test
+	void readsTm112AuthErrorBodies() {
+		ODataError v12 = error(
+				"{\"error\":\"invalid_token\",\"error_details\":\"Unable to validate authorization header\"}");
+		assertThat(v12).isNotNull();
+		assertThat(v12.code()).isEqualTo("invalid_token");
+		assertThat(v12.message()).isEqualTo("Unable to validate authorization header");
+
+		ODataError oauth = error("{\"error\":\"invalid_client\",\"error_description\":\"Bad credentials\"}");
+		assertThat(oauth).isNotNull();
+		assertThat(oauth.code()).isEqualTo("invalid_client");
+		assertThat(oauth.message()).isEqualTo("Bad credentials");
+
+		ODataError emptyDetails = error(
+				"{\"error\":\"invalid_token\",\"error_details\":\"\",\"error_description\":\"Token expired\"}");
+		assertThat(emptyDetails).isNotNull();
+		assertThat(emptyDetails.message()).isEqualTo("Token expired");
+
+		ODataError objectDetails = error("{\"error\":\"invalid_token\",\"error_details\":{\"reason\":\"expired\"}}");
+		assertThat(objectDetails).isNotNull();
+		assertThat(objectDetails.code()).isEqualTo("invalid_token");
+		assertThat(objectDetails.message()).isEqualTo("{\"reason\":\"expired\"}");
+
+		ODataError codeOnly = error("{\"error\":\"invalid_token\"}");
+		assertThat(codeOnly).isNotNull();
+		assertThat(codeOnly.code()).isEqualTo("invalid_token");
+		assertThat(codeOnly.message()).isEmpty();
+
+		assertThat(ODataError.from(MAPPER.readTree("{\"error\":\"\"}"))).isNull();
+
+		assertThat(api(401, "{\"error\":\"invalid_token\",\"error_details\":\"Bad token\"}"))
+			.isInstanceOf(Tm1AuthenticationException.class)
+			.hasMessageContaining("Bad token")
+			.hasMessageContaining("[code invalid_token]");
+	}
+
 	/**
 	 * TM1 11.8 sends impersonation errors as plain text: a status line, then the message.
 	 */
