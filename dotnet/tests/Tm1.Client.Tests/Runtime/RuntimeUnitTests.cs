@@ -32,6 +32,40 @@ public class Tm1ErrorsTest
         Assert.Null(Error("[]"));
     }
 
+    [Fact]
+    public void ReadsTm112AuthErrorBodies()
+    {
+        var v12 = Error("{\"error\":\"invalid_token\",\"error_details\":\"Unable to validate authorization header\"}");
+        Assert.NotNull(v12);
+        Assert.Equal("invalid_token", v12.Code);
+        Assert.Equal("Unable to validate authorization header", v12.Message);
+
+        var oauth = Error("{\"error\":\"invalid_client\",\"error_description\":\"Bad credentials\"}");
+        Assert.NotNull(oauth);
+        Assert.Equal("invalid_client", oauth.Code);
+        Assert.Equal("Bad credentials", oauth.Message);
+
+        var emptyDetails = Error("{\"error\":\"invalid_token\",\"error_details\":\"\",\"error_description\":\"Token expired\"}");
+        Assert.NotNull(emptyDetails);
+        Assert.Equal("Token expired", emptyDetails.Message);
+
+        var objectDetails = Error("{\"error\":\"invalid_token\",\"error_details\":{\"reason\":\"expired\"}}");
+        Assert.NotNull(objectDetails);
+        Assert.Equal("invalid_token", objectDetails.Code);
+        Assert.Equal("{\"reason\":\"expired\"}", objectDetails.Message);
+
+        var codeOnly = Error("{\"error\":\"invalid_token\"}");
+        Assert.NotNull(codeOnly);
+        Assert.Equal("invalid_token", codeOnly.Code);
+        Assert.Empty(codeOnly.Message);
+
+        Assert.Null(Error("{\"error\":\"\"}"));
+
+        var auth = Assert.IsType<Tm1AuthenticationException>(Api(401, "{\"error\":\"invalid_token\",\"error_details\":\"Bad token\"}"));
+        Assert.Contains("Bad token", auth.Message);
+        Assert.Contains("[code invalid_token]", auth.Message);
+    }
+
     /// <summary>TM1 11.8 sends impersonation errors as plain text: a status line, then the message.</summary>
     [Fact]
     public void ReadsAndClassifiesPlainTextErrors()
@@ -773,6 +807,56 @@ public class Tm1DialectTest
     [Fact]
     public void LetsASessionBeBuiltFromAnAddress() =>
         Assert.Equal("http://tm1:8010/api/v1/", Tm1Session.Builder().Address("http://tm1:8010").BasicAuth("admin", "").Build().ServiceRoot());
+
+    [Fact]
+    public void FindsTheTm112ServiceRootAndCloseUrl()
+    {
+        var sales = Tm1Dialect.V12("sales");
+        Assert.Equal("TM1 12", sales.Name());
+        Assert.Equal(Tm1Dialect.V12("tm1", "sales"), sales);
+        Assert.Equal(Tm1Dialect.V12("tm1", "sales").GetHashCode(), sales.GetHashCode());
+        Assert.Equal("Tm1Dialect[TM1 12, tm1/sales]", sales.ToString());
+        Assert.Equal("http://engine:4444/tm1/api/v1/Databases('sales')/", sales.ServiceRoot("http://engine:4444"));
+        Assert.Equal("https://engine.example.com:4444/tm1/api/v1/Databases('sales')/", sales.ServiceRoot("https://engine.example.com:4444/"));
+        Assert.Equal("http://engine:4444/tm1/api/v1/Databases('sales')/", sales.ServiceRoot("http://engine:4444/tm1/api/v1"));
+        Assert.Equal("http://engine:4444/tm1/api/v1/Databases('sales')/", sales.ServiceRoot("http://engine:4444/tm1/api/v1/Databases('sales')/"));
+        Assert.Equal("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')/", Tm1Dialect.V12("prod", "O'Neil Sales").ServiceRoot("https://proxy/pa/"));
+        Assert.Equal(
+            "http://engine:4444/tm1/api/v1/Databases('caf%C3%A9')/",
+            Tm1Dialect.V12("café").ServiceRoot("http://engine:4444/tm1/api/v1/Databases('caf%c3%a9')/")
+        );
+
+        Assert.Equal("http://tm1:8010/api/v1/ActiveSession/tm1.Close", Tm1Dialect.V11.CloseUrl("http://tm1:8010/api/v1/"));
+        Assert.Equal("http://engine:4444/tm1/api/v1/ActiveSession/tm1s.Close", sales.CloseUrl("http://engine:4444/tm1/api/v1/Databases('sales')/"));
+        Assert.Equal("https://proxy/pa/tm1/api/v1/ActiveSession/tm1s.Close", sales.CloseUrl("https://proxy/pa/tm1/api/v1/Databases('O''Neil%20Sales')"));
+
+        var dialectFirst = Tm1Session.Builder().Dialect(sales).Address("http://engine:4444").BasicAuth("admin", "").Build();
+        Assert.Equal("http://engine:4444/tm1/api/v1/Databases('sales')/", dialectFirst.ServiceRoot());
+
+        var addressFirst = Tm1Session.Builder().Address("http://engine:4444").Dialect(sales).BasicAuth("admin", "").Build();
+        Assert.Equal("http://engine:4444/tm1/api/v1/Databases('sales')/", addressFirst.ServiceRoot());
+    }
+
+    [Fact]
+    public void RefusesInvalidTm112DialectInputs()
+    {
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("  "));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("", "sales"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("a/b", "sales"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("..", "sales"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("a[b", "sales"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("tm1", " "));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("engine:4444"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("ftp://engine:4444"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("http://engine:4444?"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("http://engine:4444#"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("http:///tm1/api/v1"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").ServiceRoot("http://engine:4444/tm1/api/v1/Databases('other')/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/tm1/api/v1/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/api/v1/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V11.CloseUrl("not a url"));
+    }
 }
 
 /// <summary>The Java client's <c>Tm1RequestTest</c>.</summary>

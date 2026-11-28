@@ -808,8 +808,8 @@ public class Tm1SessionBuilder
         return this;
     }
 
-    /// <summary>The kind of deployment, for <see cref="Address"/>. <see cref="Tm1Dialect.V11"/>
-    /// unless set.</summary>
+    /// <summary>The kind of deployment, for <see cref="Address"/> and for how the session is closed
+    /// (even when <see cref="BaseUrl"/> is given). <see cref="Tm1Dialect.V11"/> unless set.</summary>
     public Tm1SessionBuilder Dialect(Tm1Dialect dialect)
     {
         _dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
@@ -924,6 +924,7 @@ public class Tm1SessionBuilder
         return new Tm1Session(
             new Connection(
                 root,
+                _dialect,
                 authenticator,
                 _impersonate,
                 _sessionContext,

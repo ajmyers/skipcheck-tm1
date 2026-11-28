@@ -37,12 +37,12 @@ internal sealed class Connection
     public const string Impersonate = "TM1-Impersonate";
     public const string SessionContextHeader = "TM1-SessionContext";
     private const string LoginPath = "ActiveSession?$select=ID";
-    private const string ClosePath = "ActiveSession/tm1.Close";
     internal const string Json = "application/json";
 
     /// <summary>TM1 closes a kept-alive connection after about 90 s idle: retire ours first.</summary>
     public static readonly TimeSpan MaxIdle = TimeSpan.FromSeconds(60);
 
+    private readonly string _closeUrl;
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
     private readonly object _gate = new();
@@ -58,6 +58,7 @@ internal sealed class Connection
 
     public Connection(
         string root,
+        Tm1Dialect dialect,
         Tm1Authenticator authenticator,
         string? impersonate,
         string? sessionContext,
@@ -71,6 +72,7 @@ internal sealed class Connection
     {
         _capabilitiesCache = capabilitiesCache ?? new CapabilitiesCache();
         Root = root.EndsWith('/') ? root : root + "/";
+        _closeUrl = dialect.CloseUrl(Root);
         Authenticator = authenticator;
         ImpersonateUser = impersonate;
         SessionContext = sessionContext;
@@ -290,7 +292,7 @@ internal sealed class Connection
         {
             // TM1 answers a disabled impersonated user exactly like wrong credentials
             var why = ImpersonateUser is null
-                ? null
+                ? ODataError.Parse(reply.Body)
                 : new ODataError("", $"The credentials were refused, or the user being impersonated ({ImpersonateUser}) is disabled");
             throw Tm1ApiException.Of(401, Tm1ErrorKind.CredentialRejected, why, "GET", url);
         }
@@ -635,7 +637,7 @@ internal sealed class Connection
                 // Never logged in: nothing to close
                 return;
             }
-            var url = Root + ClosePath;
+            var url = _closeUrl;
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
             Headers(request, Json);
             request.Headers.TryAddWithoutValidation("Cookie", $"{Cookie}={session.Cookie}");

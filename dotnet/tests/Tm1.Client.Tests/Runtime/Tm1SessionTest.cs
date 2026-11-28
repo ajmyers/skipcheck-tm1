@@ -16,6 +16,7 @@ using Skipcheck.Tm1.Client.Auth;
 using Skipcheck.Tm1.Client.Errors;
 using Skipcheck.Tm1.Client.OData;
 using Skipcheck.Tm1.Client.Session;
+using Skipcheck.Tm1.Client.Version;
 
 namespace Skipcheck.Tm1.Client.Tests.Runtime;
 
@@ -365,6 +366,40 @@ public class Tm1SessionTest
         var session = _tm1.Session();
         await session.ConnectAsync();
         await session.CloseAsync();
+    }
+
+    [Fact]
+    public async Task ClosesTm112SessionsAtTheInstanceLevel()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        const string instClose = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+        using var v12 = new ScriptedTm1()
+            .On("GET " + dbRoot + "ActiveSession?$select=ID", _ => ScriptedTm1.Json(200, "{\"ID\":9}", "TM1SessionId=s9; Path=/; HttpOnly"))
+            .On("GET " + dbRoot + "Server?$select=Name", _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}"))
+            .On(instClose, _ => ScriptedTm1.Status(204, "TM1SessionId=s9; Path=/; Max-Age=0"));
+
+        var session = Tm1Session.Builder().Dialect(Tm1Dialect.V12("sales")).Address("http://tm1.test").BasicAuth("admin", "apple").HttpHandler(v12).Build();
+
+        await session.ExecuteAsync(Server);
+        await session.CloseAsync();
+
+        var closes = v12.Requests(instClose);
+        Assert.Single(closes);
+        Assert.Equal("s9", closes[0].Cookie);
+        Assert.Empty(v12.Requests("POST " + dbRoot + "ActiveSession/tm1.Close"));
+    }
+
+    [Fact]
+    public async Task ReadsTm112AuthErrorDetailsOnLogin401()
+    {
+        _tm1.On(ScriptedTm1.Login, _ => ScriptedTm1.Json(401, "{\"error\":\"invalid_token\",\"error_details\":\"Unable to validate authorization header\"}"));
+        var session = _tm1.Session();
+
+        var ex = await Assert.ThrowsAsync<Tm1AuthenticationException>(() => session.ExecuteAsync(Server));
+        Assert.Equal(Tm1ErrorKind.CredentialRejected, ex.Kind);
+        Assert.NotNull(ex.Error);
+        Assert.Equal("invalid_token", ex.Error.Code);
+        Assert.Equal("Unable to validate authorization header", ex.Error.Message);
     }
 
     /// <summary>A body that can't be written as JSON: reading its property fails.</summary>
