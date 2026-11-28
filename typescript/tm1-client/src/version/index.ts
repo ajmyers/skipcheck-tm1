@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Tm1ProtocolException, Tm1UnsupportedOperationException } from "../errors/index.js";
+import { ODataPath } from "../odata/path.js";
 
 /** A TM1 version, such as `11.8.03500.6` or schema `11.8.35`: compared part by part, missing parts
  * as 0, as the Java client's `Tm1Version`. */
@@ -476,8 +477,40 @@ export class Tm1Capabilities {
   }
 }
 
-/** How a server's address becomes its REST API's service root, as the Java client's `Tm1Dialect`:
- * {@link Tm1Dialect.V11} turns `http://tm1:8010` into `http://tm1:8010/api/v1/`. */
+const INSTANCE_SEGMENT = /^[A-Za-z0-9._~-]+$/;
+const DATABASE_ROOT_SUFFIX = /\/api\/v1\/Databases\([^/]+\)$/;
+const PERCENT_HEX = /%[0-9a-fA-F]{2}/g;
+
+function parseAbsoluteUrl(raw: string, paramName: string, message: string): URL {
+  if (typeof raw !== "string") throw new TypeError(`${paramName} is required`);
+  const trimmed = raw.trim();
+  // eslint-disable-next-line no-control-regex
+  if (!trimmed || trimmed.includes("?") || trimmed.includes("#") || /[\x00-\x20]/.test(trimmed) || /^[a-z][a-z0-9+.-]*:\/\/\//i.test(trimmed)) {
+    throw new RangeError(message);
+  }
+  let url: URL | undefined;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    url = undefined;
+  }
+  if (!url || !url.hostname) {
+    throw new RangeError(message);
+  }
+  return url;
+}
+
+function parseHttpUrl(raw: string, paramName: string, message: string): URL {
+  const url = parseAbsoluteUrl(raw, paramName, message);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new RangeError(message);
+  }
+  return url;
+}
+
+/** How a server's address becomes its REST API's service root and how a session is closed, as the
+ * Java client's `Tm1Dialect`: {@link Tm1Dialect.V11} is TM1 11 on-premises and
+ * {@link Tm1Dialect.v12} is TM1 12 (Planning Analytics Engine). */
 export abstract class Tm1Dialect {
   /** TM1 11 on-premises: the REST API is at `http(s)://host:port/api/v1/`. */
   static readonly V11: Tm1Dialect = new (class extends Tm1Dialect {
@@ -486,27 +519,107 @@ export abstract class Tm1Dialect {
     }
 
     serviceRoot(address: string): string {
-      let url: URL;
-      try {
-        url = new URL(String(address).trim());
-      } catch {
-        url = undefined as unknown as URL;
-      }
-      if (!url || (url.protocol !== "http:" && url.protocol !== "https:") || url.search || url.hash) {
-        throw new RangeError("A TM1 11 address is the server's scheme, host and HTTP port, such as http://tm1:8010: " + address);
-      }
+      const url = parseHttpUrl(address, "address", "A TM1 11 address is the server's scheme, host and HTTP port, such as http://tm1:8010: " + address);
       let path = url.pathname.replace(/\/+$/, "");
       if (!path.endsWith("/api/v1")) path += "/api/v1";
       return `${url.protocol}//${url.host}${path}/`;
     }
   })();
 
+  /** TM1 12 (Planning Analytics Engine) for a database in the default `tm1` instance. */
+  static v12(database: string): Tm1Dialect;
+  /** TM1 12 (Planning Analytics Engine) for a database in a named instance. */
+  static v12(instance: string, database: string): Tm1Dialect;
+  static v12(instanceOrDatabase: string, database?: string): Tm1Dialect {
+    const instance = database === undefined ? "tm1" : instanceOrDatabase;
+    const db = database === undefined ? instanceOrDatabase : database;
+    return new V12Dialect(instance, db);
+  }
+
   abstract name(): string;
 
   abstract serviceRoot(address: string): string;
 
+  /** The URL a session posts to in order to close itself on TM1. TM1 11 closes at
+   * `<serviceRoot>ActiveSession/tm1.Close`; TM1 12 closes at `/<instance>/api/v1/ActiveSession/tm1s.Close`. */
+  closeUrl(serviceRoot: string): string {
+    const url = parseAbsoluteUrl(serviceRoot, "serviceRoot", "Not a service root: " + serviceRoot);
+    const path = url.pathname.replace(/\/+$/, "");
+    return `${url.protocol}//${url.host}${path}/ActiveSession/tm1.Close`;
+  }
+
+  /** Whether `other` is the same dialect. */
+  equals(other: unknown): boolean {
+    return other === this;
+  }
+
   /** The dialect's name. */
   toString(): string {
     return `Tm1Dialect[${this.name()}]`;
+  }
+}
+
+class V12Dialect extends Tm1Dialect {
+  private readonly instancePath: string;
+  private readonly databaseSegment: string;
+
+  constructor(
+    private readonly instance: string,
+    private readonly database: string,
+  ) {
+    super();
+    if (typeof instance !== "string") throw new TypeError("instance is required");
+    if (typeof database !== "string") throw new TypeError("database is required");
+    if (!instance.trim()) throw new RangeError("instance must not be blank");
+    if (instance === "." || instance === ".." || !INSTANCE_SEGMENT.test(instance)) {
+      throw new RangeError("A TM1 12 instance name must be a single URL path segment: " + instance);
+    }
+    if (!database.trim()) throw new RangeError("database must not be blank");
+    this.instancePath = `/${instance}/api/v1`;
+    this.databaseSegment = "/" + ODataPath.of("Databases").key(database).toString();
+  }
+
+  name(): string {
+    return "TM1 12";
+  }
+
+  serviceRoot(address: string): string {
+    const url = parseHttpUrl(address, "address", "A TM1 12 address is the gateway's scheme, host and HTTP port, such as http://tm1:4444: " + address);
+    let path = url.pathname.replace(/\/+$/, "");
+    const fullSuffix = this.instancePath + this.databaseSegment;
+    const normalizedPath = path.replace(PERCENT_HEX, (m) => m.toUpperCase());
+    if (normalizedPath.endsWith(fullSuffix)) {
+      path = path.slice(0, path.length - fullSuffix.length) + fullSuffix;
+    } else if (DATABASE_ROOT_SUFFIX.test(path)) {
+      throw new RangeError("The address already names another TM1 12 database: " + address);
+    } else if (path.endsWith(this.instancePath)) {
+      path += this.databaseSegment;
+    } else {
+      path += fullSuffix;
+    }
+    return `${url.protocol}//${url.host}${path}/`;
+  }
+
+  override closeUrl(serviceRoot: string): string {
+    const url = parseHttpUrl(serviceRoot, "serviceRoot", "Not a TM1 12 service root: " + serviceRoot);
+    const path = url.pathname.replace(/\/+$/, "");
+    const lastSlash = path.lastIndexOf("/");
+    if (lastSlash <= 0) {
+      throw new RangeError("A TM1 12 database service root must include its instance API path: " + serviceRoot);
+    }
+    const instanceRoot = path.slice(0, lastSlash);
+    const lastSegment = path.slice(lastSlash + 1);
+    if (!instanceRoot.endsWith("/api/v1") || !lastSegment.startsWith("Databases(") || !lastSegment.endsWith(")")) {
+      throw new RangeError("A TM1 12 database service root must end with /api/v1/Databases('<db>')/: " + serviceRoot);
+    }
+    return `${url.protocol}//${url.host}${instanceRoot}/ActiveSession/tm1s.Close`;
+  }
+
+  override equals(other: unknown): boolean {
+    return other instanceof V12Dialect && other.instance === this.instance && other.database === this.database;
+  }
+
+  override toString(): string {
+    return `Tm1Dialect[${this.name()}, ${this.instance}/${this.database}]`;
   }
 }

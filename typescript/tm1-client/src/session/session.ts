@@ -565,6 +565,7 @@ export class BatchQueue {
 /** A session's settings one by one, as the Java client's `Tm1Session.Builder`. */
 export class Tm1SessionBuilder {
   private root: string | undefined;
+  private addressValue: string | undefined;
   private dialectValue: Tm1Dialect = Tm1Dialect.V11;
   private authenticatorValue: Tm1Authenticator | undefined;
   private impersonated: string | undefined;
@@ -590,23 +591,31 @@ export class Tm1SessionBuilder {
     if (!url || !/^[a-z][a-z0-9+.-]*:\/\//i.test(baseUrl) || url.search || url.hash || baseUrl.includes("?") || baseUrl.includes("#")) {
       throw new RangeError("baseUrl must be an absolute URL with no query or fragment: " + baseUrl);
     }
+    this.addressValue = undefined;
     this.root = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
     return this;
   }
 
   /** The server's address, such as `http://tm1:8010`: its scheme, host and HTTP port. The service
-   * root comes from the dialect, {@link Tm1Dialect.V11} unless set (before this), which adds
-   * `/api/v1/`. Use {@link baseUrl} to give the service root itself.
+   * root comes from the dialect, {@link Tm1Dialect.V11} unless set, which adds `/api/v1/`. Use
+   * {@link baseUrl} to give the service root itself.
    * @throws RangeError if the address doesn't fit the dialect */
   address(address: string): this {
     if (typeof address !== "string") throw new TypeError("address is required");
-    return this.baseUrl(this.dialectValue.serviceRoot(address));
+    const resolved = this.dialectValue.serviceRoot(address);
+    this.addressValue = address;
+    this.root = resolved;
+    return this;
   }
 
-  /** The kind of deployment, for {@link address}: {@link Tm1Dialect.V11} unless set. */
+  /** The kind of deployment, for {@link address} and for how the session is closed (even when
+   * {@link baseUrl} is given): {@link Tm1Dialect.V11} unless set. */
   dialect(dialect: Tm1Dialect): this {
     if (!(dialect instanceof Tm1Dialect)) throw new TypeError("dialect is a Tm1Dialect");
     this.dialectValue = dialect;
+    if (this.addressValue !== undefined) {
+      this.root = dialect.serviceRoot(this.addressValue);
+    }
     return this;
   }
 
@@ -701,6 +710,7 @@ export class Tm1SessionBuilder {
     if (!this.authenticatorValue) throw new Error("credentials are required: call basicAuth or authenticator");
     const connection = new Connection(
       root,
+      this.dialectValue,
       this.authenticatorValue,
       this.impersonated,
       this.context,

@@ -95,10 +95,18 @@ export class ODataError {
     this.innerError = innerError;
   }
 
-  /** The error in a parsed JSON body, wrapped in `error` or not; undefined if it isn't one. */
+  /** The error in a parsed JSON body, wrapped in `error` or not, or a TM1 12 auth/gateway error
+   * (`{"error":"invalid_token","error_details":"..."}`); undefined if it isn't one. */
   static from(body: unknown): ODataError | undefined {
     if (typeof body !== "object" || body === null || Array.isArray(body)) return undefined;
     const b = body as Record<string, unknown>;
+    if (typeof b["error"] === "string") {
+      const code = b["error"];
+      const details = text(b, "error_details");
+      const message = details !== undefined && details.length > 0 ? details : (text(b, "error_description") ?? "");
+      if (!code && !message) return undefined;
+      return new ODataError(code, message);
+    }
     const error = (typeof b["error"] === "object" && b["error"] !== null ? b["error"] : b) as Record<string, unknown>;
     if (Array.isArray(error) || !("code" in error || "message" in error)) return undefined;
     const details: ODataError[] = [];

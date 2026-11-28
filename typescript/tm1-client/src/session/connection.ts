@@ -11,7 +11,7 @@ import {
   type Tm1ErrorClassifier,
 } from "../errors/index.js";
 import { Tm1Request } from "../request.js";
-import { Tm1Capabilities, Tm1Version } from "../version/index.js";
+import { Tm1Capabilities, type Tm1Dialect, Tm1Version } from "../version/index.js";
 import type { Tm1Timeouts } from "./timeouts.js";
 import type { Tm1HttpResponse, Tm1Transport } from "./transport.js";
 
@@ -27,7 +27,6 @@ export const SESSION_CONTEXT = "TM1-SessionContext";
 /** @internal What every request accepts. */
 export const JSON_ACCEPT = "application/json";
 const LOGIN_PATH = "ActiveSession?$select=ID";
-const CLOSE_PATH = "ActiveSession/tm1.Close";
 const utf8 = new TextEncoder();
 // Not fatal: bytes that aren't UTF-8 read as U+FFFD, as the Java client's Utf8Repair. TM1 (11.8)
 // sends such bytes in the transaction log, for a password's hash.
@@ -111,6 +110,7 @@ function abortError(signal: AbortSignal): unknown {
 export class Connection {
   /** The service root, ending in `/`. */
   readonly root: string;
+  private readonly closeUrl: string;
   private attempt: Attempt | undefined;
   private version: { read: Promise<Tm1Version>; for: Attempt } | undefined;
   private closed = false;
@@ -121,6 +121,7 @@ export class Connection {
   /** @internal A connection to the service root `root`, logging in with `authenticator`. */
   constructor(
     root: string,
+    dialect: Tm1Dialect,
     readonly authenticator: Tm1Authenticator,
     readonly impersonateUser: string | undefined,
     readonly sessionContext: string | undefined,
@@ -132,6 +133,7 @@ export class Connection {
     private readonly capabilitiesCache: CapabilitiesCache,
   ) {
     this.root = root.endsWith("/") ? root : root + "/";
+    this.closeUrl = dialect.closeUrl(this.root);
   }
 
   /** Whether the session was closed. */
@@ -232,7 +234,7 @@ export class Connection {
       // TM1 answers a disabled impersonated user exactly like wrong credentials
       const why =
         this.impersonateUser === undefined
-          ? undefined
+          ? ODataError.parse(reply.body)
           : new ODataError("", `The credentials were refused, or the user being impersonated (${this.impersonateUser}) is disabled`);
       throw Tm1ApiException.of(401, "CredentialRejected", why, "GET", url);
     }
@@ -467,7 +469,7 @@ export class Connection {
       // Never logged in: nothing to close
       return;
     }
-    const url = this.root + CLOSE_PATH;
+    const url = this.closeUrl;
     const headers: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT), "Content-Type": "application/json" };
     if (session.cookie !== undefined && !this.transport.keepsCookies) headers["Cookie"] = `${COOKIE}=${session.cookie}`;
     // TM1 sometimes drops the connection that carried a close: don't reuse it

@@ -153,6 +153,52 @@ describe("Tm1Dialect", () => {
     expect(Tm1Session.builder().address("http://tm1:8010").basicAuth("admin", "").build().serviceRoot()).toBe("http://tm1:8010/api/v1/");
     expect(() => Tm1Session.builder().address("tm1:8010/x"), "refused at once").toThrow(RangeError);
   });
+
+  it("finds the TM1 12 service root and close URL", () => {
+    const sales = Tm1Dialect.v12("sales");
+    expect(sales.name()).toBe("TM1 12");
+    expect(sales.equals(Tm1Dialect.v12("tm1", "sales"))).toBe(true);
+    expect(sales.toString()).toBe("Tm1Dialect[TM1 12, tm1/sales]");
+    expect(sales.serviceRoot("http://engine:4444")).toBe("http://engine:4444/tm1/api/v1/Databases('sales')/");
+    expect(sales.serviceRoot("https://engine.example.com:4444/")).toBe("https://engine.example.com:4444/tm1/api/v1/Databases('sales')/");
+    expect(sales.serviceRoot("http://engine:4444/tm1/api/v1"), "already an instance root").toBe("http://engine:4444/tm1/api/v1/Databases('sales')/");
+    expect(sales.serviceRoot("http://engine:4444/tm1/api/v1/Databases('sales')/"), "already a database root").toBe(
+      "http://engine:4444/tm1/api/v1/Databases('sales')/",
+    );
+    expect(Tm1Dialect.v12("prod", "O'Neil Sales").serviceRoot("https://proxy/pa/")).toBe("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')/");
+    expect(Tm1Dialect.v12("café").serviceRoot("http://engine:4444/tm1/api/v1/Databases('caf%c3%a9')/")).toBe(
+      "http://engine:4444/tm1/api/v1/Databases('caf%C3%A9')/",
+    );
+
+    expect(Tm1Dialect.V11.closeUrl("http://tm1:8010/api/v1/")).toBe("http://tm1:8010/api/v1/ActiveSession/tm1.Close");
+    expect(sales.closeUrl("http://engine:4444/tm1/api/v1/Databases('sales')/")).toBe("http://engine:4444/tm1/api/v1/ActiveSession/tm1s.Close");
+    expect(sales.closeUrl("https://proxy/pa/tm1/api/v1/Databases('O''Neil%20Sales')")).toBe("https://proxy/pa/tm1/api/v1/ActiveSession/tm1s.Close");
+
+    const dialectFirst = Tm1Session.builder().dialect(sales).address("http://engine:4444").basicAuth("admin", "").build();
+    expect(dialectFirst.serviceRoot()).toBe("http://engine:4444/tm1/api/v1/Databases('sales')/");
+
+    const addressFirst = Tm1Session.builder().address("http://engine:4444").dialect(sales).basicAuth("admin", "").build();
+    expect(addressFirst.serviceRoot()).toBe("http://engine:4444/tm1/api/v1/Databases('sales')/");
+  });
+
+  it("refuses invalid TM1 12 dialect inputs", () => {
+    expect(() => Tm1Dialect.v12("  ")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("", "sales")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("a/b", "sales")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("..", "sales")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("a[b", "sales")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("tm1", " ")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("engine:4444")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("ftp://engine:4444")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("http://engine:4444?")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("http://engine:4444#")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("http:///tm1/api/v1")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").serviceRoot("http://engine:4444/tm1/api/v1/Databases('other')/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/tm1/api/v1/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/api/v1/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.V11.closeUrl("not a url")).toThrow(RangeError);
+  });
 });
 
 /** The Java client's `Tm1CapabilitiesTest` (in its `metadata` package): capability checks against
