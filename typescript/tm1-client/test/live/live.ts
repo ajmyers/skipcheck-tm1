@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { inject, it } from "vitest";
-import { CognosSource, Tm1EngineSource } from "@skipcheck/tm1-testcontainers";
+import { CognosSource, Tm1EngineSource, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import { RequiresCognos, RequiresTm1, RequiresTm1Engine } from "@skipcheck/tm1-testcontainers/vitest";
 import { Tm1Authenticator, Tm1Client, Tm1ClientBuilder, Tm1Dialect } from "../../src/index.js";
 import type { LiveTm1, Target } from "./global-setup.js";
@@ -142,3 +142,35 @@ export const engineConfigured = engineSkip === undefined;
 
 /** The reason the TM1 v12 engine auth tests are skipped, for a describe's title. */
 export const engineReason = engineSkip === undefined ? "" : ` (skipped: ${engineSkip})`;
+
+/** Why the tests that start both a TM1 11 server and a TM1 v12 engine can't run, or undefined. */
+async function tm11SkipReason(): Promise<string | undefined> {
+  try {
+    if (!Tm1Source.discover()) return RequiresTm1.NO_SOURCE_MESSAGE;
+  } catch {
+    // Set but wrong
+  }
+  return RequiresTm1.skipReason();
+}
+
+const passThroughSkip = engineSkip ?? (await tm11SkipReason());
+
+/** `it`, skipped without both TM1 11 and TM1 v12 engine sources and Docker. */
+export const enginePassThroughTest: typeof it = (passThroughSkip === undefined ? it : it.skip) as typeof it;
+
+/** Whether the TM1 v12 pass-through Basic auth tests run. */
+export const enginePassThroughConfigured = passThroughSkip === undefined;
+
+/** The reason the TM1 v12 pass-through Basic auth tests are skipped, for a describe's title. */
+export const enginePassThroughReason = passThroughSkip === undefined ? "" : ` (skipped: ${passThroughSkip})`;
+
+const passThroughCamSkip = cognosSkip ?? engineSkip;
+
+/** `it`, skipped without Cognos, TM1 11, and TM1 v12 engine sources and Docker. */
+export const enginePassThroughCamTest: typeof it = (passThroughCamSkip === undefined ? it : it.skip) as typeof it;
+
+/** Whether the TM1 v12 pass-through CAM auth tests run. */
+export const enginePassThroughCamConfigured = passThroughCamSkip === undefined;
+
+/** The reason the TM1 v12 pass-through CAM auth tests are skipped, for a describe's title. */
+export const enginePassThroughCamReason = passThroughCamSkip === undefined ? "" : ` (skipped: ${passThroughCamSkip})`;
