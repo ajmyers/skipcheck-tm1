@@ -79,7 +79,8 @@ public final class Smoke {
 		// The other modules: a class of each loads, with what it depends on, and what they ship is there
 		ClassLoader loader = Smoke.class.getClassLoader();
 		for (String name : List.of("io.skipcheck.tm1.csdl.CsdlParser", "io.skipcheck.tm1.spring.boot.autoconfigure.Tm1AutoConfiguration",
-				"io.skipcheck.tm1.spring.boot.testcontainers.Tm1ContainerConnectionDetailsFactory")) {
+				"io.skipcheck.tm1.spring.boot.testcontainers.Tm1ContainerConnectionDetailsFactory",
+				"io.skipcheck.tm1.spring.boot.testcontainers.Tm1EngineContainerConnectionDetailsFactory")) {
 			Class.forName(name, true, loader);
 		}
 		require(Tm1ServerContainer.class.getResource("paw-local.sh") != null, "paw-local.sh isn't in tm1-testcontainers' jar");
