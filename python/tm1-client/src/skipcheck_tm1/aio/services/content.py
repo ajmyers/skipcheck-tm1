@@ -60,7 +60,8 @@ class ContentService(Service):
 
     @endpoint("EntitySet Contents")
     async def roots(self, query: ODataQuery | None = None, **options: Any) -> list[Entry]:
-        """``GET Contents``: the root folders, ``Applications`` and ``Blobs``."""
+        """``GET Contents``: the root folders (``Applications`` and ``Blobs`` on TM1 11;
+        ``Applications``, ``Files``, ``Home``, and ``Session`` on TM1 12)."""
         return await self._session.collect(Tm1Request.list(ODataPath.of("Contents"), ODataQuery.of(query, **options), Entry))
 
     @endpoint("EntitySet Contents")
@@ -96,9 +97,10 @@ class ContentService(Service):
     async def create(self, folder: ContentPath, scope: ContentScope, entry: Any) -> Entry:
         """Makes an entry in a folder: a ``FolderCreate``, ``DocumentCreate``, ``LinkCreate`` or a
         reference, such as a ``CubeReferenceCreate`` with ``bind_cube(ODataPath.of("Cubes").key("Sales"))``.
-        A document made outside ``Blobs`` comes back as a ``DocumentReference``, with an empty
-        document behind it; :meth:`upload` gives it content. Returns the entry as made, with the
-        ``ID`` to find it by."""
+        A document made under ``Applications`` comes back as a ``DocumentReference``, with an empty
+        document behind it; a document made under a direct-document root (``Blobs``, ``Files``,
+        ``Home``, or ``Session``) comes back as a ``Document``. :meth:`upload` gives it content.
+        Returns the entry as made, with the ``ID`` (TM1 11) or ``Name`` (TM1 12) to find it by."""
         path = _path(folder).nav(_scope(_require(scope, "scope")).navigation())
         return await self._session.execute(Tm1Request.post(path, _require(entry, "entry"), Entry))
 
@@ -133,20 +135,23 @@ class ContentService(Service):
 
     @endpoint("Navigation DocumentReference/Document")
     async def document(self, reference: ContentPath, query: ODataQuery | None = None, **options: Any) -> Document:
-        """``Document``: the document a reference refers to, in ``Blobs``, with its ``Size`` and
-        ``LastUpdated``."""
+        """``Document``: the document itself (under ``Blobs``, ``Files``, ``Home``, or
+        ``Session``), or the document a reference in ``Applications`` refers to, with its ``Size``
+        and ``LastUpdated``."""
         return await self._session.execute(Tm1Request.get(_document(reference), ODataQuery.of(query, **options), Document))
 
     @endpoint("Navigation DocumentReference/Document")
     async def content(self, document: ContentPath) -> bytes:
-        """A document's ``Content``, as bytes. The path is a document reference, or a document in
-        ``Blobs``."""
+        """A document's ``Content``, as bytes. The path is a document reference in
+        ``Applications``, or a direct document under ``Blobs``, ``Files``, ``Home``, or
+        ``Session``."""
         return await self._session.execute(Tm1Request.bytes(_document(document).nav("Content")))
 
     @endpoint("Navigation DocumentReference/Document")
     async def upload(self, document: ContentPath, content: bytes) -> None:
-        """Replaces a document's ``Content``. The path is a document reference, or a document in
-        ``Blobs``. TM1 (11.8) refuses a chunked upload, so the content is sent whole, with its
+        """Replaces a document's ``Content``. The path is a document reference in
+        ``Applications``, or a direct document under ``Blobs``, ``Files``, ``Home``, or
+        ``Session``. TM1 (11.8) refuses a chunked upload, so the content is sent whole, with its
         length."""
         path = _document(document).nav("Content")
         await self._session.execute(Tm1Request.put(path, bytes(_require(content, "content"))))
@@ -173,4 +178,5 @@ def _path(entry: ContentPath) -> ODataPath:
 
 
 def _document(entry: ContentPath) -> ODataPath:
-    return _path(entry).cast("tm1.Document") if entry.in_blobs() else _path(entry).cast("tm1.DocumentReference").nav("Document")
+    path = _path(entry)
+    return path.cast("tm1.Document") if entry._is_direct_document_root() else path.cast("tm1.DocumentReference").nav("Document")

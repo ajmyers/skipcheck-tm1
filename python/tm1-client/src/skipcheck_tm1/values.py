@@ -219,18 +219,19 @@ class ContentScope(enum.Enum):
 
 # From the Java client's service.content package
 class ContentPath:
-    """Where an entry is in the contents tree: a root folder, then each folder's child by ID::
+    """Where an entry is in the contents tree: a root folder, then each folder's child by key::
 
-        # Children by ID, which for most entries is the name plus a suffix for the kind
+        # Children by key (ID on TM1 11, Name on TM1 12)
         notes = ContentPath.applications().child("Planning").child("notes.txt.blob")
         # Contents('Applications')/Contents('Planning')/Contents('notes.txt.blob')
 
-    Children are found by their ``ID``, not their ``Name``, though ``$metadata`` keys entries by
-    ``Name``: TM1 (11.8) gives most entries an ID of the name plus a suffix for its kind, such
-    as ``notes.txt.blob`` for a document, ``ibm.extr`` for a link and ``}ClientGroups.cube``
-    for a cube reference. A folder's ID is its name. The ID is in the entry TM1 returns when
-    it's made. ``$metadata`` deprecates ``Entry.ID`` in schema 11.5.0, but TM1 11.8 still keys
-    by it. Paths are immutable.
+    On TM1 11.8, children are found by their ``ID``, not their ``Name``, though ``$metadata``
+    keys entries by ``Name``: TM1 (11.8) gives most entries an ID of the name plus a suffix for
+    its kind, such as ``notes.txt.blob`` for a document, ``ibm.extr`` for a link and
+    ``}ClientGroups.cube`` for a cube reference. A folder's ID is its name. ``$metadata``
+    deprecates ``Entry.ID`` in schema 11.5.0, and TM1 12 omits ``ID`` altogether and keys
+    entries by ``Name``. :meth:`child` uses ``ID`` when present and falls back to ``Name``.
+    Paths are immutable.
     """
 
     __slots__ = ("_steps",)
@@ -253,24 +254,40 @@ class ContentPath:
         """The ``Blobs`` folder, holding the documents behind the document references in applications."""
         return ContentPath.root("Blobs")
 
+    @staticmethod
+    def files() -> ContentPath:
+        """The ``Files`` folder, holding direct documents on TM1 12."""
+        return ContentPath.root("Files")
+
+    @staticmethod
+    def home() -> ContentPath:
+        """The ``Home`` folder, holding the current user's direct documents on TM1 12."""
+        return ContentPath.root("Home")
+
+    @staticmethod
+    def session() -> ContentPath:
+        """The ``Session`` folder, holding session-scoped direct documents on TM1 12."""
+        return ContentPath.root("Session")
+
     def child(
         self,
         id: str | Entry | None = None,
         entry: Entry | ContentScope | None = None,
         scope: ContentScope = ContentScope.PUBLIC,
     ) -> ContentPath:
-        """A child of this folder: by its ID (``child("notes.txt.blob")``), or as TM1 returned
-        it (``child(entry)``, such as from ``ContentService.create``: found by its ``ID``, which
-        ``$metadata`` deprecates but TM1 (11.8) still keys entries by). ``scope`` says which of
-        the folder's collections holds it (``child("x", ContentScope.PRIVATE)`` works too).
-        A ``ValueError`` if an entry has no ID (it was selected away)."""
+        """A child of this folder: by its key (``child("notes.txt.blob")`` on TM1 11 or
+        ``child("notes.txt")`` on TM1 12), or as TM1 returned it (``child(entry)``, such as from
+        ``ContentService.create``: found by its ``ID`` when present on TM1 11, falling back to
+        its ``Name`` when ``ID`` is absent on TM1 12). ``scope`` says which of the folder's
+        collections holds it (``child("x", ContentScope.PRIVATE)`` works too).
+        A ``ValueError`` if an entry has neither an ID nor a Name."""
         if isinstance(entry, enum.Enum):
             scope, entry = entry, None
         given = entry if entry is not None else id
         if isinstance(given, Entry):
-            if given.id is None:
-                raise ValueError(f"The entry has no ID to find it by: {given!r}")
-            child_id = given.id
+            child_id = given.id if given.id else given.name
+            if not child_id:
+                raise ValueError(f"The entry has neither an ID nor a Name to find it by: {given!r}")
         else:
             child_id = _require(given, "id")
         return ContentPath(self._steps + ((child_id, _scope(_require(scope, "scope"))),))
@@ -278,6 +295,11 @@ class ContentPath:
     def in_blobs(self) -> bool:
         """Whether this is in the ``Blobs`` folder, where documents themselves are."""
         return self._steps[0][0] == "Blobs"
+
+    def _is_direct_document_root(self) -> bool:
+        """Whether this path is under a root holding ``Document`` entities directly (every root
+        other than ``Applications``, where documents are ``DocumentReference``s)."""
+        return self._steps[0][0].lower() != "applications"
 
     def path(self) -> ODataPath:
         """The OData path to the entry, such as ``Contents('Applications')/Contents('Planning')``."""

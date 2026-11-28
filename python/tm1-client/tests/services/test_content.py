@@ -32,12 +32,26 @@ def test_paths_find_children_by_id() -> None:
     assert str(private.path()) == "Contents('Applications')/Contents('Planning')/PrivateContents('mine')"
     assert str(private) == "Applications/Planning/(private) mine"
     assert PLANNING.child(scope=ContentScope.PRIVATE, id="x") == PLANNING.child("x", ContentScope.PRIVATE)
-    # As TM1 returned it: by its ID, not its name
+    # As TM1 returned it: by its ID on TM1 11, falling back to Name on TM1 12
     assert PLANNING.child(Folder(name="Guide", id="Guide.extr")) == PLANNING.child("Guide.extr")
-    with pytest.raises(ValueError, match="no ID"):
-        PLANNING.child(Folder(name="Guide"))
+    assert PLANNING.child(Folder(name="Guide")) == PLANNING.child("Guide")
+    assert PLANNING.child(Folder(name="Guide", id="")) == PLANNING.child("Guide")
+    assert PLANNING.child(Folder(name="Guide"), ContentScope.PRIVATE) == PLANNING.child("Guide", ContentScope.PRIVATE)
+    for missing in (Folder(), Folder(id=""), Folder(name=""), Folder(id="", name="")):
+        with pytest.raises(ValueError, match="neither an ID nor a Name"):
+            PLANNING.child(missing)
+    with pytest.raises(TypeError):
+        PLANNING.child(None)
+    with pytest.raises(TypeError):
+        PLANNING.child(Folder(name="Guide"), scope=None)  # type: ignore[arg-type]
     assert ContentPath.blobs().in_blobs() and not PLANNING.in_blobs()
+    assert not ContentPath.files().in_blobs()
+    assert not ContentPath.home().in_blobs()
+    assert not ContentPath.session().in_blobs()
     assert ContentPath.root("Blobs") == ContentPath.blobs()
+    assert str(ContentPath.files().path()) == "Contents('Files')"
+    assert str(ContentPath.home().path()) == "Contents('Home')"
+    assert str(ContentPath.session().path()) == "Contents('Session')"
     assert ContentScope.PRIVATE.navigation() == "PrivateContents"
     # One class for both flavors' behaviour: the asyncio one is the same code
     assert str(AsyncContentPath.applications().child("x").path()) == "Contents('Applications')/Contents('x')"
@@ -102,9 +116,25 @@ def test_document_content_goes_through_the_reference(api: Api, fake: FakeTm1) ->
     fake.respond = lambda r: httpx2.Response(200, content=b"\x00abc")
     assert api.run(api.client.contents.content(notes)) == b"\x00abc"
     assert target(fake.last).endswith("/tm1.DocumentReference/Document/Content")
-    # In Blobs, the path is the document itself
+    # In Blobs, Files, Home, and Session, the path is the direct Document itself
     api.run(api.client.contents.content(ContentPath.blobs().child("notes_1.txt")))
     assert target(fake.last) == "GET Contents('Blobs')/Contents('notes_1.txt')/tm1.Document/Content"
+    fake.respond = lambda r: {"Name": "q1.csv", "Size": 7}
+    assert api.run(api.client.contents.document(ContentPath.files().child("reports").child("q1.csv"))).size == 7
+    assert target(fake.last) == "GET Contents('Files')/Contents('reports')/Contents('q1.csv')/tm1.Document"
+    fake.respond = lambda r: httpx2.Response(200, content=b"abc")
+    assert api.run(api.client.contents.content(ContentPath.home().child("scratch.txt"))) == b"abc"
+    assert target(fake.last) == "GET Contents('Home')/Contents('scratch.txt')/tm1.Document/Content"
+    fake.respond = lambda r: None
+    api.run(api.client.contents.upload(ContentPath.session().child("temp.bin"), b"ok"))
+    assert target(fake.last) == "PUT Contents('Session')/Contents('temp.bin')/tm1.Document/Content"
+    fake.respond = lambda r: {"Size": 4}
+    api.run(api.client.contents.document(ContentPath.root("applications").child("Planning").child("notes.txt")))
+    assert target(fake.last) == "GET Contents('applications')/Contents('Planning')/Contents('notes.txt')/tm1.DocumentReference/Document"
+    api.run(api.client.contents.document(ContentPath.root("Custom").child("data.bin")))
+    assert target(fake.last) == "GET Contents('Custom')/Contents('data.bin')/tm1.Document"
+    with pytest.raises(TypeError):
+        api.run(api.client.contents.document(None))  # type: ignore[arg-type]
     fake.respond = lambda r: None
     api.run(api.client.contents.upload(notes, b"hello"))
     assert target(fake.last).startswith("PUT ") and fake.last.content == b"hello"
