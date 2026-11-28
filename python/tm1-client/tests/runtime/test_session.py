@@ -1626,3 +1626,213 @@ def test_basic_credentials_on_the_wire(rt: Runtime) -> None:
     rt.run(rt.session(rt.builder().basic_auth("admin", None)).execute(SERVER))
     value = rt.fake.login_requests[0].headers["authorization"].split(" ", 1)[1]
     assert base64.b64decode(value).decode() == "admin:"
+
+
+def _v12_http(rt: Runtime, handler: Callable[[httpx2.Request], httpx2.Response]) -> Any:
+    http = httpx2.Client(transport=httpx2.MockTransport(handler)) if rt.flavor == "sync" else httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
+    rt.clients.append(http)
+    return http
+
+
+def test_logs_in_with_bearer_token_and_refreshes_on_expiry(rt: Runtime) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+    issued = iter(range(1, 10))
+    login_n = 0
+    server_n = 0
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        nonlocal login_n, server_n
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            login_n += 1
+            return json_response(200, {"ID": 9 + login_n}, f"TM1SessionId=s{9 + login_n}; Path=/; HttpOnly")
+        if request.method == "GET" and url == db_root + "Server?$select=Name":
+            server_n += 1
+            if server_n == 2:
+                return json_response(401, None, "TM1SessionId=s10; Path=/; Max-Age=0")
+            return json_response(200, {"Name": "sales"})
+        return httpx2.Response(404)
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.bearer(lambda: f"jwt-{next(issued)}"))
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    assert rt.run(session.execute(SERVER)) == {"Name": "sales"}
+    assert rt.run(session.execute(SERVER)) == {"Name": "sales"}
+
+    logins = [r for r in seen if str(r.url) == db_root + "ActiveSession?$select=ID"]
+    assert [r.headers["authorization"] for r in logins] == ["Bearer jwt-1", "Bearer jwt-2"]
+    assert cookie(logins[1]) is None, "expired Max-Age=0 cookie is not sent back"
+    reads = [r for r in seen if str(r.url) == db_root + "Server?$select=Name"]
+    assert len(reads) == 3
+    assert cookie(reads[0]) == "s10" and "authorization" not in reads[0].headers
+    assert cookie(reads[2]) == "s11"
+
+
+def test_logs_in_with_application_credentials_and_sets_session_context(rt: Runtime) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+    auth_url = "http://tm1.test/tm1/auth/v1/session"
+    close_url = "http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close"
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "POST" and url == auth_url:
+            return httpx2.Response(201, headers={"Set-Cookie": "TM1SessionId=app1; Path=/; HttpOnly"})
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            return json_response(200, {"ID": 42})
+        if request.method == "GET" and url == db_root + "Server?$select=Name":
+            return json_response(200, {"Name": "sales"})
+        if request.method == "POST" and url == close_url:
+            return httpx2.Response(204, headers={"Set-Cookie": "TM1SessionId=app1; Path=/; Max-Age=0"})
+        return httpx2.Response(404)
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("my-app", "s3cr3t", "analyst"))
+        .session_context("reporting-service")
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    assert rt.run(session.execute(SERVER)) == {"Name": "sales"}
+    assert rt.run(session.session_id()) == 42
+    rt.run(session.close())
+
+    auth_req = [r for r in seen if str(r.url) == auth_url][0]
+    assert auth_req.headers["authorization"] == "Basic " + base64.b64encode(b"my-app:s3cr3t").decode()
+    assert "tm1-sessioncontext" not in auth_req.headers
+    assert json.loads(auth_req.content) == {"User": "analyst"}
+
+    active_req = [r for r in seen if str(r.url) == db_root + "ActiveSession?$select=ID"][0]
+    assert cookie(active_req) == "app1"
+    assert "authorization" not in active_req.headers
+    assert active_req.headers["tm1-sessioncontext"] == "reporting-service"
+
+    closes = [r for r in seen if str(r.url) == close_url]
+    assert len(closes) == 1 and cookie(closes[0]) == "app1"
+
+
+def test_fails_fast_when_application_user_is_forbidden_in_database(rt: Runtime) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "POST" and url == "http://tm1.test/tm1/auth/v1/session":
+            return httpx2.Response(201, headers={"Set-Cookie": "TM1SessionId=app2; Path=/; HttpOnly"})
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            return json_response(403, {"error": {"code": "", "message": "Forbidden"}})
+        return httpx2.Response(404)
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("my-app", "s3cr3t", "ghost"))
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    rt.raises(Tm1ForbiddenError, lambda: session.execute(SERVER))
+    assert not any(str(r.url) == db_root + "Server?$select=Name" for r in seen)
+
+
+def test_reports_refused_application_credentials(rt: Runtime) -> None:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return json_response(401, {"error": "invalid_client", "error_details": "Invalid client credentials"})
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("my-app", "wrong", "analyst"))
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    error = rt.raises(Tm1AuthenticationError, lambda: session.execute(SERVER))
+    assert error.kind is Tm1ErrorKind.CREDENTIAL_REJECTED
+    assert error.error is not None
+    assert (error.error.code, error.error.message) == ("invalid_client", "Invalid client credentials")
+
+
+def test_refuses_application_auth_without_tm112_dialect_or_with_impersonate(rt: Runtime) -> None:
+    with pytest.raises(ValueError):
+        rt.Session.builder().address("http://tm1.test:8010").authenticator(auth.application("my-app", "s3cr3t", "analyst")).build()
+    with pytest.raises(ValueError):
+        (
+            rt.Session.builder()
+            .dialect(Tm1Dialect.v12("sales"))
+            .address("http://tm1.test")
+            .authenticator(auth.application("my-app", "s3cr3t", "analyst"))
+            .impersonate("someone-else")
+            .build()
+        )
+
+
+def test_relogs_in_with_application_credentials_after_max_age_zero401(rt: Runtime) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+    auth_url = "http://tm1.test/tm1/auth/v1/session"
+    auth_n = 0
+    active_n = 0
+    server_n = 0
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        nonlocal auth_n, active_n, server_n
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "POST" and url == auth_url:
+            auth_n += 1
+            return httpx2.Response(201, headers={"Set-Cookie": f"TM1SessionId=a{auth_n}; Path=/; HttpOnly"})
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            active_n += 1
+            return json_response(200, {"ID": active_n})
+        if request.method == "GET" and url == db_root + "Server?$select=Name":
+            server_n += 1
+            if server_n == 2:
+                return json_response(401, None, "TM1SessionId=a1; Path=/; Max-Age=0")
+            return json_response(200, {"Name": "sales"})
+        return httpx2.Response(404)
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("my-app", "s3cr3t", "analyst"))
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    assert rt.run(session.execute(SERVER)) == {"Name": "sales"}
+    assert rt.run(session.execute(SERVER)) == {"Name": "sales"}
+
+    auth_reqs = [r for r in seen if str(r.url) == auth_url]
+    assert len(auth_reqs) == 2 and cookie(auth_reqs[1]) is None
+    active_reqs = [r for r in seen if str(r.url) == db_root + "ActiveSession?$select=ID"]
+    assert len(active_reqs) == 2 and cookie(active_reqs[1]) == "a2"
+    reads = [r for r in seen if str(r.url) == db_root + "Server?$select=Name"]
+    assert cookie(reads[2]) == "a2"
+    assert rt.run(session.session_id()) == 2
+
+
+def test_reports_protocol_error_when_application_login_sets_no_cookie(rt: Runtime) -> None:
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(201)
+
+    session = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("my-app", "s3cr3t", "analyst"))
+        .http_client(_v12_http(rt, handle))
+        .build()
+    )
+    rt.raises(Tm1ProtocolError, lambda: session.execute(SERVER))

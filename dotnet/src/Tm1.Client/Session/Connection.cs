@@ -43,6 +43,8 @@ internal sealed class Connection
     public static readonly TimeSpan MaxIdle = TimeSpan.FromSeconds(60);
 
     private readonly string _closeUrl;
+    private readonly string? _authSessionUrl;
+    private readonly string? _applicationUser;
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
     private readonly object _gate = new();
@@ -73,7 +75,23 @@ internal sealed class Connection
         _capabilitiesCache = capabilitiesCache ?? new CapabilitiesCache();
         Root = root.EndsWith('/') ? root : root + "/";
         _closeUrl = dialect.CloseUrl(Root);
+        _authSessionUrl = dialect.AuthSessionUrl(Root);
         Authenticator = authenticator;
+        _applicationUser = authenticator.ApplicationUser();
+        if (_applicationUser is not null)
+        {
+            CheckApplicationUser(_applicationUser);
+            if (impersonate is not null)
+            {
+                throw new InvalidOperationException(
+                    "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.Application(clientId, clientSecret, user) instead"
+                );
+            }
+            if (_authSessionUrl is null)
+            {
+                throw new InvalidOperationException("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.V12)");
+            }
+        }
         ImpersonateUser = impersonate;
         SessionContext = sessionContext;
         Timeouts = timeouts;
@@ -96,6 +114,22 @@ internal sealed class Connection
         {
             Timeout = System.Threading.Timeout.InfiniteTimeSpan,
         };
+    }
+
+    internal static string CheckApplicationUser(string user)
+    {
+        if (string.IsNullOrWhiteSpace(user))
+        {
+            throw new ArgumentException("application user must not be blank");
+        }
+        foreach (var c in user)
+        {
+            if (char.IsControl(c))
+            {
+                throw new ArgumentException("application user must not contain control characters");
+            }
+        }
+        return user;
     }
 
     public string Root { get; }
@@ -267,8 +301,12 @@ internal sealed class Connection
 
     private async Task<(string, long)> SendLoginAsync(string? seedCookie)
     {
+        if (_applicationUser is not null)
+        {
+            return await SendApplicationLoginAsync().ConfigureAwait(false);
+        }
         var url = Root + LoginPath;
-        var authorization = await AuthorizationAsync(url).ConfigureAwait(false);
+        var authorization = await AuthorizationAsync("GET", url).ConfigureAwait(false);
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         Headers(request, Json);
         request.Headers.TryAddWithoutValidation("Authorization", authorization);
@@ -313,14 +351,61 @@ internal sealed class Connection
         var cookie = SessionCookie(reply)
             ?? seedCookie
             ?? throw new Tm1ProtocolException($"TM1 accepted the login but set no {Cookie} cookie", null, "GET", url, null);
+        return (cookie, ParseSessionId(reply.Body, url));
+    }
+
+    private async Task<(string, long)> SendApplicationLoginAsync()
+    {
+        var authUrl = _authSessionUrl!;
+        var authorization = await AuthorizationAsync("POST", authUrl).ConfigureAwait(false);
+        using var authRequest = new HttpRequestMessage(HttpMethod.Post, authUrl);
+        Headers(authRequest, Json);
+        authRequest.Headers.TryAddWithoutValidation("Authorization", authorization);
+        authRequest.Content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, string> { ["User"] = _applicationUser! }));
+        authRequest.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(Json);
+        var authReply = await SendRawAsync(authRequest, Timeouts.Login, authUrl, true, CancellationToken.None).ConfigureAwait(false);
+        if (authReply.Status == 401)
+        {
+            throw Tm1ApiException.Of(401, Tm1ErrorKind.CredentialRejected, ODataError.Parse(authReply.Body), "POST", authUrl);
+        }
+        if (authReply.Status >= 400)
+        {
+            throw Tm1ApiException.FromBody(authReply.Status, authReply.Body, "POST", authUrl, Classifier);
+        }
+        var cookie = SessionCookie(authReply)
+            ?? throw new Tm1ProtocolException($"TM1 accepted the application login but set no {Cookie} cookie", null, "POST", authUrl, null);
+
+        var activeUrl = Root + LoginPath;
+        using var activeRequest = new HttpRequestMessage(HttpMethod.Get, activeUrl);
+        Headers(activeRequest, Json);
+        activeRequest.Headers.TryAddWithoutValidation("Cookie", $"{Cookie}={cookie}");
+        if (SessionContext is not null)
+        {
+            activeRequest.Headers.TryAddWithoutValidation(SessionContextHeader, SessionContext);
+        }
+        var activeReply = await SendRawAsync(activeRequest, Timeouts.Login, activeUrl, true, CancellationToken.None).ConfigureAwait(false);
+        if (activeReply.Status == 401)
+        {
+            throw Tm1ApiException.Of(401, Tm1ErrorKind.CredentialRejected, ODataError.Parse(activeReply.Body), "GET", activeUrl);
+        }
+        if (activeReply.Status >= 400)
+        {
+            throw Tm1ApiException.FromBody(activeReply.Status, activeReply.Body, "GET", activeUrl, Classifier);
+        }
+        var effective = SessionCookie(activeReply) ?? cookie;
+        return (effective, ParseSessionId(activeReply.Body, activeUrl));
+    }
+
+    private static long ParseSessionId(byte[] body, string url)
+    {
         try
         {
-            using var doc = JsonDocument.Parse(reply.Body);
+            using var doc = JsonDocument.Parse(body);
             if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("ID", out var id) || !TryLong(id, out var sessionId))
             {
                 throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", null, "GET", url, null);
             }
-            return (cookie, sessionId);
+            return sessionId;
         }
         catch (JsonException e)
         {
@@ -333,7 +418,7 @@ internal sealed class Connection
     /// a passport), and one that never answers would otherwise hold every request, and the close,
     /// for ever. Then it's told to stop, and the login fails in the connect phase: nothing has been
     /// sent to TM1, so it's safe to retry.</summary>
-    private async Task<string> AuthorizationAsync(string url)
+    private async Task<string> AuthorizationAsync(string method, string url)
     {
         using var deadline = new CancellationTokenSource();
         var asked = Authenticator.AuthorizationAsync(deadline.Token).AsTask();
@@ -346,7 +431,7 @@ internal sealed class Connection
             throw new Tm1TransportException(
                 Tm1TransportException.Phase.Connect,
                 true,
-                "GET",
+                method,
                 url,
                 new TimeoutException($"The authenticator {Authenticator.Describe()} supplied no credentials within {Timeouts.Login}")
             );

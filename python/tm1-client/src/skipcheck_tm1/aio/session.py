@@ -25,6 +25,7 @@ from it (``tm1_pygen.unasync``).
 from __future__ import annotations
 
 import contextlib
+import inspect
 import json
 import logging
 import os
@@ -94,7 +95,7 @@ def _refusal(error: BaseException) -> bool:
     return isinstance(error, Tm1ApiError) and error.status in (400, 401, 403)
 
 
-def _transport(error: BaseException, method: str, url: str) -> Tm1TransportError:
+def _transport(error: BaseException, method: str, url: str, *, idempotent: bool | None = None) -> Tm1TransportError:
     """A failure to send or to get a whole answer, by phase: before sending (couldn't connect,
     TLS, no connection free) or after (a timeout, a dropped connection)."""
     phase = (
@@ -102,7 +103,24 @@ def _transport(error: BaseException, method: str, url: str) -> Tm1TransportError
         if isinstance(error, (httpx2.ConnectError, httpx2.ConnectTimeout, httpx2.PoolTimeout, httpx2.UnsupportedProtocol))
         else Tm1TransportError.Phase.RESPONSE
     )
-    return Tm1TransportError(phase, method.upper() in _IDEMPOTENT, method, url, error)
+    retryable = method.upper() in _IDEMPOTENT if idempotent is None else idempotent
+    return Tm1TransportError(phase, retryable, method, url, error)
+
+
+def _resolve_application_user(authenticator: Authenticator) -> str | None:
+    app_user: Any = getattr(authenticator, "application_user", None)
+    resolved = app_user() if callable(app_user) else app_user
+    if resolved is None:
+        return None
+    if not isinstance(resolved, str):
+        if inspect.iscoroutine(resolved):
+            resolved.close()
+        raise TypeError("application_user must return a string or None")
+    if not resolved.strip():
+        raise ValueError("application user must not be blank")
+    if any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F for c in resolved):
+        raise ValueError("application user must not contain control characters")
+    return resolved
 
 
 class _AsyncConnection:
@@ -138,9 +156,19 @@ class _AsyncConnection:
     ):
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
         self.close_url = dialect.close_url(self.base_url)
+        self.auth_session_url = dialect.auth_session_url(self.base_url)
         self.authenticator = authenticator
+        self.application_user: str | None = _resolve_application_user(authenticator)
         self.session_context = session_context
         self.impersonate = impersonate
+        if self.application_user is not None:
+            if self.impersonate is not None:
+                raise ValueError(
+                    "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): "
+                    "pass the user to auth.application(client_id, client_secret, user) instead"
+                )
+            if self.auth_session_url is None:
+                raise ValueError("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)")
         self.timeouts = timeouts
         self.classifier = classifier
         self.http = http
@@ -234,18 +262,10 @@ class _AsyncConnection:
             return cookie
 
     async def _login(self, seed: str | None) -> tuple[str, int]:
+        if self.application_user is not None:
+            return await self._login_application()
         url = self.base_url + p.LOGIN
-        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged.
-        # It gets the login's timeout too: it may ask another server (Cognos, for a passport), and one
-        # that never answers would otherwise hold every request, and close(), for ever.
-        try:
-            authorization = await runtime.within(self.timeouts.login, self.authenticator.authorization)
-        except Expired:
-            waited = TimeoutError(f"The authenticator {self.authenticator.describe()} supplied no credentials within {self.timeouts.login} s")
-            # Nothing has been sent to TM1, so it's safe to try again
-            raise Tm1TransportError(Tm1TransportError.Phase.CONNECT, True, "GET", url, waited) from None
-        if not authorization:
-            raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
+        authorization = await self._credentials("GET", url)
         extra = {"Authorization": authorization}
         if self.impersonate is not None:
             # At login only: TM1 decides the identity then and ignores the header afterwards
@@ -274,6 +294,57 @@ class _AsyncConnection:
         cookie = p.session_cookie(response.headers.get_list("set-cookie")) or seed
         if cookie is None:
             raise Tm1ProtocolError(f"TM1 accepted the login but set no {p.COOKIE} cookie", None, "GET", url)
+        return cookie, self._parse_session_id(response, url)
+
+    async def _login_application(self) -> tuple[str, int]:
+        assert self.auth_session_url is not None and self.application_user is not None
+        auth_url = self.auth_session_url
+        authorization = await self._credentials("POST", auth_url)
+        body = json.dumps({"User": self.application_user}).encode("utf-8")
+        try:
+            headers = p.headers(None, p.JSON, {"Authorization": authorization, "Content-Type": "application/json"})
+            response = await self.http.post(auth_url, content=body, headers=headers, timeout=self._timeout(self.timeouts.login))
+        except httpx2.HTTPError as e:
+            raise _transport(e, "POST", auth_url, idempotent=True) from e
+        self.http.cookies.clear()
+        if response.status_code == 401:
+            raise Tm1ApiError.of_kind(401, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError.parse(response.content), "POST", auth_url)
+        if response.status_code >= 400:
+            raise api_error("POST", auth_url, response.status_code, response.content, self.classifier)
+        cookie = p.session_cookie(response.headers.get_list("set-cookie"))
+        if cookie is None:
+            raise Tm1ProtocolError(f"TM1 accepted the application login but set no {p.COOKIE} cookie", None, "POST", auth_url)
+
+        active_url = self.base_url + p.LOGIN
+        try:
+            active_headers = httpx2.Headers(p.headers(self.session_context, p.JSON, {"Cookie": f"{p.COOKIE}={cookie}"}), encoding=p.HEADER_ENCODING)
+            active = await self.http.get(active_url, headers=active_headers, timeout=self._timeout(self.timeouts.login))
+        except httpx2.HTTPError as e:
+            raise _transport(e, "GET", active_url) from e
+        self.http.cookies.clear()
+        if active.status_code == 401:
+            raise Tm1ApiError.of_kind(401, Tm1ErrorKind.CREDENTIAL_REJECTED, ODataError.parse(active.content), "GET", active_url)
+        if active.status_code >= 400:
+            raise api_error("GET", active_url, active.status_code, active.content, self.classifier)
+        effective = p.session_cookie(active.headers.get_list("set-cookie")) or cookie
+        return effective, self._parse_session_id(active, active_url)
+
+    async def _credentials(self, method: str, url: str) -> str:
+        # The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged.
+        # It gets the login's timeout too: it may ask another server (Cognos, for a passport), and one
+        # that never answers would otherwise hold every request, and close(), for ever.
+        try:
+            authorization = await runtime.within(self.timeouts.login, self.authenticator.authorization)
+        except Expired:
+            waited = TimeoutError(f"The authenticator {self.authenticator.describe()} supplied no credentials within {self.timeouts.login} s")
+            # Nothing has been sent to TM1, so it's safe to try again
+            raise Tm1TransportError(Tm1TransportError.Phase.CONNECT, True, method, url, waited) from None
+        if not authorization:
+            raise RuntimeError(f"The authenticator {self.authenticator.describe()} supplied no credentials")
+        return str(authorization)
+
+    @staticmethod
+    def _parse_session_id(response: httpx2.Response, url: str) -> int:
         try:
             doc = response.json()
         except ValueError as e:
@@ -283,7 +354,7 @@ class _AsyncConnection:
             session_id = int(session_id)
         if not isinstance(session_id, int) or isinstance(session_id, bool):
             raise Tm1ProtocolError("TM1 accepted the login but didn't return the session ID", None, "GET", url)
-        return cookie, session_id
+        return session_id
 
     def _impersonation_error(self, error: Tm1ApiError, url: str) -> Tm1ApiError:
         """A login that impersonates and gets a 400 or 403 was refused for the impersonation:
@@ -399,7 +470,7 @@ class _AsyncConnection:
                 response = await self.http.post(url, content=b"{}", headers=headers, timeout=self._timeout(self.timeouts.close))
             except httpx2.HTTPError as e:
                 log.warning("Couldn't close TM1 session %s at %s: %s", self.session_id, self.base_url, e)
-                raise _transport(e, "POST", url) from e
+                raise _transport(e, "POST", url, idempotent=True) from e
             if response.status_code >= 400 and response.status_code != 401:
                 raise api_error("POST", url, response.status_code, response.content, self.classifier)
             log.info("Closed TM1 session %s at %s", self.session_id, self.base_url)
@@ -448,14 +519,27 @@ class AsyncTm1Session:
                 raise ValueError("Give an authenticator, or a user (and password) for basic authentication")
             authenticator = basic(user, password)
         _check_session_context(session_context)
+        checked_impersonate = None if impersonate is None else check_impersonated(impersonate)
+        normalized_root = base_url if base_url.endswith("/") else base_url + "/"
+        dialect.close_url(normalized_root)
+        auth_session_url = dialect.auth_session_url(normalized_root)
+        app_user = _resolve_application_user(authenticator)
+        if app_user is not None:
+            if checked_impersonate is not None:
+                raise ValueError(
+                    "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): "
+                    "pass the user to auth.application(client_id, client_secret, user) instead"
+                )
+            if auth_session_url is None:
+                raise ValueError("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)")
         timeouts = timeouts or Tm1Timeouts.DEFAULTS
         http = client or runtime.HttpClient(verify=_ssl_context(verify), timeout=httpx2.Timeout(timeouts.request, connect=timeouts.connect))
         self._connection = _AsyncConnection(
-            base_url,
+            normalized_root,
             dialect,
             authenticator,
             session_context,
-            None if impersonate is None else check_impersonated(impersonate),
+            checked_impersonate,
             timeouts,
             error_classifier or Tm1ErrorClassifier.defaults(),
             http,

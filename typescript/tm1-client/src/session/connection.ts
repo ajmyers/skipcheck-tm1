@@ -111,6 +111,8 @@ export class Connection {
   /** The service root, ending in `/`. */
   readonly root: string;
   private readonly closeUrl: string;
+  private readonly authSessionUrl: string | undefined;
+  private readonly applicationUser: string | undefined;
   private attempt: Attempt | undefined;
   private version: { read: Promise<Tm1Version>; for: Attempt } | undefined;
   private closed = false;
@@ -134,6 +136,21 @@ export class Connection {
   ) {
     this.root = root.endsWith("/") ? root : root + "/";
     this.closeUrl = dialect.closeUrl(this.root);
+    this.authSessionUrl = dialect.authSessionUrl(this.root);
+    this.applicationUser = authenticator.applicationUser();
+    if (this.applicationUser !== undefined) {
+      if (!this.applicationUser.trim()) throw new RangeError("application user must not be blank");
+      // eslint-disable-next-line no-control-regex
+      if (/[\x00-\x1f\x7f-\x9f]/.test(this.applicationUser)) throw new RangeError("application user must not contain control characters");
+      if (impersonateUser !== undefined) {
+        throw new Error(
+          "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.application(clientId, clientSecret, user) instead",
+        );
+      }
+      if (this.authSessionUrl === undefined) {
+        throw new Error("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.v12)");
+      }
+    }
   }
 
   /** Whether the session was closed. */
@@ -219,9 +236,10 @@ export class Connection {
 
   /** @internal */
   async sendLogin(seedCookie: string | undefined): Promise<Login> {
+    if (this.applicationUser !== undefined) return this.sendApplicationLogin();
     const url = this.root + LOGIN_PATH;
     // The authenticator's own failures (say, a passport it couldn't get) reach the caller unchanged
-    const authorization = await this.credentials(url);
+    const authorization = await this.credentials("GET", url);
     if (!authorization) throw new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials`);
     const headers: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT), Authorization: authorization };
     // At login only: TM1 decides the identity then and ignores the header later
@@ -250,16 +268,57 @@ export class Connection {
     const cookie = sessionCookie(reply) ?? seedCookie;
     if (cookie === undefined && !this.transport.keepsCookies)
       throw new Tm1ProtocolException(`TM1 accepted the login but set no ${COOKIE} cookie`, undefined, "GET", url);
+    return { cookie, id: this.parseSessionId(reply.body, url) };
+  }
+
+  private async sendApplicationLogin(): Promise<Login> {
+    const authUrl = this.authSessionUrl!;
+    const authorization = await this.credentials("POST", authUrl);
+    if (!authorization) throw new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials`);
+    const authHeaders: Record<string, string> = {
+      ...this.baseHeaders(JSON_ACCEPT),
+      Authorization: authorization,
+      "Content-Type": JSON_ACCEPT,
+    };
+    const authBody = utf8.encode(JSON.stringify({ User: this.applicationUser! }));
+    const authReply = await this.sendRaw("POST", authUrl, authHeaders, authBody, this.timeouts.login, true, undefined);
+    if (authReply.status === 401) {
+      throw Tm1ApiException.of(401, "CredentialRejected", ODataError.parse(authReply.body), "POST", authUrl);
+    }
+    if (authReply.status >= 400) {
+      throw Tm1ApiException.fromBody(authReply.status, authReply.body, "POST", authUrl, this.classifier);
+    }
+    const cookie = sessionCookie(authReply);
+    if (cookie === undefined && !this.transport.keepsCookies) {
+      throw new Tm1ProtocolException(`TM1 accepted the application login but set no ${COOKIE} cookie`, undefined, "POST", authUrl);
+    }
+
+    const activeUrl = this.root + LOGIN_PATH;
+    const activeHeaders: Record<string, string> = { ...this.baseHeaders(JSON_ACCEPT) };
+    if (cookie !== undefined && !this.transport.keepsCookies) activeHeaders["Cookie"] = `${COOKIE}=${cookie}`;
+    if (this.sessionContext !== undefined) activeHeaders[SESSION_CONTEXT] = headerText(this.sessionContext);
+    const activeReply = await this.sendRaw("GET", activeUrl, activeHeaders, undefined, this.timeouts.login, true, undefined);
+    if (activeReply.status === 401) {
+      throw Tm1ApiException.of(401, "CredentialRejected", ODataError.parse(activeReply.body), "GET", activeUrl);
+    }
+    if (activeReply.status >= 400) {
+      throw Tm1ApiException.fromBody(activeReply.status, activeReply.body, "GET", activeUrl, this.classifier);
+    }
+    const effective = sessionCookie(activeReply) ?? cookie;
+    return { cookie: effective, id: this.parseSessionId(activeReply.body, activeUrl) };
+  }
+
+  private parseSessionId(body: Uint8Array, url: string): number {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(textOf(reply.body));
+      parsed = JSON.parse(textOf(body));
     } catch (e) {
       throw new Tm1ProtocolException("TM1 accepted the login but its response isn't JSON", undefined, "GET", url, e);
     }
     const id = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ID"] : undefined;
     const n = typeof id === "number" ? id : typeof id === "string" && /^-?\d+$/.test(id) ? Number(id) : NaN;
     if (!Number.isFinite(n)) throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", undefined, "GET", url);
-    return { cookie, id: n };
+    return n;
   }
 
   /** The authenticator's credentials, given up on after the login timeout. The authenticator may ask
@@ -267,14 +326,14 @@ export class Connection {
    * request on the session, and `close()`, for ever. The failure is a transport one in the connect
    * phase: nothing has been sent to TM1, so it is safe to retry. The authenticator's signal is
    * aborted then, so it can stop what it was doing. */
-  private async credentials(url: string): Promise<string> {
+  private async credentials(method: string, url: string): Promise<string> {
     const within = this.timeouts.login;
     const deadline = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
         const why = new Error(`The authenticator ${this.authenticator.describe()} supplied no credentials within ${within} ms`);
-        reject(new Tm1TransportException("Connect", true, "GET", url, why));
+        reject(new Tm1TransportException("Connect", true, method, url, why));
         deadline.abort(why);
       }, within);
     });

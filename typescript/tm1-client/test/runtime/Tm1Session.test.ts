@@ -363,6 +363,217 @@ describe("Tm1Session", () => {
     expect(auth.error!.message).toBe("Unable to validate authorization header");
   });
 
+  it("logs in with bearer token and refreshes on expiry", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const login = "GET " + dbRoot + "ActiveSession?$select=ID";
+    const server = "GET " + dbRoot + "Server?$select=Name";
+    let issued = 0;
+    const v12 = new ScriptedTm1()
+      .onEach(
+        login,
+        () => ScriptedTm1.json(200, '{"ID":10}', "TM1SessionId=s10; Path=/; HttpOnly"),
+        () => ScriptedTm1.json(200, '{"ID":11}', "TM1SessionId=s11; Path=/; HttpOnly"),
+      )
+      .onEach(
+        server,
+        () => ScriptedTm1.json(200, '{"Name":"sales"}'),
+        () => ScriptedTm1.status(401, "TM1SessionId=s10; Path=/; Max-Age=0"),
+        () => ScriptedTm1.json(200, '{"Name":"sales"}'),
+      );
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.bearer(() => `jwt-${++issued}`))
+      .transport(v12)
+      .build();
+
+    await session.execute(SERVER);
+    await session.execute(SERVER);
+
+    const logins = v12.requests(login);
+    expect(logins).toHaveLength(2);
+    expect(logins[0]!.authorization).toBe("Bearer jwt-1");
+    expect(logins[1]!.authorization).toBe("Bearer jwt-2");
+    expect(logins[1]!.cookie).toBeUndefined();
+    const reads = v12.requests(server);
+    expect(reads).toHaveLength(3);
+    expect(reads[0]!.cookie).toBe("s10");
+    expect(reads[0]!.authorization).toBeUndefined();
+    expect(reads[2]!.cookie).toBe("s11");
+  });
+
+  it("logs in with application credentials and sets session context", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+    const activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+    const serverUrl = "GET " + dbRoot + "Server?$select=Name";
+    const closeUrl = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+    const v12 = new ScriptedTm1()
+      .on(authUrl, () => ScriptedTm1.status(201, "TM1SessionId=app1; Path=/; HttpOnly"))
+      .on(activeUrl, () => ScriptedTm1.json(200, '{"ID":42}'))
+      .on(serverUrl, () => ScriptedTm1.json(200, '{"Name":"sales"}'))
+      .on(closeUrl, () => ScriptedTm1.status(204, "TM1SessionId=app1; Path=/; Max-Age=0"));
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+      .sessionContext("reporting-service")
+      .transport(v12)
+      .build();
+
+    expect(await session.execute(SERVER)).toEqual({ Name: "sales" });
+    expect(await session.sessionId()).toBe(42);
+    await session.close();
+
+    const authReq = v12.requests(authUrl)[0]!;
+    expect(authReq.authorization).toBe("Basic " + Buffer.from("my-app:s3cr3t", "utf8").toString("base64"));
+    expect(authReq.header("TM1-SessionContext")).toBeUndefined();
+    expect(authReq.json).toEqual({ User: "analyst" });
+
+    const activeReq = v12.requests(activeUrl)[0]!;
+    expect(activeReq.cookie).toBe("app1");
+    expect(activeReq.authorization).toBeUndefined();
+    expect(activeReq.header("TM1-SessionContext")).toBe("reporting-service");
+
+    const closes = v12.requests(closeUrl);
+    expect(closes).toHaveLength(1);
+    expect(closes[0]!.cookie).toBe("app1");
+  });
+
+  it("fails fast when application user is forbidden in database", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const v12 = new ScriptedTm1()
+      .on("POST http://tm1.test/tm1/auth/v1/session", () => ScriptedTm1.status(201, "TM1SessionId=app2; Path=/; HttpOnly"))
+      .on("GET " + dbRoot + "ActiveSession?$select=ID", () => ScriptedTm1.json(403, '{"error":{"code":"","message":"Forbidden"}}'));
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "ghost"))
+      .transport(v12)
+      .build();
+
+    expect(await failure(session.execute(SERVER))).toBeInstanceOf(Tm1ForbiddenException);
+    expect(v12.requests("GET " + dbRoot + "Server?$select=Name")).toHaveLength(0);
+  });
+
+  it("reports refused application credentials", async () => {
+    const v12 = new ScriptedTm1().on("POST http://tm1.test/tm1/auth/v1/session", () =>
+      ScriptedTm1.json(401, '{"error":"invalid_client","error_details":"Invalid client credentials"}'),
+    );
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "wrong", "analyst"))
+      .transport(v12)
+      .build();
+
+    const e = await failure(session.execute(SERVER));
+    expect(e).toBeInstanceOf(Tm1AuthenticationException);
+    const auth = e as Tm1AuthenticationException;
+    expect(auth.kind).toBe("CredentialRejected");
+    expect(auth.error?.code).toBe("invalid_client");
+    expect(auth.error?.message).toBe("Invalid client credentials");
+  });
+
+  it("refuses application auth without TM1 12 dialect or with impersonate", () => {
+    expect(() =>
+      Tm1Session.builder()
+        .address("http://tm1.test:8010")
+        .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+        .build(),
+    ).toThrow(Error);
+    expect(() =>
+      Tm1Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+        .impersonate("someone-else")
+        .build(),
+    ).toThrow(Error);
+  });
+
+  it("relogs in with application credentials after Max-Age zero 401", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+    const activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+    const serverUrl = "GET " + dbRoot + "Server?$select=Name";
+    const v12 = new ScriptedTm1()
+      .onEach(
+        authUrl,
+        () => ScriptedTm1.status(201, "TM1SessionId=a1; Path=/; HttpOnly"),
+        () => ScriptedTm1.status(201, "TM1SessionId=a2; Path=/; HttpOnly"),
+      )
+      .onEach(
+        activeUrl,
+        () => ScriptedTm1.json(200, '{"ID":1}'),
+        () => ScriptedTm1.json(200, '{"ID":2}'),
+      )
+      .onEach(
+        serverUrl,
+        () => ScriptedTm1.json(200, '{"Name":"sales"}'),
+        () => ScriptedTm1.status(401, "TM1SessionId=a1; Path=/; Max-Age=0"),
+        () => ScriptedTm1.json(200, '{"Name":"sales"}'),
+      );
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+      .transport(v12)
+      .build();
+
+    await session.execute(SERVER);
+    await session.execute(SERVER);
+
+    const authReqs = v12.requests(authUrl);
+    expect(authReqs).toHaveLength(2);
+    expect(authReqs[1]!.cookie).toBeUndefined();
+    const activeReqs = v12.requests(activeUrl);
+    expect(activeReqs).toHaveLength(2);
+    expect(activeReqs[1]!.cookie).toBe("a2");
+    expect(v12.requests(serverUrl)[2]!.cookie).toBe("a2");
+    expect(await session.sessionId()).toBe(2);
+  });
+
+  it("reports protocol error when application login sets no cookie", async () => {
+    const v12 = new ScriptedTm1().on("POST http://tm1.test/tm1/auth/v1/session", () => ScriptedTm1.status(201));
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+      .transport(v12)
+      .build();
+
+    expect(await failure(session.execute(SERVER))).toBeInstanceOf(Tm1ProtocolException);
+  });
+
+  it("uses browser-managed cookies for application login when transport keeps cookies", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+    const activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+    const serverUrl = "GET " + dbRoot + "Server?$select=Name";
+    const v12 = new ScriptedTm1()
+      .on(authUrl, () => ScriptedTm1.status(201))
+      .on(activeUrl, () => ScriptedTm1.json(200, '{"ID":77}'))
+      .on(serverUrl, () => ScriptedTm1.json(200, '{"Name":"sales"}'));
+    const browserTransport = { keepsCookies: true, send: (r: Parameters<typeof v12.send>[0]) => v12.send(r) };
+
+    const session = Tm1Session.builder()
+      .dialect(Tm1Dialect.v12("sales"))
+      .address("http://tm1.test")
+      .authenticator(Tm1Authenticator.application("my-app", "s3cr3t", "analyst"))
+      .transport(browserTransport)
+      .build();
+
+    expect(await session.execute(SERVER)).toEqual({ Name: "sales" });
+    expect(await session.sessionId()).toBe(77);
+    expect(v12.requests(activeUrl)[0]!.cookie).toBeUndefined();
+  });
+
   it("refuses a base URL that isn't an absolute URL, and settings without a server or credentials", () => {
     expect(Tm1Session.builder().baseUrl("http://tm1:8010/api/v1").basicAuth("a", "").build().serviceRoot()).toBe("http://tm1:8010/api/v1/");
     for (const bad of ["tm1/api/v1/", "/api/v1/", "http://tm1:8010/api/v1/?x=1", "http://tm1:8010/api/v1/#top"]) {

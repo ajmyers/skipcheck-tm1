@@ -402,6 +402,207 @@ public class Tm1SessionTest
         Assert.Equal("Unable to validate authorization header", ex.Error.Message);
     }
 
+    [Fact]
+    public async Task LogsInWithBearerTokenAndRefreshesOnExpiry()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        const string login = "GET " + dbRoot + "ActiveSession?$select=ID";
+        const string server = "GET " + dbRoot + "Server?$select=Name";
+        var issued = 0;
+        using var v12 = new ScriptedTm1()
+            .OnEach(
+                login,
+                _ => ScriptedTm1.Json(200, "{\"ID\":10}", "TM1SessionId=s10; Path=/; HttpOnly"),
+                _ => ScriptedTm1.Json(200, "{\"ID\":11}", "TM1SessionId=s11; Path=/; HttpOnly")
+            )
+            .OnEach(
+                server,
+                _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}"),
+                _ => ScriptedTm1.Status(401, "TM1SessionId=s10; Path=/; Max-Age=0"),
+                _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}")
+            );
+
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Bearer(_ => ValueTask.FromResult("jwt-" + Interlocked.Increment(ref issued))))
+            .HttpHandler(v12)
+            .Build();
+
+        await session.ExecuteAsync(Server);
+        await session.ExecuteAsync(Server);
+
+        var logins = v12.Requests(login);
+        Assert.Equal(2, logins.Count);
+        Assert.Equal("Bearer jwt-1", logins[0].Authorization);
+        Assert.Equal("Bearer jwt-2", logins[1].Authorization);
+        Assert.Null(logins[1].Cookie);
+        var reads = v12.Requests(server);
+        Assert.Equal(3, reads.Count);
+        Assert.Equal("s10", reads[0].Cookie);
+        Assert.Null(reads[0].Authorization);
+        Assert.Equal("s11", reads[2].Cookie);
+    }
+
+    [Fact]
+    public async Task LogsInWithApplicationCredentialsAndSetsSessionContext()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        const string authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+        const string activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+        const string serverUrl = "GET " + dbRoot + "Server?$select=Name";
+        const string closeUrl = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+        using var v12 = new ScriptedTm1()
+            .On(authUrl, _ => ScriptedTm1.Status(201, "TM1SessionId=app1; Path=/; HttpOnly"))
+            .On(activeUrl, _ => ScriptedTm1.Json(200, "{\"ID\":42}"))
+            .On(serverUrl, _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}"))
+            .On(closeUrl, _ => ScriptedTm1.Status(204, "TM1SessionId=app1; Path=/; Max-Age=0"));
+
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "analyst"))
+            .SessionContext("reporting-service")
+            .HttpHandler(v12)
+            .Build();
+
+        var name = (await session.ExecuteAsync(Server)).GetProperty("Name").GetString();
+        Assert.Equal("sales", name);
+        Assert.Equal(42L, await session.SessionIdAsync());
+        await session.CloseAsync();
+
+        var authReq = Assert.Single(v12.Requests(authUrl));
+        Assert.Equal("Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("my-app:s3cr3t")), authReq.Authorization);
+        Assert.Null(authReq.Header("TM1-SessionContext"));
+        Assert.Equal("{\"User\":\"analyst\"}", authReq.Text);
+
+        var activeReq = Assert.Single(v12.Requests(activeUrl));
+        Assert.Equal("app1", activeReq.Cookie);
+        Assert.Null(activeReq.Authorization);
+        Assert.Equal("reporting-service", activeReq.Header("TM1-SessionContext"));
+
+        var closeReq = Assert.Single(v12.Requests(closeUrl));
+        Assert.Equal("app1", closeReq.Cookie);
+    }
+
+    [Fact]
+    public async Task FailsFastWhenApplicationUserIsForbiddenInDatabase()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        using var v12 = new ScriptedTm1()
+            .On("POST http://tm1.test/tm1/auth/v1/session", _ => ScriptedTm1.Status(201, "TM1SessionId=app2; Path=/; HttpOnly"))
+            .On("GET " + dbRoot + "ActiveSession?$select=ID", _ => ScriptedTm1.Json(403, "{\"error\":{\"code\":\"\",\"message\":\"Forbidden\"}}"));
+
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "ghost"))
+            .HttpHandler(v12)
+            .Build();
+
+        await Assert.ThrowsAsync<Tm1ForbiddenException>(() => session.ExecuteAsync(Server));
+        Assert.Empty(v12.Requests("GET " + dbRoot + "Server?$select=Name"));
+    }
+
+    [Fact]
+    public async Task ReportsRefusedApplicationCredentials()
+    {
+        using var v12 = new ScriptedTm1().On("POST http://tm1.test/tm1/auth/v1/session", _ =>
+            ScriptedTm1.Json(401, "{\"error\":\"invalid_client\",\"error_details\":\"Invalid client credentials\"}")
+        );
+
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Application("my-app", "wrong", "analyst"))
+            .HttpHandler(v12)
+            .Build();
+
+        var ex = await Assert.ThrowsAsync<Tm1AuthenticationException>(() => session.ExecuteAsync(Server));
+        Assert.Equal(Tm1ErrorKind.CredentialRejected, ex.Kind);
+        Assert.NotNull(ex.Error);
+        Assert.Equal("invalid_client", ex.Error.Code);
+        Assert.Equal("Invalid client credentials", ex.Error.Message);
+    }
+
+    [Fact]
+    public void RefusesApplicationAuthWithoutTm112DialectOrWithImpersonate()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            Tm1Session.Builder().Address("http://tm1.test:8010").Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "analyst")).Build()
+        );
+        Assert.Throws<InvalidOperationException>(() =>
+            Tm1Session
+                .Builder()
+                .Dialect(Tm1Dialect.V12("sales"))
+                .Address("http://tm1.test")
+                .Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "analyst"))
+                .Impersonate("someone-else")
+                .Build()
+        );
+    }
+
+    [Fact]
+    public async Task RelogsInWithApplicationCredentialsAfterMaxAgeZero401()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        const string authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+        const string activeUrl = "GET " + dbRoot + "ActiveSession?$select=ID";
+        const string serverUrl = "GET " + dbRoot + "Server?$select=Name";
+        using var v12 = new ScriptedTm1()
+            .OnEach(
+                authUrl,
+                _ => ScriptedTm1.Status(201, "TM1SessionId=a1; Path=/; HttpOnly"),
+                _ => ScriptedTm1.Status(201, "TM1SessionId=a2; Path=/; HttpOnly")
+            )
+            .OnEach(activeUrl, _ => ScriptedTm1.Json(200, "{\"ID\":1}"), _ => ScriptedTm1.Json(200, "{\"ID\":2}"))
+            .OnEach(
+                serverUrl,
+                _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}"),
+                _ => ScriptedTm1.Status(401, "TM1SessionId=a1; Path=/; Max-Age=0"),
+                _ => ScriptedTm1.Json(200, "{\"Name\":\"sales\"}")
+            );
+
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "analyst"))
+            .HttpHandler(v12)
+            .Build();
+
+        await session.ExecuteAsync(Server);
+        await session.ExecuteAsync(Server);
+
+        var authReqs = v12.Requests(authUrl);
+        Assert.Equal(2, authReqs.Count);
+        Assert.Null(authReqs[1].Cookie);
+        var activeReqs = v12.Requests(activeUrl);
+        Assert.Equal(2, activeReqs.Count);
+        Assert.Equal("a2", activeReqs[1].Cookie);
+        Assert.Equal("a2", v12.Requests(serverUrl)[2].Cookie);
+        Assert.Equal(2L, await session.SessionIdAsync());
+    }
+
+    [Fact]
+    public async Task ReportsProtocolErrorWhenApplicationLoginSetsNoCookie()
+    {
+        using var v12 = new ScriptedTm1().On("POST http://tm1.test/tm1/auth/v1/session", _ => ScriptedTm1.Status(201));
+        var session = Tm1Session
+            .Builder()
+            .Dialect(Tm1Dialect.V12("sales"))
+            .Address("http://tm1.test")
+            .Authenticator(Tm1Authenticator.Application("my-app", "s3cr3t", "analyst"))
+            .HttpHandler(v12)
+            .Build();
+
+        await Assert.ThrowsAsync<Tm1ProtocolException>(() => session.ExecuteAsync(Server));
+    }
+
     /// <summary>A body that can't be written as JSON: reading its property fails.</summary>
     private sealed class Unwritable
     {

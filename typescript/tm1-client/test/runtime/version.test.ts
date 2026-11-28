@@ -197,7 +197,22 @@ describe("Tm1Dialect", () => {
     expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/")).toThrow(RangeError);
     expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/tm1/api/v1/")).toThrow(RangeError);
     expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/api/v1/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444/api/v1/Databases('sales')/")).toThrow(RangeError);
+    expect(() => Tm1Dialect.v12("sales").closeUrl("http://engine:4444//api/v1/Databases('sales')/")).toThrow(RangeError);
     expect(() => Tm1Dialect.V11.closeUrl("not a url")).toThrow(RangeError);
+  });
+
+  it("finds the TM1 12 auth session URL", () => {
+    const sales = Tm1Dialect.v12("sales");
+    expect(Tm1Dialect.V11.authSessionUrl("http://tm1:8010/api/v1/")).toBeUndefined();
+    expect(() => Tm1Dialect.V11.authSessionUrl("not a url")).toThrow(RangeError);
+    expect(sales.authSessionUrl("http://engine:4444/tm1/api/v1/Databases('sales')/")).toBe("http://engine:4444/tm1/auth/v1/session");
+    expect(Tm1Dialect.v12("prod", "O'Neil Sales").authSessionUrl("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')")).toBe(
+      "https://proxy/pa/prod/auth/v1/session",
+    );
+    expect(() => sales.authSessionUrl("http://engine:4444/api/v1/Databases('sales')/")).toThrow(RangeError);
+    expect(() => sales.authSessionUrl("http://engine:4444//api/v1/Databases('sales')/")).toThrow(RangeError);
+    expect(() => sales.authSessionUrl("http://engine:4444/tm1/api/v1/")).toThrow(RangeError);
   });
 });
 

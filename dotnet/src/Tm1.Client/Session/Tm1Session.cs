@@ -914,13 +914,30 @@ public class Tm1SessionBuilder
     internal string BaseUrlOrUnset() => _root ?? (_address is not null ? _dialect.ServiceRoot(_address) : "(no base URL)");
 
     /// <summary>The session. Nothing is sent to TM1 until the first request.</summary>
-    /// <exception cref="InvalidOperationException">The base URL or credentials aren't
-    /// set.</exception>
+    /// <exception cref="InvalidOperationException">The base URL or credentials aren't set, or
+    /// application authentication is combined with <see cref="Impersonate"/> or a non-TM1 12
+    /// dialect.</exception>
+    /// <exception cref="ArgumentException">An application authenticator supplies an invalid user
+    /// name.</exception>
     public Tm1Session Build()
     {
         var root = _root
             ?? (_address is not null ? _dialect.ServiceRoot(_address) : throw new InvalidOperationException("Give the server: BaseUrl or Address"));
         var authenticator = _authenticator ?? throw new InvalidOperationException("Give the login: BasicAuth or Authenticator");
+        if (authenticator.ApplicationUser() is { } appUser)
+        {
+            Connection.CheckApplicationUser(appUser);
+            if (_impersonate is not null)
+            {
+                throw new InvalidOperationException(
+                    "TM1 12 application authentication doesn't support TM1-Impersonate (TM1 ignores the header): pass the user to Tm1Authenticator.Application(clientId, clientSecret, user) instead"
+                );
+            }
+            if (_dialect.AuthSessionUrl(root) is null)
+            {
+                throw new InvalidOperationException("TM1 application authentication requires a TM1 12 dialect (Tm1Dialect.V12)");
+            }
+        }
         return new Tm1Session(
             new Connection(
                 root,

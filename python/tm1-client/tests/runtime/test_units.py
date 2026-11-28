@@ -554,10 +554,30 @@ def test_refuses_invalid_tm112_dialect_inputs() -> None:
         lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/"),
         lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/tm1/api/v1/"),
         lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/api/v1/"),
+        lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/api/v1/Databases('sales')/"),
+        lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444//api/v1/Databases('sales')/"),
         lambda: Tm1Dialect.V11.close_url("not a url"),
     ):
         with pytest.raises(ValueError):
             bad()
+
+
+def test_finds_the_tm112_auth_session_url() -> None:
+    sales = Tm1Dialect.v12("sales")
+    assert Tm1Dialect.V11.auth_session_url("http://tm1:8010/api/v1/") is None
+    with pytest.raises(ValueError):
+        Tm1Dialect.V11.auth_session_url("not a url")
+    assert sales.auth_session_url("http://engine:4444/tm1/api/v1/Databases('sales')/") == "http://engine:4444/tm1/auth/v1/session"
+    assert (
+        Tm1Dialect.v12("prod", "O'Neil Sales").auth_session_url("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')")
+        == "https://proxy/pa/prod/auth/v1/session"
+    )
+    with pytest.raises(ValueError):
+        sales.auth_session_url("http://engine:4444/api/v1/Databases('sales')/")
+    with pytest.raises(ValueError):
+        sales.auth_session_url("http://engine:4444//api/v1/Databases('sales')/")
+    with pytest.raises(ValueError):
+        sales.auth_session_url("http://engine:4444/tm1/api/v1/")
 
 
 # Tm1TimeoutsTest
@@ -636,11 +656,75 @@ def test_authenticators_that_hold_their_credentials_are_equal_when_the_credentia
     assert "secret" not in repr(auth.cognos_logon("http://cognos:9300", "LDAP", "dave", "secret"))
 
 
+def test_writes_bearer_credentials() -> None:
+    bearer = auth.bearer("eyJ.token.sig")
+    assert bearer.authorization() == "Bearer eyJ.token.sig"
+    assert bearer.describe() == "Bearer"
+    assert bearer == auth.bearer("eyJ.token.sig") and hash(bearer) == hash(auth.bearer("eyJ.token.sig"))
+    assert bearer != auth.bearer("other-token")
+    with pytest.raises(ValueError):
+        auth.bearer("  ")
+    with pytest.raises(ValueError):
+        auth.bearer("bad\r\ntoken")
+    with pytest.raises(ValueError):
+        auth.bearer("Bearer eyJ.token")
+
+
+def test_asks_for_a_fresh_bearer_token_on_every_login() -> None:
+    import asyncio
+
+    issued = iter(range(1, 10))
+    bearer = auth.bearer(lambda: f"t{next(issued)}")
+    assert bearer.authorization() == "Bearer t1"
+    assert bearer.authorization() == "Bearer t2"
+    assert bearer.describe() == "Bearer"
+    assert bearer != auth.bearer(lambda: "t1")
+    with pytest.raises(ValueError):
+        auth.bearer(lambda: "  ").authorization()
+    with pytest.raises(ValueError):
+        auth.bearer(lambda: "bad\ntoken").authorization()
+
+    async def async_token() -> str:
+        return "async-jwt"
+
+    async def blank_async_token() -> str:
+        return "  "
+
+    assert asyncio.run(auth.bearer(async_token).authorization()) == "Bearer async-jwt"
+    with pytest.raises(ValueError):
+        asyncio.run(auth.bearer(blank_async_token).authorization())
+
+
+def test_writes_application_credentials() -> None:
+    app = auth.application("svc-client", "s3cr3t", "analyst")
+    assert app.authorization() == "Basic " + b64("svc-client:s3cr3t")
+    assert app.describe() == "Application svc-client as analyst"
+    assert app == auth.application("svc-client", "s3cr3t", "analyst")
+    assert hash(app) == hash(auth.application("svc-client", "s3cr3t", "analyst"))
+    assert app != auth.application("svc-client", "s3cr3t", "other")
+    assert app != auth.application("svc-client", "other", "analyst")
+    assert app != auth.basic("svc-client", "s3cr3t")
+    for bad in (
+        lambda: auth.application(" ", "s3cr3t", "analyst"),
+        lambda: auth.application("bad:id", "s3cr3t", "analyst"),
+        lambda: auth.application("bad\nid", "s3cr3t", "analyst"),
+        lambda: auth.application("svc-client", " ", "analyst"),
+        lambda: auth.application("svc-client", "s3cr3t", " "),
+        lambda: auth.application("svc-client", "s3cr3t", "bad\nuser"),
+    ):
+        with pytest.raises(ValueError):
+            bad()
+
+
 def test_never_shows_credentials_in_to_string() -> None:
     # Java's toString is repr here
     assert "apple" not in repr(auth.basic("admin", "apple")) and b64("admin:apple") not in repr(auth.basic("admin", "apple"))
     assert "secret" not in repr(auth.cam_namespace("alice", "secret", "LDAP"))
     assert "passport-value" not in repr(auth.cam_passport(lambda: "passport-value"))
+    assert "secret-jwt" not in repr(auth.bearer("secret-jwt"))
+    assert "secret-jwt" not in repr(auth.bearer(lambda: "secret-jwt"))
+    app_repr = repr(auth.application("svc-client", "s3cr3t", "analyst"))
+    assert "s3cr3t" not in app_repr and b64("svc-client:s3cr3t") not in app_repr
 
 
 # Tm1RequestTest

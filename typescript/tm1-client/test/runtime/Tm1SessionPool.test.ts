@@ -7,6 +7,7 @@ import {
   ODataQuery,
   Tm1Authenticator,
   Tm1Clock,
+  Tm1Dialect,
   Tm1Identity,
   Tm1Request,
   Tm1Session,
@@ -346,5 +347,42 @@ describe("Tm1SessionPool", () => {
     expect(real.session()).toBe(real.session());
     expect(Tm1Clock.system.now()).toBeGreaterThan(0);
     await real.close();
+  });
+
+  it("pools per-user application sessions", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+    const v12 = new ScriptedTm1()
+      .onEach(
+        authUrl,
+        () => ScriptedTm1.status(201, "TM1SessionId=u1; Path=/; HttpOnly"),
+        () => ScriptedTm1.status(201, "TM1SessionId=u2; Path=/; HttpOnly"),
+      )
+      .on("GET " + dbRoot + "ActiveSession?$select=ID", () => ScriptedTm1.json(200, '{"ID":1}'))
+      .on("GET " + dbRoot + "Server", () => ScriptedTm1.json(200, "{}"))
+      .on("POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close", () => ScriptedTm1.status(204));
+
+    const v12Pool = Tm1SessionPool.builder(
+      Tm1Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(Tm1Authenticator.application("svc", "secret", "default-user"))
+        .transport(v12),
+    )
+      .clock(time)
+      .build();
+    try {
+      const alice = v12Pool.session(Tm1Identity.withCredentials("alice", Tm1Authenticator.application("svc", "secret", "alice")));
+      expect(v12Pool.session(Tm1Identity.withCredentials("ALICE", Tm1Authenticator.application("svc", "secret", "alice")))).toBe(alice);
+      const bob = v12Pool.session(Tm1Identity.withCredentials("bob", Tm1Authenticator.application("svc", "secret", "bob")));
+      expect(bob).not.toBe(alice);
+      expect(() => v12Pool.session(Tm1Identity.impersonating("charlie"))).toThrow(Error);
+
+      await alice.execute(SERVER);
+      await bob.execute(SERVER);
+      expect(v12.requests(authUrl).map((r) => r.json)).toEqual([{ User: "alice" }, { User: "bob" }]);
+    } finally {
+      await v12Pool.close();
+    }
   });
 });

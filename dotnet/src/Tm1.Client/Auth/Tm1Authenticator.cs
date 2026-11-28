@@ -15,10 +15,12 @@ namespace Skipcheck.Tm1.Client.Auth;
 /// <para>A <c>Tm1SessionPool</c> keeps one session for each set of a user's own credentials, and
 /// tells them apart with <see cref="object.Equals(object)"/>. The authenticators here that hold
 /// their credentials (<see cref="Basic"/>, <see cref="CamNamespace"/>,
-/// <see cref="CamPassport(string)"/>, <see cref="CognosLogon"/>) are equal when the credentials are.
-/// One that asks a supplier (<see cref="CamPassport(Func{CancellationToken, ValueTask{string}})"/>,
-/// <see cref="CognosIdToken"/>) is only equal to itself, so keep it and pass the same one each
-/// time; so is your own, unless it defines <c>Equals</c>.</para></summary>
+/// <see cref="CamPassport(string)"/>, <see cref="CognosLogon"/>, <see cref="Bearer(string)"/>,
+/// <see cref="Application"/>) are equal when the credentials are. One that asks a supplier
+/// (<see cref="CamPassport(Func{CancellationToken, ValueTask{string}})"/>,
+/// <see cref="CognosIdToken"/>, <see cref="Bearer(Func{CancellationToken, ValueTask{string}})"/>)
+/// is only equal to itself, so keep it and pass the same one each time; so is your own, unless it
+/// defines <c>Equals</c>.</para></summary>
 public abstract class Tm1Authenticator
 {
     /// <summary>The header to log in with; asked for at each login.</summary>
@@ -26,6 +28,11 @@ public abstract class Tm1Authenticator
 
     /// <summary>Who logs in, without secrets, for logs and errors.</summary>
     public abstract string Describe();
+
+    /// <summary>The TM1 user name for TM1 12 application (service-to-service) authentication, when
+    /// logging in through <c>/&lt;instance&gt;/auth/v1/session</c>. Null for authenticators that
+    /// send <c>Authorization</c> directly to the database's <c>ActiveSession</c>.</summary>
+    public virtual string? ApplicationUser() => null;
 
     /// <inheritdoc/>
     public override string ToString() => $"Tm1Authenticator[{Describe()}]";
@@ -93,7 +100,70 @@ public abstract class Tm1Authenticator
             [dispatcher, @namespace, idToken, handler]
         );
 
+    /// <summary>Bearer token authentication, for TM1 12 with OAuth2/OIDC:
+    /// <c>Bearer &lt;token&gt;</c>. Two of these are equal when their tokens are.</summary>
+    /// <param name="token">The bearer token; not blank.</param>
+    /// <exception cref="ArgumentException"><paramref name="token"/> is blank or contains control
+    /// characters.</exception>
+    public static Tm1Authenticator Bearer(string token) => new Fixed("Bearer " + CheckToken(token), "Bearer");
+
+    /// <summary>Bearer token authentication with a token supplied on every login, for TM1 12 with
+    /// OAuth2/OIDC: <c>Bearer &lt;token&gt;</c>. Equal only to itself.</summary>
+    /// <param name="token">Supplies a current bearer token; asked at each login.</param>
+    public static Tm1Authenticator Bearer(Func<CancellationToken, ValueTask<string>> token) =>
+        new BearerSupplier(token ?? throw new ArgumentNullException(nameof(token)));
+
+    /// <summary>TM1 12 (Planning Analytics Engine) service-to-service application authentication.
+    /// Logs in via <c>POST /&lt;instance&gt;/auth/v1/session</c> with HTTP Basic
+    /// <c>clientId:clientSecret</c> and a JSON body naming <paramref name="user"/>, then resolves
+    /// the session on the target database. Requires <c>Tm1Dialect.V12</c> and cannot be combined
+    /// with <c>TM1-Impersonate</c>.</summary>
+    /// <param name="clientId">The configured application client ID; not blank and without <c>:</c>.</param>
+    /// <param name="clientSecret">The configured application client secret; not blank.</param>
+    /// <param name="user">The TM1 user to act as; not blank.</param>
+    /// <exception cref="ArgumentException">Any argument is blank or contains invalid characters.</exception>
+    public static Tm1Authenticator Application(string clientId, string clientSecret, string user) => new ApplicationAuth(clientId, clientSecret, user);
+
     private static string Base64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
+
+    private static string CheckToken(string token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new ArgumentException("bearer token must not be blank", nameof(token));
+        }
+        foreach (var c in token)
+        {
+            if (c <= 0x20 || c >= 0x7F)
+            {
+                throw new ArgumentException("bearer token must contain only printable ASCII characters without whitespace", nameof(token));
+            }
+        }
+        return token;
+    }
+
+    private static string CheckNonBlank(string value, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException($"{paramName} must not be blank", paramName);
+        }
+        return value;
+    }
+
+    private static bool HasControlChars(string value)
+    {
+        foreach (var c in value)
+        {
+            if (char.IsControl(c))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /// <summary>Credentials the authenticator holds. Equal when the credentials are.</summary>
     private sealed class Fixed(string value, string description) : Tm1Authenticator
@@ -139,5 +209,60 @@ public abstract class Tm1Authenticator
             "CAMPassport " + await passport(cancellationToken).ConfigureAwait(false);
 
         public override string Describe() => "CAMPassport";
+    }
+
+    private sealed class BearerSupplier(Func<CancellationToken, ValueTask<string>> token) : Tm1Authenticator
+    {
+        public override async ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) =>
+            "Bearer " + CheckToken(await token(cancellationToken).ConfigureAwait(false));
+
+        public override string Describe() => "Bearer";
+    }
+
+    private sealed class ApplicationAuth : Tm1Authenticator
+    {
+        private readonly string _clientId;
+        private readonly string _clientSecret;
+        private readonly string _user;
+        private readonly string _headerValue;
+        private readonly string _description;
+
+        public ApplicationAuth(string clientId, string clientSecret, string user)
+        {
+            _clientId = CheckNonBlank(clientId, nameof(clientId));
+            if (_clientId.Contains(':', StringComparison.Ordinal))
+            {
+                throw new ArgumentException("clientId must not contain ':'", nameof(clientId));
+            }
+            if (HasControlChars(_clientId))
+            {
+                throw new ArgumentException("clientId must not contain control characters", nameof(clientId));
+            }
+            _clientSecret = CheckNonBlank(clientSecret, nameof(clientSecret));
+            _user = CheckNonBlank(user, nameof(user));
+            if (HasControlChars(_user))
+            {
+                throw new ArgumentException("user must not contain control characters", nameof(user));
+            }
+            _headerValue = "Basic " + Base64($"{_clientId}:{_clientSecret}");
+            _description = $"Application {_clientId} as {_user}";
+        }
+
+        public override ValueTask<string> AuthorizationAsync(CancellationToken cancellationToken = default) => ValueTask.FromResult(_headerValue);
+
+        public override string? ApplicationUser() => _user;
+
+        public override string Describe() => _description;
+
+        public override bool Equals(object? obj) =>
+            ReferenceEquals(this, obj)
+            || (
+                obj is ApplicationAuth other
+                && string.Equals(_clientId, other._clientId, StringComparison.Ordinal)
+                && string.Equals(_clientSecret, other._clientSecret, StringComparison.Ordinal)
+                && string.Equals(_user, other._user, StringComparison.Ordinal)
+            );
+
+        public override int GetHashCode() => HashCode.Combine(_clientId, _clientSecret, _user);
     }
 }

@@ -7,6 +7,7 @@ these tests call ``evict_expired()``, which is when this pool does it."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 import time
@@ -15,7 +16,7 @@ from typing import Any
 import httpx2
 import pytest
 
-from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Identity, Tm1Request, Tm1SessionClosedError, auth
+from skipcheck_tm1 import ODataPath, ODataQuery, Tm1Dialect, Tm1Identity, Tm1Request, Tm1SessionClosedError, auth
 from skipcheck_tm1.aio import cognos as aio_cognos
 
 from ..conftest import BASE, target
@@ -361,3 +362,50 @@ def test_refuses_settings_that_make_no_sense(rt: Runtime) -> None:
         builder.idle_timeout(0)
     with pytest.raises(ValueError):
         builder.close_grace(-1)
+
+
+def test_pools_per_user_application_sessions(rt: Runtime, clock: Clock) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+    auth_url = "http://tm1.test/tm1/auth/v1/session"
+    n = 0
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        nonlocal n
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "POST" and url == auth_url:
+            n += 1
+            return httpx2.Response(201, headers={"Set-Cookie": f"TM1SessionId=u{n}; Path=/; HttpOnly"})
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            return httpx2.Response(200, json={"ID": 1})
+        if request.method == "GET" and url == db_root + "Server?$select=Name":
+            return httpx2.Response(200, json={"Name": "sales"})
+        if request.method == "POST" and url == "http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close":
+            return httpx2.Response(204)
+        return httpx2.Response(404)
+
+    http = httpx2.Client(transport=httpx2.MockTransport(handle)) if rt.flavor == "sync" else httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+    rt.clients.append(http)
+    sessions = (
+        rt.Session.builder()
+        .dialect(Tm1Dialect.v12("sales"))
+        .address("http://tm1.test")
+        .authenticator(auth.application("svc", "secret", "default-user"))
+        .http_client(http)
+    )
+    p = pool(rt, clock, sessions=sessions)
+    try:
+        alice = p.session(Tm1Identity.with_credentials("alice", auth.application("svc", "secret", "alice")))
+        assert p.session(Tm1Identity.with_credentials("ALICE", auth.application("svc", "secret", "alice"))) is alice
+        bob = p.session(Tm1Identity.with_credentials("bob", auth.application("svc", "secret", "bob")))
+        assert bob is not alice
+        with pytest.raises(ValueError):
+            p.session(Tm1Identity.impersonating("charlie"))
+
+        rt.run(alice.execute(SERVER))
+        rt.run(bob.execute(SERVER))
+        auth_bodies = [json.loads(r.content) for r in seen if str(r.url) == auth_url]
+        assert auth_bodies == [{"User": "alice"}, {"User": "bob"}]
+    finally:
+        rt.run(p.close())

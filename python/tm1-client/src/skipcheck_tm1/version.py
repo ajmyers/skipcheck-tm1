@@ -454,6 +454,7 @@ class Tm1Dialect:
         name: str,
         service_root: Any,
         close_url: Any = None,
+        auth_session_url: Any = None,
         *,
         _key: tuple[str, ...] | None = None,
         _detail: str | None = None,
@@ -461,6 +462,7 @@ class Tm1Dialect:
         self._name = name
         self._service_root = service_root
         self._close_url = close_url or _default_close_url
+        self._auth_session_url = auth_session_url or _default_auth_session_url
         self._key = _key
         self._detail = _detail
 
@@ -499,7 +501,7 @@ class Tm1Dialect:
                 path += full_suffix
             return f"{parts.scheme}://{parts.netloc}{path}/"
 
-        return cls("TM1 12", resolve_root, _v12_close_url, _key=("v12", instance, db), _detail=f"{instance}/{db}")
+        return cls("TM1 12", resolve_root, _v12_close_url, _v12_auth_session_url, _key=("v12", instance, db), _detail=f"{instance}/{db}")
 
     @property
     def name(self) -> str:
@@ -517,6 +519,12 @@ class Tm1Dialect:
         ``<service_root>ActiveSession/tm1.Close``; TM1 12 closes at the instance level
         ``/<instance>/api/v1/ActiveSession/tm1s.Close``."""
         return self._close_url(service_root)
+
+    def auth_session_url(self, service_root: str) -> str | None:
+        """The URL a session posts to in order to log in with application (service-to-service)
+        credentials, or None if this deployment doesn't have one. TM1 12 uses
+        ``/<instance>/auth/v1/session``."""
+        return self._auth_session_url(service_root)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Tm1Dialect):
@@ -561,7 +569,14 @@ def _default_close_url(service_root: str) -> str:
     return f"{parts.scheme}://{parts.netloc}{path}/ActiveSession/tm1.Close"
 
 
-def _v12_close_url(service_root: str) -> str:
+def _default_auth_session_url(service_root: str) -> str | None:
+    if not isinstance(service_root, str):
+        raise TypeError("service_root is required")
+    _parse_absolute_url(service_root, f"Not a service root: {service_root}")
+    return None
+
+
+def _v12_instance_root(service_root: str) -> tuple[str, str]:
     parts = _parse_http_url(service_root, f"Not a TM1 12 service root: {service_root}")
     path = parts.path.rstrip("/")
     last_slash = path.rfind("/")
@@ -570,8 +585,24 @@ def _v12_close_url(service_root: str) -> str:
     instance_root = path[:last_slash]
     last_segment = path[last_slash + 1 :]
     if not instance_root.endswith("/api/v1") or not last_segment.startswith("Databases(") or not last_segment.endswith(")"):
-        raise ValueError(f"A TM1 12 database service root must end with /api/v1/Databases('<db>')/: {service_root}")
-    return f"{parts.scheme}://{parts.netloc}{instance_root}/ActiveSession/tm1s.Close"
+        raise ValueError(f"A TM1 12 database service root must end with /<instance>/api/v1/Databases('<db>')/: {service_root}")
+    instance_prefix = instance_root[: -len("/api/v1")]
+    prefix_slash = instance_prefix.rfind("/")
+    instance_segment = "" if prefix_slash < 0 else instance_prefix[prefix_slash + 1 :]
+    if not instance_segment or instance_segment in (".", "..") or not _INSTANCE_SEGMENT.match(instance_segment):
+        raise ValueError(f"A TM1 12 database service root must include a valid instance segment before /api/v1: {service_root}")
+    return f"{parts.scheme}://{parts.netloc}", instance_root
+
+
+def _v12_close_url(service_root: str) -> str:
+    origin, instance_root = _v12_instance_root(service_root)
+    return f"{origin}{instance_root}/ActiveSession/tm1s.Close"
+
+
+def _v12_auth_session_url(service_root: str) -> str:
+    origin, instance_root = _v12_instance_root(service_root)
+    prefix = instance_root[: -len("/api/v1")]
+    return f"{origin}{prefix}/auth/v1/session"
 
 
 def _v11(address: str) -> str:
