@@ -348,12 +348,16 @@ describe("Tm1Operations", () => {
     const catalog = allOperations.map((op) => op.endpoint());
     expect(new Set(catalog).size, "no duplicates").toBe(catalog.length);
     expect([...catalog].sort()).toEqual([...operations].sort());
-    expect(catalog).toHaveLength(105);
+    expect(catalog).toHaveLength(112);
   });
 
   it("every capability is one the snapshot has", () => {
-    const snapshot = Tm1Capabilities.parse(SNAPSHOT);
-    for (const op of allOperations) expect(snapshot.supports(op.capability()), op.endpoint()).toBe(true);
+    const snapshots = Repo.snapshots.map((path) => Tm1Capabilities.parse(readFileSync(path, "utf8")));
+    for (const op of allOperations)
+      expect(
+        snapshots.some((s) => s.supports(op.capability())),
+        op.endpoint(),
+      ).toBe(true);
   });
 
   it("carries revisions, parameters and return types", () => {
@@ -361,7 +365,10 @@ describe("Tm1Operations", () => {
     const mdx = Tm1Operations.ExecuteMdx;
     expect(mdx.kind).toBe("Action");
     expect(mdx.importName).toBe("ExecuteMDX");
-    expect(mdx.parameters).toEqual([{ name: "MDX", type: "Edm.String", nullable: false }]);
+    expect(mdx.parameters).toEqual([
+      { name: "MDX", type: "Edm.String", nullable: false },
+      { name: "Context", type: "Edm.Untyped", nullable: true },
+    ]);
     expect(mdx.returnType).toBe("tm1.Cellset");
     expect(mdx.addedIn).toBe("10.2.2.1");
     expect(allOperations.filter((op) => op.deprecated())).not.toHaveLength(0);

@@ -27,7 +27,13 @@ export const Repo = {
     return join(this.root, "java", "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
   },
   get snapshot(): string {
-    return join(this.root, "java", "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
+    return this.snapshotFor("11.8.35");
+  },
+  get snapshots(): readonly string[] {
+    return [this.snapshotFor("11.8.35"), this.snapshotFor("12.6.0")];
+  },
+  snapshotFor(schema: string): string {
+    return join(this.root, "java", "tm1-client", "src", "model", "metadata", `tm1-schema-${schema}.xml`);
   },
   get javaClient(): string {
     return join(this.root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client");

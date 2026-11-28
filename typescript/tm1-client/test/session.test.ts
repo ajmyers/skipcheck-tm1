@@ -170,10 +170,12 @@ describe("Tm1Session", () => {
   });
 
   it("reads the snapshot into the spec's inventory", () => {
-    const caps = Tm1Capabilities.parse(readFileSync(Repo.snapshot, "utf8"));
-    expect(caps.schemaVersion).toBe("11.8.35");
-    const spec = JSON.parse(readFileSync(Repo.spec, "utf8")) as { endpoints: { id: string }[] };
-    expect([...caps.endpoints].sort()).toEqual(spec.endpoints.map((e) => e.id).sort());
+    const parsed = Repo.snapshots.map((path) => Tm1Capabilities.parse(readFileSync(path, "utf8")));
+    const mergedEndpoints = new Set(parsed.flatMap((c) => [...c.endpoints]));
+    expect(parsed.at(-1)!.schemaVersion).toBe("12.6.0");
+    const spec = JSON.parse(readFileSync(Repo.spec, "utf8")) as { source: { schemaVersion: string }; endpoints: { id: string }[] };
+    expect(spec.source.schemaVersion).toBe(parsed.at(-1)!.schemaVersion);
+    expect([...mergedEndpoints].sort()).toEqual(spec.endpoints.map((e) => e.id).sort());
   });
 
   it("remembers a refused login", async () => {

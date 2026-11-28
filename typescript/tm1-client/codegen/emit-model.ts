@@ -24,6 +24,7 @@ const EDM: Record<string, string> = {
   "Edm.Duration": "string",
   "Edm.Guid": "string",
   "Edm.PrimitiveType": "unknown",
+  "Edm.Untyped": "unknown",
 };
 
 /** The TypeScript type of a CSDL type; undefined for streams. */

@@ -71,6 +71,6 @@ describe("coverage gate", () => {
     expect(all.has("EntitySet Cubes")).toBe(true);
     expect(all.has("Navigation ViewTitle/Subset")).toBe(true);
     // The same count as the Java client's CoverageGateTest
-    expect(all.size).toBe(242);
+    expect(all.size).toBe(256);
   });
 });

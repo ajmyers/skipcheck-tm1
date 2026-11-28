@@ -28,6 +28,8 @@ interface Case {
   params: string[];
   args: any[];
   take?: number;
+  schema?: string;
+  productVersion?: string;
   exchanges: Entry[];
   result?: any;
   error?: codec.EncodedError;
@@ -35,7 +37,7 @@ interface Case {
 
 interface Fixture {
   specVersion: number;
-  session: { productVersion: string };
+  session: { productVersion: string; schema?: string };
   cases: Case[];
 }
 
@@ -70,7 +72,9 @@ describe("conformance with the Java client's recorded calls", () => {
       const reason = unsupported.get(c.id);
       (reason ? it.skip : it)(c.id, async () => {
         const tm1 = new FakeTm1();
-        tm1.productVersion = fixture.session.productVersion;
+        tm1.productVersion = c.productVersion ?? fixture.session.productVersion;
+        const schema = c.schema ?? fixture.session.schema;
+        if (schema) tm1.metadata = readFileSync(Repo.snapshotFor(schema));
         // Each entry a list of exchanges: one, or an unordered group's, answered by the equal request
         const entries = c.exchanges.map((x) => ("unordered" in x ? [...x.unordered] : [x]));
         const answered: [sent: Record<string, unknown>, expected: Record<string, unknown>][] = [];
