@@ -57,6 +57,24 @@ public sealed class Tm1TheoryAttribute : TheoryAttribute
     }
 }
 
+/// <summary>A fact requiring both a TM1 11 server source and a TM1 v12 engine source.</summary>
+public sealed class RequiresTm1PassThroughFactAttribute : FactAttribute
+{
+    public RequiresTm1PassThroughFactAttribute()
+    {
+        Skip = RequiresTm1FactAttribute.Tm1SkipReason() ?? RequiresTm1EngineFactAttribute.EngineSkipReason();
+    }
+}
+
+/// <summary>A fact requiring Cognos, TM1 11, and TM1 v12 engine sources.</summary>
+public sealed class RequiresTm1PassThroughCamFactAttribute : FactAttribute
+{
+    public RequiresTm1PassThroughCamFactAttribute()
+    {
+        Skip = new RequiresCognosFactAttribute().Skip ?? RequiresTm1EngineFactAttribute.EngineSkipReason();
+    }
+}
+
 public static class Live
 {
     private static readonly string? Running = Environment.GetEnvironmentVariable("TM1_URL");
