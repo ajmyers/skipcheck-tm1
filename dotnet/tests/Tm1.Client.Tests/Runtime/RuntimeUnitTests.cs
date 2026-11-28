@@ -211,12 +211,65 @@ public class Tm1AuthenticatorTest
     }
 
     [Fact]
+    public async Task WritesBearerCredentials()
+    {
+        var bearer = Tm1Authenticator.Bearer("eyJ.token.sig");
+        Assert.Equal("Bearer eyJ.token.sig", await bearer.AuthorizationAsync());
+        Assert.Equal("Bearer", bearer.Describe());
+        Assert.Null(bearer.ApplicationUser());
+        Assert.Equal(Tm1Authenticator.Bearer("eyJ.token.sig"), bearer);
+        Assert.Equal(Tm1Authenticator.Bearer("eyJ.token.sig").GetHashCode(), bearer.GetHashCode());
+        Assert.NotEqual(Tm1Authenticator.Bearer("other-token"), bearer);
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Bearer("  "));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Bearer("bad\r\ntoken"));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Bearer("Bearer eyJ.token"));
+    }
+
+    [Fact]
+    public async Task AsksForAFreshBearerTokenOnEveryLogin()
+    {
+        var issued = 0;
+        var bearer = Tm1Authenticator.Bearer(_ => ValueTask.FromResult("t" + Interlocked.Increment(ref issued)));
+        Assert.Equal("Bearer t1", await bearer.AuthorizationAsync());
+        Assert.Equal("Bearer t2", await bearer.AuthorizationAsync());
+        Assert.Equal("Bearer", bearer.Describe());
+        Assert.NotEqual(Tm1Authenticator.Bearer(_ => ValueTask.FromResult("t1")), bearer);
+        await Assert.ThrowsAsync<ArgumentException>(async () => await Tm1Authenticator.Bearer(_ => ValueTask.FromResult("  ")).AuthorizationAsync());
+        await Assert.ThrowsAsync<ArgumentException>(async () => await Tm1Authenticator.Bearer(_ => ValueTask.FromResult("bad\ntoken")).AuthorizationAsync());
+    }
+
+    [Fact]
+    public async Task WritesApplicationCredentials()
+    {
+        var app = Tm1Authenticator.Application("svc-client", "s3cr3t", "analyst");
+        Assert.Equal("Basic " + Base64("svc-client:s3cr3t"), await app.AuthorizationAsync());
+        Assert.Equal("analyst", app.ApplicationUser());
+        Assert.Equal("Application svc-client as analyst", app.Describe());
+        Assert.Equal(Tm1Authenticator.Application("svc-client", "s3cr3t", "analyst"), app);
+        Assert.Equal(Tm1Authenticator.Application("svc-client", "s3cr3t", "analyst").GetHashCode(), app.GetHashCode());
+        Assert.NotEqual(Tm1Authenticator.Application("svc-client", "s3cr3t", "other"), app);
+        Assert.NotEqual(Tm1Authenticator.Application("svc-client", "other", "analyst"), app);
+        Assert.NotEqual(Tm1Authenticator.Basic("svc-client", "s3cr3t"), app);
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application(" ", "s3cr3t", "analyst"));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application("bad:id", "s3cr3t", "analyst"));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application("bad\nid", "s3cr3t", "analyst"));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application("svc-client", " ", "analyst"));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application("svc-client", "s3cr3t", " "));
+        Assert.Throws<ArgumentException>(() => Tm1Authenticator.Application("svc-client", "s3cr3t", "bad\nuser"));
+    }
+
+    [Fact]
     public void NeverShowsCredentialsInToString()
     {
         Assert.DoesNotContain("apple", Tm1Authenticator.Basic("admin", "apple").ToString());
         Assert.DoesNotContain(Base64("admin:apple"), Tm1Authenticator.Basic("admin", "apple").ToString());
         Assert.DoesNotContain("secret", Tm1Authenticator.CamNamespace("alice", "secret", "LDAP").ToString());
         Assert.DoesNotContain("passport-value", Tm1Authenticator.CamPassport(_ => ValueTask.FromResult("passport-value")).ToString());
+        Assert.DoesNotContain("secret-jwt", Tm1Authenticator.Bearer("secret-jwt").ToString());
+        Assert.DoesNotContain("secret-jwt", Tm1Authenticator.Bearer(_ => ValueTask.FromResult("secret-jwt")).ToString());
+        var appStr = Tm1Authenticator.Application("svc-client", "s3cr3t", "analyst").ToString();
+        Assert.DoesNotContain("s3cr3t", appStr);
+        Assert.DoesNotContain(Base64("svc-client:s3cr3t"), appStr);
     }
 
     private static string Base64(string text) => Convert.ToBase64String(Encoding.UTF8.GetBytes(text));
@@ -855,7 +908,25 @@ public class Tm1DialectTest
         Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/"));
         Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/tm1/api/v1/"));
         Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/api/v1/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444/api/v1/Databases('sales')/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V12("sales").CloseUrl("http://engine:4444//api/v1/Databases('sales')/"));
         Assert.Throws<ArgumentException>(() => Tm1Dialect.V11.CloseUrl("not a url"));
+    }
+
+    [Fact]
+    public void FindsTheTm112AuthSessionUrl()
+    {
+        var sales = Tm1Dialect.V12("sales");
+        Assert.Null(Tm1Dialect.V11.AuthSessionUrl("http://tm1:8010/api/v1/"));
+        Assert.Throws<ArgumentException>(() => Tm1Dialect.V11.AuthSessionUrl("not a url"));
+        Assert.Equal("http://engine:4444/tm1/auth/v1/session", sales.AuthSessionUrl("http://engine:4444/tm1/api/v1/Databases('sales')/"));
+        Assert.Equal(
+            "https://proxy/pa/prod/auth/v1/session",
+            Tm1Dialect.V12("prod", "O'Neil Sales").AuthSessionUrl("https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')")
+        );
+        Assert.Throws<ArgumentException>(() => sales.AuthSessionUrl("http://engine:4444/api/v1/Databases('sales')/"));
+        Assert.Throws<ArgumentException>(() => sales.AuthSessionUrl("http://engine:4444//api/v1/Databases('sales')/"));
+        Assert.Throws<ArgumentException>(() => sales.AuthSessionUrl("http://engine:4444/tm1/api/v1/"));
     }
 }
 

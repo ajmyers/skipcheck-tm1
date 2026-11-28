@@ -57,6 +57,18 @@ public abstract class Tm1Dialect
         return $"{uri.Scheme}://{uri.Authority}{path}/ActiveSession/tm1.Close";
     }
 
+    /// <summary>The URL a session posts to in order to log in with application (service-to-service)
+    /// credentials, or null if this deployment doesn't have one. TM1 12 uses
+    /// <c>/&lt;instance&gt;/auth/v1/session</c>.</summary>
+    /// <param name="serviceRoot">The database REST API's service root.</param>
+    /// <exception cref="ArgumentException"><paramref name="serviceRoot"/> isn't a valid service
+    /// root for this dialect.</exception>
+    public virtual string? AuthSessionUrl(string serviceRoot)
+    {
+        ParseAbsoluteUri(serviceRoot, nameof(serviceRoot), "Not a service root: " + serviceRoot);
+        return null;
+    }
+
     /// <inheritdoc/>
     public override string ToString() => $"Tm1Dialect[{Name()}]";
 
@@ -164,6 +176,19 @@ public abstract class Tm1Dialect
 
         public override string CloseUrl(string serviceRoot)
         {
+            var (origin, instanceRoot) = ParseInstanceRoot(serviceRoot);
+            return $"{origin}{instanceRoot}/ActiveSession/tm1s.Close";
+        }
+
+        public override string? AuthSessionUrl(string serviceRoot)
+        {
+            var (origin, instanceRoot) = ParseInstanceRoot(serviceRoot);
+            var prefix = instanceRoot[..^"/api/v1".Length];
+            return $"{origin}{prefix}/auth/v1/session";
+        }
+
+        private static (string Origin, string InstanceRoot) ParseInstanceRoot(string serviceRoot)
+        {
             var uri = ParseHttpUri(serviceRoot, nameof(serviceRoot), "Not a TM1 12 service root: " + serviceRoot);
             var path = uri.AbsolutePath.TrimEnd('/');
             var lastSlash = path.LastIndexOf('/');
@@ -179,9 +204,16 @@ public abstract class Tm1Dialect
                 || !lastSegment.EndsWith(')')
             )
             {
-                throw new ArgumentException("A TM1 12 database service root must end with /api/v1/Databases('<db>')/: " + serviceRoot);
+                throw new ArgumentException("A TM1 12 database service root must end with /<instance>/api/v1/Databases('<db>')/: " + serviceRoot);
             }
-            return $"{uri.Scheme}://{uri.Authority}{instanceRoot}/ActiveSession/tm1s.Close";
+            var instancePrefix = instanceRoot[..^"/api/v1".Length];
+            var prefixSlash = instancePrefix.LastIndexOf('/');
+            var instanceSegment = prefixSlash < 0 ? "" : instancePrefix[(prefixSlash + 1)..];
+            if (instanceSegment.Length == 0 || instanceSegment is "." or ".." || !InstanceSegment.IsMatch(instanceSegment))
+            {
+                throw new ArgumentException("A TM1 12 database service root must include a valid instance segment before /api/v1: " + serviceRoot);
+            }
+            return ($"{uri.Scheme}://{uri.Authority}", instanceRoot);
         }
 
         public override bool Equals(object? obj) =>

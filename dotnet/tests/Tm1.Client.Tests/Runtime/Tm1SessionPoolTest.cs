@@ -280,6 +280,50 @@ public sealed class Tm1SessionPoolTest : IAsyncLifetime
         builder.CloseGrace(TimeSpan.Zero);
     }
 
+    [Fact]
+    public async Task PoolsPerUserApplicationSessions()
+    {
+        const string dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+        const string authUrl = "POST http://tm1.test/tm1/auth/v1/session";
+        using var v12 = new ScriptedTm1()
+            .OnEach(
+                authUrl,
+                _ => ScriptedTm1.Status(201, "TM1SessionId=u1; Path=/; HttpOnly"),
+                _ => ScriptedTm1.Status(201, "TM1SessionId=u2; Path=/; HttpOnly")
+            )
+            .On("GET " + dbRoot + "ActiveSession?$select=ID", _ => ScriptedTm1.Json(200, "{\"ID\":1}"))
+            .On("GET " + dbRoot + "Server", _ => ScriptedTm1.Json(200, "{}"))
+            .On("POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close", _ => ScriptedTm1.Status(204));
+
+        var v12Pool = Tm1SessionPool
+            .Builder(
+                Tm1Session
+                    .Builder()
+                    .Dialect(Skipcheck.Tm1.Client.Version.Tm1Dialect.V12("sales"))
+                    .Address("http://tm1.test")
+                    .Authenticator(Tm1Authenticator.Application("svc", "secret", "default-user"))
+                    .HttpHandler(v12)
+            )
+            .TimeProvider(_time)
+            .Build();
+        try
+        {
+            var alice = v12Pool.Session(Tm1Identity.WithCredentials("alice", Tm1Authenticator.Application("svc", "secret", "alice")));
+            Assert.Same(alice, v12Pool.Session(Tm1Identity.WithCredentials("ALICE", Tm1Authenticator.Application("svc", "secret", "alice"))));
+            var bob = v12Pool.Session(Tm1Identity.WithCredentials("bob", Tm1Authenticator.Application("svc", "secret", "bob")));
+            Assert.NotSame(alice, bob);
+            Assert.Throws<InvalidOperationException>(() => v12Pool.Session(Tm1Identity.Impersonating("charlie")));
+
+            await alice.ExecuteAsync(Server);
+            await bob.ExecuteAsync(Server);
+            Assert.Equal(["{\"User\":\"alice\"}", "{\"User\":\"bob\"}"], v12.Requests(authUrl).Select(r => r.Text).ToArray());
+        }
+        finally
+        {
+            await v12Pool.CloseAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
     private Tm1SessionPool Pool(Func<Tm1SessionPoolBuilder, Tm1SessionPoolBuilder> settings) =>
         settings(Tm1SessionPool.Builder(_tm1.Builder().BasicAuth("admin", "apple")).TimeProvider(_time)).Build();
 }
