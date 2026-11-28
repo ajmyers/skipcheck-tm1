@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
 import io.skipcheck.tm1.client.model.Cube;
@@ -43,7 +44,14 @@ class MdxAndModelTm1Test {
 
 	@Test
 	void runsAnMdxStatementButNotCreateSet() {
-		tm1.cellsets().executeStatement("SELECT {} ON 0 FROM [}ClientGroups]").block(WAIT);
+		if (ServerAssumptions.isV12(tm1)) {
+			assertThatThrownBy(() -> tm1.cellsets().executeStatement("SELECT {} ON 0 FROM [}ClientGroups]").block(WAIT))
+				.as("TM1 v12 ExecuteMDXStatement only supports CREATE and DROP")
+				.isInstanceOf(Tm1BadRequestException.class);
+		}
+		else {
+			tm1.cellsets().executeStatement("SELECT {} ON 0 FROM [}ClientGroups]").block(WAIT);
+		}
 		assertThatThrownBy(() -> tm1.cellsets()
 			.executeStatement("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")
 			.block(WAIT)).isInstanceOf(Tm1BadRequestException.class);

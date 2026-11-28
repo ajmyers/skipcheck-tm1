@@ -5,6 +5,7 @@ package io.skipcheck.tm1.client.service.process;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.time.Duration;
 import java.util.List;
@@ -50,6 +51,9 @@ class ProcessDebugTm1Test {
 	@BeforeAll
 	static void createProcess(LiveServer server) {
 		tm1 = server.clientBuilder().build();
+		var ti = tm1.server().activeConfiguration(ODataQuery.none()).block(WAIT).modelling().ti();
+		assumeTrue(ti != null && Boolean.TRUE.equals(ti.enableTIDebugging()),
+				"TI debugging is disabled in ActiveConfiguration (EnableTIDebugging=false)");
 		debug = tm1.processDebugging();
 		process = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.processes()
@@ -62,8 +66,12 @@ class ProcessDebugTm1Test {
 
 	@AfterAll
 	static void deleteProcess() {
-		tm1.processes().delete(process).block(WAIT);
-		tm1.close().block(WAIT);
+		if (process != null) {
+			tm1.processes().delete(process).block(WAIT);
+		}
+		if (tm1 != null) {
+			tm1.close().block(WAIT);
+		}
 	}
 
 	@Test

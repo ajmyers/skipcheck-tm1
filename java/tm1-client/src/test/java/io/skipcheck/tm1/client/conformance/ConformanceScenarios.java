@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -139,7 +140,7 @@ public final class ConformanceScenarios {
 		public Mono<ClientResponse> filter(ClientRequest request, ExchangeFunction next) {
 			String url = request.url().toString();
 			String target = url.startsWith(root) ? url.substring(root.length()) : url;
-			if (SESSION.stream().anyMatch(target::startsWith)) {
+			if (isSessionRequest(url, target)) {
 				return next.exchange(request);
 			}
 			String label = step;
@@ -164,6 +165,15 @@ public final class ConformanceScenarios {
 				exchange.put("status", response.statusCode().value());
 				exchanges.add(exchange);
 			}));
+		}
+
+		private static boolean isSessionRequest(String url, String target) {
+			if (SESSION.stream().anyMatch(target::startsWith)) {
+				return true;
+			}
+			String path = URI.create(url).getRawPath();
+			return path != null && (path.endsWith("/auth/v1/session") || path.endsWith("/auth/v1/token")
+					|| path.endsWith("/ActiveSession/tm1s.Close"));
 		}
 
 		public Path write(String scenario, Map<String, String> names) {
@@ -210,6 +220,7 @@ public final class ConformanceScenarios {
 	public static List<String> run(Tm1Client client, Traffic traffic, JsonNode scenario, Map<String, String> names,
 			Predicate<JsonNode> applies) {
 		List<String> failures = new ArrayList<>();
+		RuntimeException cleanupError = null;
 		// What steps keep of their results, as read, for a $fromRead after them
 		Map<String, Object> kept = new LinkedHashMap<>();
 		try {
@@ -238,9 +249,19 @@ public final class ConformanceScenarios {
 			for (JsonNode step : scenario.path("finally")) {
 				traffic.step("finally[" + i++ + "]");
 				if (applies.test(step) && !unkept(step, kept)) {
-					outcome(client, step, names, kept);
+					try {
+						outcome(client, step, names, kept);
+					}
+					catch (RuntimeException e) {
+						if (cleanupError == null) {
+							cleanupError = e;
+						}
+					}
 				}
 			}
+		}
+		if (failures.isEmpty() && cleanupError != null) {
+			throw cleanupError;
 		}
 		return failures;
 	}

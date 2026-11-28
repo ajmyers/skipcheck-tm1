@@ -3,6 +3,7 @@
 package io.skipcheck.tm1.client.session;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -31,6 +32,8 @@ class Tm1SessionPoolTm1Test {
 	private static final Tm1Request<JsonNode> ACTIVE_USER = Tm1Request.get(ODataPath.of("ActiveUser"),
 			ODataQuery.none().select("Name"), JsonNode.class);
 
+	private LiveServer server;
+
 	private RawTm1 raw;
 
 	private String admin;
@@ -47,6 +50,7 @@ class Tm1SessionPoolTm1Test {
 
 	@BeforeEach
 	void setUp(LiveServer server) {
+		this.server = server;
 		login = server.getUsername();
 		raw = new RawTm1(server);
 		admin = raw.login();
@@ -73,6 +77,15 @@ class Tm1SessionPoolTm1Test {
 
 	@Test
 	void runsEachIdentityAsItself() {
+		if (server.isEngine()) {
+			assertThat(name(pool.session(Tm1Identity.withCredentials(alice, server.authenticator(alice, "a")))))
+				.isEqualTo(alice);
+			assertThat(name(pool.session(Tm1Identity.withCredentials(bob, server.authenticator(bob, "b")))))
+				.isEqualTo(bob);
+			assertThat(name(pool.session())).isEqualToIgnoringCase(login);
+			assertThat(pool.stats().held()).isEqualTo(3);
+			return;
+		}
 		assertThat(name(pool.session(Tm1Identity.impersonating(alice)))).isEqualTo(alice);
 		assertThat(name(pool.session(Tm1Identity.impersonating(bob)))).isEqualTo(bob);
 		assertThat(name(pool.session(Tm1Identity.withCredentials(bob, Tm1Authenticator.basic(bob, "b")))))
@@ -83,7 +96,7 @@ class Tm1SessionPoolTm1Test {
 
 	@Test
 	void closesEvictedSessionsOnTm1() throws InterruptedException {
-		Tm1Session session = pool.session(Tm1Identity.impersonating(alice));
+		Tm1Session session = pool.session(identity(alice, "a"));
 		assertThat(name(session)).isEqualTo(alice);
 		long id = session.sessionId().block(WAIT);
 
@@ -95,8 +108,8 @@ class Tm1SessionPoolTm1Test {
 
 	@Test
 	void leavesNoSessionBehindWhenClosed() {
-		name(pool.session(Tm1Identity.impersonating(alice)));
-		name(pool.session(Tm1Identity.impersonating(bob)));
+		name(pool.session(identity(alice, "a")));
+		name(pool.session(identity(bob, "b")));
 		pool.close().block(WAIT);
 		assertThat(raw.awaitSessionCount(admin, context, 0, WAIT)).isZero();
 	}
@@ -104,6 +117,7 @@ class Tm1SessionPoolTm1Test {
 	/** Asking for an administrator fails; nothing runs as the pool's own user instead. */
 	@Test
 	void neverFallsBackToAnotherIdentity() {
+		assumeFalse(server.isEngine(), "TM1 v12 does not support TM1-Impersonate");
 		Object outcome = pool.session(Tm1Identity.impersonating("Admin"))
 			.execute(ACTIVE_USER)
 			.map(n -> (Object) n)
@@ -111,6 +125,11 @@ class Tm1SessionPoolTm1Test {
 			.block(WAIT);
 		assertThat(outcome).isInstanceOfSatisfying(Tm1ApiException.class,
 				e -> assertThat(e.kind()).isEqualTo(Tm1ErrorKind.IMPERSONATION_REFUSED));
+	}
+
+	private Tm1Identity identity(String user, String password) {
+		return server.isEngine() ? Tm1Identity.withCredentials(user, server.authenticator(user, password))
+				: Tm1Identity.impersonating(user);
 	}
 
 	private static String name(Tm1Session session) {

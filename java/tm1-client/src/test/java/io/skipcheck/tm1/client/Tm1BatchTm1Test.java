@@ -82,14 +82,34 @@ class Tm1BatchTm1Test {
 
 			assertThat(cube.block(WAIT).name()).isEqualTo("}ClientGroups");
 			assertThatThrownBy(() -> missing.block(WAIT)).isInstanceOf(Tm1NotFoundException.class);
-			assertThat(north.block(WAIT).name()).isEqualTo("North");
-			assertThatThrownBy(() -> twice.block(WAIT)).as("TM1 carries on past it, in order").isNotNull();
-			assertThat(listed.map(Element::name).collectList().block(WAIT)).as("sees the element made before it")
-				.containsExactly("North");
-			assertThat(run.block(WAIT).processExecuteStatusCode())
-				.isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
-			assertThat(count.block(WAIT)).as("plain text, which TM1 refuses under the batch's own Accept")
-				.isEqualTo("1");
+			if (ServerAssumptions.isV12(tm1)) {
+				// TM1 v12 executes $batch requests concurrently rather than sequentially:
+				// one of the two duplicate creates succeeds and the other fails with a
+				// conflict, and the write is visible once the batch completes
+				List<Object> creates = List.of(north.map(e -> (Object) e.name()).onErrorResume(Mono::just).block(WAIT),
+						twice.map(e -> (Object) e.name()).onErrorResume(Mono::just).block(WAIT));
+				assertThat(creates).contains("North").anyMatch(Throwable.class::isInstance);
+				assertThat(listed.map(Element::name).collectList().block(WAIT)).isNotNull();
+				assertThat(run.block(WAIT).processExecuteStatusCode())
+					.isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
+				assertThat(count.block(WAIT)).as("plain text, which TM1 refuses under the batch's own Accept")
+					.isIn("0", "1");
+				assertThat(tm1.elements()
+					.list(dimension, dimension, ODataQuery.none())
+					.map(Element::name)
+					.collectList()
+					.block(WAIT)).containsExactly("North");
+			}
+			else {
+				assertThat(north.block(WAIT).name()).isEqualTo("North");
+				assertThatThrownBy(() -> twice.block(WAIT)).as("TM1 carries on past it, in order").isNotNull();
+				assertThat(listed.map(Element::name).collectList().block(WAIT)).as("sees the element made before it")
+					.containsExactly("North");
+				assertThat(run.block(WAIT).processExecuteStatusCode())
+					.isEqualTo(ProcessExecuteStatusCode.COMPLETED_SUCCESSFULLY);
+				assertThat(count.block(WAIT)).as("plain text, which TM1 refuses under the batch's own Accept")
+					.isEqualTo("1");
+			}
 		}
 		finally {
 			tm1.processes().delete(process).block(WAIT);
@@ -99,6 +119,8 @@ class Tm1BatchTm1Test {
 
 	@Test
 	void runsRequestsInOrder() {
+		ServerAssumptions.assumeV11(tm1,
+				"TM1 v12 $batch reads don't see writes from earlier requests in the same batch");
 		String dimension = "batch" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.dimensions()
 			.create(DimensionCreate.builder()

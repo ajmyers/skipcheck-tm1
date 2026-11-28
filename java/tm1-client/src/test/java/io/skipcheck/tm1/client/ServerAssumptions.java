@@ -14,6 +14,7 @@ import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParser;
+import io.skipcheck.tm1.testcontainers.Tm1EngineSource;
 import io.skipcheck.tm1.testcontainers.Tm1Source;
 
 /**
@@ -32,6 +33,9 @@ public final class ServerAssumptions {
 	 * 11.8.03400.2 (2.1.17) the stale, and no build between them was released.
 	 */
 	public static final Tm1Version STALE_FIRST_PULL_FROM = Tm1Version.parse("11.8.03400");
+
+	/** First TM1 v12 version (Planning Analytics Engine 3.x). */
+	public static final Tm1Version TM1_12 = Tm1Version.parse("12.0");
 
 	/**
 	 * Whether TM1 can write to its own install, which TM1 needs to make a local
@@ -84,6 +88,15 @@ public final class ServerAssumptions {
 		return source instanceof Tm1Source.InstallDir ? Install.READ_ONLY : Install.WRITABLE;
 	}
 
+	/**
+	 * Whether the install of a TM1 v12 engine started from the source is writable.
+	 * @param source where its TM1 comes from
+	 * @return read-only for an installed folder, else writable
+	 */
+	public static Install install(Tm1EngineSource source) {
+		return source instanceof Tm1EngineSource.InstallDir ? Install.READ_ONLY : Install.WRITABLE;
+	}
+
 	private static final Pattern SCHEMA_VERSION = Pattern
 		.compile("Term=\"Core\\.SchemaVersion\">\\s*<String>([^<]+)</String>");
 
@@ -117,6 +130,16 @@ public final class ServerAssumptions {
 	/** Whether the server's product version is at least the version. */
 	public static boolean isAtLeast(Tm1Client tm1, Tm1Version version) {
 		return productVersion(tm1).isAtLeast(version);
+	}
+
+	/** Whether the server is TM1 v12 (major version 12 or later). */
+	public static boolean isV12(Tm1Client tm1) {
+		return isAtLeast(tm1, TM1_12);
+	}
+
+	/** Skips the rest of the test on TM1 v12 with the given reason. */
+	public static void assumeV11(Tm1Client tm1, String reason) {
+		assumeTrue(!isV12(tm1), () -> reason + " (TM1 " + productVersion(tm1) + ")");
 	}
 
 	/**

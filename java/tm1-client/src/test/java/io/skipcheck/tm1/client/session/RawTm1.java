@@ -44,6 +44,8 @@ final class RawTm1 {
 
 	private static final String COOKIE = "TM1SessionId";
 
+	private final LiveServer server;
+
 	private final HttpClient http;
 
 	private final boolean verify;
@@ -53,6 +55,7 @@ final class RawTm1 {
 	private final String basic;
 
 	RawTm1(LiveServer tm1) {
+		this.server = tm1;
 		this.root = tm1.getRestUrl();
 		this.basic = tm1.getAuthorization();
 		this.http = tm1.httpClient().version(HttpClient.Version.HTTP_1_1).build();
@@ -60,9 +63,13 @@ final class RawTm1 {
 	}
 
 	/**
-	 * Logs in with Basic credentials and no cookie, and returns the new session's cookie.
+	 * Logs in with credentials and no cookie, and returns the new session's cookie.
 	 */
 	String login() {
+		if (server.database().isPresent()) {
+			var login = server.database().get().login();
+			return login.session(basic(login.getClientId(), login.getClientSecret()));
+		}
 		return cookie(send(request("GET", "ActiveSession?$select=ID").basic())).orElseThrow();
 	}
 
@@ -73,14 +80,54 @@ final class RawTm1 {
 
 	/** Closes the session behind a cookie. */
 	void close(String cookie) {
+		if (server.database().isPresent()) {
+			var db = server.database().get();
+			String closeUrl = db.getEngine().getUrl() + db.getInstance() + "/api/v1/ActiveSession/tm1s.Close";
+			try {
+				http.send(HttpRequest.newBuilder(URI.create(closeUrl))
+					.header("Cookie", cookie)
+					.header("Content-Type", "application/json")
+					.POST(HttpRequest.BodyPublishers.ofString("{}"))
+					.build(), HttpResponse.BodyHandlers.discarding());
+			}
+			catch (IOException e) {
+				throw new IllegalStateException("POST " + closeUrl + " failed", e);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("POST " + closeUrl + " interrupted", e);
+			}
+			return;
+		}
 		send(request("POST", "ActiveSession/tm1.Close").cookie(cookie).body("{}"));
 	}
 
 	/**
-	 * Kills another session by ID, through {@code Sessions(id)/tm1.Close}, from
-	 * {@code admin}'s session.
+	 * Kills another session by ID, through {@code Sessions(id)/tm1.Close} on TM1 11 or
+	 * instance-level {@code Sessions(id)/tm1s.Close} on TM1 v12, from {@code admin}'s
+	 * session.
 	 */
 	int kill(String admin, long id) {
+		if (server.database().isPresent()) {
+			var db = server.database().get();
+			String killUrl = db.getEngine().getUrl() + db.getInstance() + "/api/v1/Sessions(" + id + ")/tm1s.Close";
+			try {
+				return http
+					.send(HttpRequest.newBuilder(URI.create(killUrl))
+						.header("Cookie", admin)
+						.header("Content-Type", "application/json")
+						.POST(HttpRequest.BodyPublishers.ofString("{}"))
+						.build(), HttpResponse.BodyHandlers.discarding())
+					.statusCode();
+			}
+			catch (IOException e) {
+				throw new IllegalStateException("POST " + killUrl + " failed", e);
+			}
+			catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				throw new IllegalStateException("POST " + killUrl + " interrupted", e);
+			}
+		}
 		return send(request("POST", "Sessions(" + id + ")/tm1.Close").cookie(admin).body("{}")).statusCode();
 	}
 

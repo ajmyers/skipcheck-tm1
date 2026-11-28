@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
@@ -97,20 +98,30 @@ class CellsetServiceTm1Test {
 
 	@Test
 	void runsMdxAndReadsTheCellsetPieceByPiece() {
+		boolean v12 = ServerAssumptions.isV12(tm1);
 		Cellset cellset = cellsets
 			.execute(mdx, ODataQuery.none().expand("Axes").expand("Cells", c -> c.select("Ordinal", "Value")))
 			.block(WAIT);
 		String id = cellset.id();
 		assertThat(id).isNotBlank();
-		assertThat(cellset.axes()).as("columns, rows and the slicer TM1 adds").hasSize(3);
+		assertThat(cellset.axes()).as(v12 ? "columns and rows" : "columns, rows and the slicer TM1 adds")
+			.hasSize(v12 ? 2 : 3);
 		assertThat(cellset.cells()).hasSize(8);
 		try {
 			assertThat(cellsets.list(ODataQuery.none()).collectList().block(WAIT))
 				.as("TM1 lists none, though each reads by ID")
 				.isEmpty();
 			assertThat(cellsets.get(id, ODataQuery.none()).block(WAIT).id()).isEqualTo(id);
-			assertThat(cellsets.axes(id, ODataQuery.none()).collectList().block(WAIT)).extracting(a -> a.cardinality())
-				.containsExactly(2, 4, 1);
+			if (v12) {
+				assertThat(cellsets.axes(id, ODataQuery.none()).collectList().block(WAIT))
+					.extracting(a -> a.cardinality())
+					.containsExactly(2, 4);
+			}
+			else {
+				assertThat(cellsets.axes(id, ODataQuery.none()).collectList().block(WAIT))
+					.extracting(a -> a.cardinality())
+					.containsExactly(2, 4, 1);
+			}
 			assertThat(cellsets.hierarchies(id, 1, ODataQuery.none()).map(h -> h.name()).collectList().block(WAIT))
 				.containsExactly(region);
 			assertThat(cellsets.tuples(id, 1, ODataQuery.none()).collectList().block(WAIT)).hasSize(4);
@@ -119,9 +130,15 @@ class CellsetServiceTm1Test {
 			assertThat(
 					values(cellsets.cells(id, ODataQuery.none().select("Ordinal", "Value")).collectList().block(WAIT)))
 				.containsExactly(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0);
-			assertThat(cellsets.cellMembers(id, 5, ODataQuery.none()).map(Member::name).collectList().block(WAIT))
-				.as("Sandboxes' Base first")
-				.containsExactly("Base", "E", "Count");
+			if (v12) {
+				assertThat(cellsets.cellMembers(id, 5, ODataQuery.none()).map(Member::name).collectList().block(WAIT))
+					.containsExactly("E", "Count");
+			}
+			else {
+				assertThat(cellsets.cellMembers(id, 5, ODataQuery.none()).map(Member::name).collectList().block(WAIT))
+					.as("Sandboxes' Base first")
+					.containsExactly("Base", "E", "Count");
+			}
 			assertThat(cellsets.cube(id, ODataQuery.none()).block(WAIT).name()).isEqualTo(cube);
 			assertThat(cellsets.partition(id, 2, 4, ODataQuery.none().select("Ordinal")).collectList().block(WAIT))
 				.as("a rectangle: column 0 of rows 1 and 2")

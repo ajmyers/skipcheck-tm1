@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.model.MessageLogEntry;
 import io.skipcheck.tm1.client.model.ProcessCreate;
@@ -53,6 +54,7 @@ class LogServiceTm1Test {
 
 	@Test
 	void readsTheMessageLog() {
+		ServerAssumptions.assumeV11(tm1, "TM1 v12 does not populate MessageLogEntries");
 		List<MessageLogEntry> first = tm1.logs().messageLogEntries(ODataQuery.none().top(20)).collectList().block(WAIT);
 		assertThat(first).isNotEmpty();
 		assertThat(first).as("an entry without a time reads as null rather than failing")
@@ -68,6 +70,7 @@ class LogServiceTm1Test {
 
 	@Test
 	void followsTheMessageLogWithoutRepeating() {
+		ServerAssumptions.assumeV11(tm1, "TM1 v12 does not populate MessageLogEntries");
 		Mono<Void> logins = Mono.delay(Duration.ofMillis(1500))
 			.then(Mono.usingWhen(Mono.fromSupplier(LogServiceTm1Test::client),
 					c -> c.cubes().list(ODataQuery.none()).then(), Tm1Client::close))
@@ -90,6 +93,8 @@ class LogServiceTm1Test {
 
 	@Test
 	void readsTheTransactionAndAuditLogs() {
+		ServerAssumptions.assumeV11(tm1,
+				"TM1 v12 leaves TransactionLogEntries empty unless LegacyTransactionLog is set");
 		assertThat(tm1.logs().transactionLogEntries(ODataQuery.none().top(5)).collectList().block(WAIT)).isNotEmpty();
 		assertThat(tm1.logs().transactionLog(true, true, ODataQuery.none().top(5)).collectList().block(WAIT))
 			.allMatch(entry -> entry.statusMessage() == null);
@@ -109,6 +114,7 @@ class LogServiceTm1Test {
 
 	@Test
 	void readsAPasswordsHashThatIsntUtf8AsReplacementCharacters() {
+		ServerAssumptions.assumeV11(tm1, "TM1 v12 does not store native password hashes in TransactionLogEntries");
 		String user = "tm1-client-" + UUID.randomUUID().toString().substring(0, 8);
 		tm1.users().create(UserCreate.builder().name(user).password("pw").build()).block(WAIT);
 		try {
@@ -142,9 +148,13 @@ class LogServiceTm1Test {
 			assertThat(tm1.logs().errorLogFiles(ODataQuery.none()).collectList().block(WAIT))
 				.anyMatch(f -> filename.equals(f.filename()));
 			assertThat(tm1.logs().errorLogFile(filename, ODataQuery.none()).block(WAIT).filename()).isEqualTo(filename);
-			assertThat(tm1.logs().errorLogContent(filename).block(WAIT)).as("without the byte order mark")
-				.startsWith("Error:")
-				.contains("ProcessError");
+			String content = tm1.logs().errorLogContent(filename).block(WAIT);
+			if (ServerAssumptions.isV12(tm1)) {
+				assertThat(content).as("JSONL without BOM").startsWith("{").contains("ProcessError");
+			}
+			else {
+				assertThat(content).as("without the byte order mark").startsWith("Error:").contains("ProcessError");
+			}
 		}
 		finally {
 			tm1.processes().delete(process).block(WAIT);

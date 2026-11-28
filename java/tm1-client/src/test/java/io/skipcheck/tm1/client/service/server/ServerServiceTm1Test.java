@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import io.skipcheck.tm1.client.LiveServer;
 import io.skipcheck.tm1.client.LiveTm1;
+import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.Tm1Request;
 import io.skipcheck.tm1.client.error.Tm1BadRequestException;
@@ -49,8 +50,15 @@ class ServerServiceTm1Test {
 
 	@Test
 	void readsTheServerAndItsConfigurations() {
+		boolean v12 = ServerAssumptions.isV12(tm1);
 		Server read = tm1.server().server(ODataQuery.none()).block(WAIT);
-		assertThat(read.productVersion()).isEqualTo(server.getTm1Version().toString());
+		if (v12) {
+			assertThat(tm1.server().server(ODataQuery.none().select("ProductVersion")).block(WAIT).productVersion())
+				.isEqualTo(server.getTm1Version().toString());
+		}
+		else {
+			assertThat(read.productVersion()).isEqualTo(server.getTm1Version().toString());
+		}
 		assertThat(read.etag()).as("none for the Server").isNull();
 		ServerSettings fixed = tm1.server().staticConfiguration(ODataQuery.none()).block(WAIT);
 		ServerSettings active = tm1.server().activeConfiguration(ODataQuery.none()).block(WAIT);
@@ -70,9 +78,14 @@ class ServerServiceTm1Test {
 						AdministrationSettingsPatch.builder().serverName(active.administration().serverName()).build())
 				.build()))
 			.block(WAIT)).as("the active configuration is read only").isInstanceOf(Tm1BadRequestException.class);
-		assertThat(active.access().cam().clientPingCAMPassport().isString())
-			.as("a duration here, though declared Int32")
-			.isTrue();
+		if (v12) {
+			assertThat(active.access()).as("TM1 v12 omits Access from ActiveConfiguration").isNull();
+		}
+		else {
+			assertThat(active.access().cam().clientPingCAMPassport().isString())
+				.as("a duration here, though declared Int32")
+				.isTrue();
+		}
 	}
 
 	@SuppressWarnings("deprecation")

@@ -118,7 +118,13 @@ class DimensionServiceTm1Test {
 			Dimension read = dimensions
 				.get(name, ODataQuery.none().expand(Dimension.HIERARCHIES, h -> h.expand(Hierarchy.ELEMENTS)))
 				.block(WAIT);
-			assertThat(read.allLeavesHierarchyName()).as("TM1 accepts the PATCH and ignores it").isEmpty();
+			if (ServerAssumptions.isV12(tm1)) {
+				assertThat(read.allLeavesHierarchyName()).as("TM1 v12 applies AllLeavesHierarchyName")
+					.isEqualTo("AllLeaves");
+			}
+			else {
+				assertThat(read.allLeavesHierarchyName()).as("TM1 accepts the PATCH and ignores it").isEmpty();
+			}
 			assertThat(read.hierarchies()).singleElement().satisfies(h -> assertThat(h.elements()).hasSize(2));
 		}
 		finally {

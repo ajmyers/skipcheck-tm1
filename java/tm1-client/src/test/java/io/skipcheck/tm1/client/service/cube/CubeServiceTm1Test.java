@@ -21,6 +21,7 @@ import io.skipcheck.tm1.client.LiveTm1;
 import io.skipcheck.tm1.client.ServerAssumptions;
 import io.skipcheck.tm1.client.Tm1Client;
 import io.skipcheck.tm1.client.error.Tm1NotFoundException;
+import io.skipcheck.tm1.client.error.Tm1NotImplementedException;
 import io.skipcheck.tm1.client.error.Tm1PreconditionFailedException;
 import io.skipcheck.tm1.client.model.Cube;
 import io.skipcheck.tm1.client.model.CubeCreate;
@@ -88,8 +89,14 @@ class CubeServiceTm1Test {
 			.map(Cube::name)
 			.collectList()
 			.block(WAIT)).containsExactly(cube);
-		assertThat(names(cubes.dimensions(cube, ODataQuery.none().select(Dimension.NAME)))).as("Sandboxes first")
-			.containsExactly("Sandboxes", region, measure);
+		if (ServerAssumptions.isV12(tm1)) {
+			assertThat(names(cubes.dimensions(cube, ODataQuery.none().select(Dimension.NAME)))).containsExactly(region,
+					measure);
+		}
+		else {
+			assertThat(names(cubes.dimensions(cube, ODataQuery.none().select(Dimension.NAME)))).as("Sandboxes first")
+				.containsExactly("Sandboxes", region, measure);
+		}
 
 		cubes.delete(cube).block(WAIT);
 		assertThatThrownBy(() -> cubes.get(cube, ODataQuery.none()).block(WAIT))
@@ -119,13 +126,25 @@ class CubeServiceTm1Test {
 		Double change = cubes.reorderDimensions(cube, List.of(measure, region)).block(WAIT);
 		assertThat(change).isNotNull();
 		assertThat(names(cubes.dimensionsStorageOrder(cube, ODataQuery.none()))).containsExactly(measure, region);
-		assertThat(names(cubes.dimensions(cube, ODataQuery.none()))).as("presentation order unchanged")
-			.containsExactly("Sandboxes", region, measure);
+		if (ServerAssumptions.isV12(tm1)) {
+			assertThat(names(cubes.dimensions(cube, ODataQuery.none()))).as("presentation order unchanged")
+				.containsExactly(region, measure);
+		}
+		else {
+			assertThat(names(cubes.dimensions(cube, ODataQuery.none()))).as("presentation order unchanged")
+				.containsExactly("Sandboxes", region, measure);
+		}
 	}
 
 	@Test
 	void loadsUnloadsLocksAndReserves() {
-		cubes.unload(cube).then(cubes.load(cube)).block(WAIT);
+		if (ServerAssumptions.isV12(tm1)) {
+			assertThatThrownBy(() -> cubes.unload(cube).block(WAIT)).as("TM1 v12 removed demand load/unload")
+				.isInstanceOf(Tm1NotImplementedException.class);
+		}
+		else {
+			cubes.unload(cube).then(cubes.load(cube)).block(WAIT);
+		}
 		cubes.lock(cube).then(cubes.unlock(cube)).block(WAIT);
 		ServerAssumptions.assumeSupports(tm1, Tm1Operations.CUBE_RESERVE);
 		cubes.reserve(cube).then(cubes.release(cube)).block(WAIT);
