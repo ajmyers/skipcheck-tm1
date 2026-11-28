@@ -39,9 +39,21 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
         await _tm1.DisposeAsync();
     }
 
+    private async Task<bool> DebuggingEnabledAsync()
+    {
+        var config = await _tm1.Session.ExecuteAsync(
+            Tm1Request.Get<System.Text.Json.JsonElement>(ODataPath.Of("ActiveConfiguration").Nav("Modelling").Nav("TI"))
+        );
+        return config.TryGetProperty("EnableTIDebugging", out var enabled) && enabled.ValueKind == System.Text.Json.JsonValueKind.True;
+    }
+
     [Tm1Fact]
     public async Task StopsAtABreakpointReadsTheStateAndRunsToTheEnd()
     {
+        if (!await DebuggingEnabledAsync())
+        {
+            return; // EnableTIDebugging is off on this server (xUnit 2 can't skip once started)
+        }
         var id = (await Debug.DebugAsync(_process)).Id!;
         try
         {
@@ -116,6 +128,10 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task NeedsAChosenBreakpointIdAndUpdatesAndRemovesByIt()
     {
+        if (!await DebuggingEnabledAsync())
+        {
+            return; // EnableTIDebugging is off on this server
+        }
         var breakpoints = await Debug.DebuggingAsync(_process, null, async context =>
         {
             var id = context.Id!;
@@ -135,6 +151,10 @@ public sealed class ProcessDebugLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task FinishesTheRunAfterDebuggingEvenWithBreakpointsLeft()
     {
+        if (!await DebuggingEnabledAsync())
+        {
+            return; // EnableTIDebugging is off on this server
+        }
         var id = await Debug.DebuggingAsync(_process, null, async context =>
         {
             await Debug.AddBreakpointAsync(context.Id!, Line(1, 2));

@@ -63,17 +63,18 @@ public class EncryptionServiceLiveTests
         await Refused(tm1, Tm1Operations.DisableEncryptionAtRest, () => tm1.Encryption.DisableAsync(), "DataModelConversion");
         await Refused(tm1, Tm1Operations.RotateDataEncryptionKey, () => tm1.Encryption.RotateDataEncryptionKeyAsync(), "DataEncryptionKeyRotationFailed");
         await Refused(tm1, Tm1Operations.RotateDataModelKey, () => tm1.Encryption.RotateDataModelKeyAsync(), "RotateDataModelKey");
+        var fileCode = await ServerAssumptions.IsV12Async(tm1) ? "UnsupportedOperation" : "DataFileConversion";
         await Refused(
             tm1,
             Tm1Operations.EncryptDataFile,
             () => tm1.Encryption.EncryptFileAsync("tm1s.cfg", "/tmp/tm1s.cfg.enc", EncryptionFileType.Object),
-            "DataFileConversion"
+            fileCode
         );
         await Refused(
             tm1,
             Tm1Operations.DecryptDataFile,
             () => tm1.Encryption.DecryptFileAsync("}clientgroups.cub", "/tmp/clientgroups.cub", EncryptionFileType.Object),
-            "DataFileConversion"
+            fileCode
         );
     }
 

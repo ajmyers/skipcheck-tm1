@@ -19,9 +19,17 @@ public sealed class OidcKeyAndSqlDataSourceLiveTests
         await using var tm1 = Live.Client();
         Assert.Empty(await tm1.OidcKeys.KeysAsync().ToListAsync());
         await tm1.OidcKeys.RemoveAsync([]);
-        // TM1 answers 400 ObjectNotFound, read as not found
-        var e = await Assert.ThrowsAsync<Tm1NotFoundException>(() => tm1.OidcKeys.RemoveAsync(["not-cached"]));
-        Assert.Contains("ObjectNotFound", e.Message, StringComparison.Ordinal);
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            // TM1 v12 answers 204 for an unknown key
+            await tm1.OidcKeys.RemoveAsync(["not-cached"]);
+        }
+        else
+        {
+            // TM1 11 answers 400 ObjectNotFound, read as not found
+            var e = await Assert.ThrowsAsync<Tm1NotFoundException>(() => tm1.OidcKeys.RemoveAsync(["not-cached"]));
+            Assert.Contains("ObjectNotFound", e.Message, StringComparison.Ordinal);
+        }
     }
 
     [Tm1Fact]

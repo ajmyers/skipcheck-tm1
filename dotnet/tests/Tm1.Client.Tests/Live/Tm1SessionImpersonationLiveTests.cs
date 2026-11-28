@@ -40,7 +40,7 @@ public sealed class Tm1SessionImpersonationLiveTests : IDisposable
         }
     }
 
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task RunsAsTheImpersonatedUser()
     {
         var session = Session(Alice.ToUpperInvariant());
@@ -54,7 +54,7 @@ public sealed class Tm1SessionImpersonationLiveTests : IDisposable
         }
     }
 
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task RunsAsAUserWhoseNameIsOutsideAscii()
     {
         foreach (var name in new[] { Alice + "_ë", Alice + "_日本" })
@@ -73,13 +73,19 @@ public sealed class Tm1SessionImpersonationLiveTests : IDisposable
         }
     }
 
-    [Tm1Fact]
-    public async Task ReportsAnUnknownUser() => Assert.Equal(Tm1ErrorKind.UnknownUser, await KindOf(Session("zz_nobody")));
+    [Tm1Fact(V11Only = true)]
+    public async Task ReportsAnUnknownUser()
+    {
+        Assert.Equal(Tm1ErrorKind.UnknownUser, await KindOf(Session("zz_nobody")));
+    }
 
-    [Tm1Fact]
-    public async Task ReportsThatAdministratorsCantBeImpersonated() => Assert.Equal(Tm1ErrorKind.ImpersonationRefused, await KindOf(Session("Admin")));
+    [Tm1Fact(V11Only = true)]
+    public async Task ReportsThatAdministratorsCantBeImpersonated()
+    {
+        Assert.Equal(Tm1ErrorKind.ImpersonationRefused, await KindOf(Session("Admin")));
+    }
 
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task ReportsADisabledUserAsRefusedCredentials()
     {
         Raw.Send(Raw.Request("PATCH", $"Users('{Alice}')").WithCookie(Admin).WithBody("{\"Enabled\":false}"));
@@ -87,7 +93,7 @@ public sealed class Tm1SessionImpersonationLiveTests : IDisposable
     }
 
     /// <summary>Each refused login leaves a session on TM1; a remembered refusal doesn't add more.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public async Task DoesntLogInAgainWhileARefusalIsRemembered()
     {
         var session = Session("zz_nobody");

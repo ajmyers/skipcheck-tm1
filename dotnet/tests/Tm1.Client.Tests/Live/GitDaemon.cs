@@ -64,7 +64,9 @@ public sealed class GitDaemon : IAsyncDisposable
             throw new InvalidOperationException("The git daemon runs beside the TM1 container, and TM1_URL names a server that isn't one; set TM1_GIT_URL");
         }
         // The container the live tests share, asked for by name: it's already running by now
-        var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult().ContainerId;
+        var tm1 = Live.IsEngine
+            ? Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().ContainerId
+            : Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult().ContainerId;
         var script = string.Join(
             " && ",
             "apk add -q --no-cache git git-daemon",

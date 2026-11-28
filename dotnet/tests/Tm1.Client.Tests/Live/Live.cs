@@ -3,6 +3,7 @@
 using System;
 using System.Net.Http;
 using Skipcheck.Tm1.Client.Auth;
+using Skipcheck.Tm1.Client.Version;
 using Skipcheck.Tm1.Testcontainers;
 using Skipcheck.Tm1.Testcontainers.Xunit;
 
@@ -19,11 +20,27 @@ namespace Skipcheck.Tm1.Client.Tests.Live;
 /// but wrong fails. Tests make objects named <c>tm1net_test_…</c> and delete them afterwards.</summary>
 public sealed class Tm1FactAttribute : FactAttribute
 {
+    private bool _v11Only;
+
     public Tm1FactAttribute()
     {
         if (!Live.Configured)
         {
             Skip = Live.Reason;
+        }
+    }
+
+    /// <summary>When true, skipped against a TM1 v12 engine container.</summary>
+    public bool V11Only
+    {
+        get => _v11Only;
+        set
+        {
+            _v11Only = value;
+            if (value && Live.IsEngine && Skip is null)
+            {
+                Skip = "TM1 11 only";
+            }
         }
     }
 }
@@ -43,12 +60,17 @@ public sealed class Tm1TheoryAttribute : TheoryAttribute
 public static class Live
 {
     private static readonly string? Running = Environment.GetEnvironmentVariable("TM1_URL");
-    private static readonly string? ContainerSkip = string.IsNullOrWhiteSpace(Running) ? RequiresTm1FactAttribute.Tm1SkipReason() : null;
+    private static readonly string? ServerSkip = string.IsNullOrWhiteSpace(Running) ? RequiresTm1FactAttribute.Tm1SkipReason() : null;
+    private static readonly string? EngineSkip =
+        string.IsNullOrWhiteSpace(Running) && ServerSkip is not null ? RequiresTm1EngineFactAttribute.EngineSkipReason() : null;
+
+    /// <summary>Whether the live tests are running against a TM1 v12 engine container.</summary>
+    public static bool IsEngine { get; } = string.IsNullOrWhiteSpace(Running) && ServerSkip is not null && EngineSkip is null;
 
     /// <summary>Whether the TM1 the tests run against can write to its own install, as Java's
-    /// ServerAssumptions.Install names it: <c>readOnly</c> for an installed folder (TM1_HOME_DIR, which
-    /// Skipcheck.Tm1.Testcontainers mounts read-only), <c>writable</c> for any other source, and null
-    /// for a server the suite didn't start (TM1_URL).</summary>
+    /// ServerAssumptions.Install names it: <c>readOnly</c> for an installed folder (TM1_HOME_DIR or
+    /// TM1_ENGINE_HOME_DIR, which Skipcheck.Tm1.Testcontainers mounts read-only), <c>writable</c> for
+    /// any other source, and null for a server the suite didn't start (TM1_URL).</summary>
     public static string? Install { get; } = InstallOf();
 
     private static string? InstallOf()
@@ -59,10 +81,14 @@ public static class Live
         }
         try
         {
-            return Tm1Source.Discover() switch
+            if (Tm1Source.Discover() is { } server)
+            {
+                return server is Tm1Source.InstallDir ? "readOnly" : "writable";
+            }
+            return Tm1EngineSource.Discover() switch
             {
                 null => null,
-                Tm1Source.InstallDir => "readOnly",
+                Tm1EngineSource.InstallDir => "readOnly",
                 _ => "writable",
             };
         }
@@ -73,10 +99,15 @@ public static class Live
     }
 
     /// <summary>Whether there's a TM1 to test against.</summary>
-    public static bool Configured { get; } = !string.IsNullOrWhiteSpace(Running) || ContainerSkip is null;
+    public static bool Configured { get; } = !string.IsNullOrWhiteSpace(Running) || ServerSkip is null || EngineSkip is null;
 
     /// <summary>Why the live tests are skipped: tm1-testcontainers' reason, or TM1_URL unset.</summary>
-    public static string Reason => (ContainerSkip ?? RequiresTm1FactAttribute.NoSourceMessage) + " Or set TM1_URL for a server that's already running.";
+    public static string Reason =>
+        (
+            ServerSkip == RequiresTm1FactAttribute.NoDockerMessage
+                ? ServerSkip
+                : RequiresTm1FactAttribute.NoSourceMessage + " " + RequiresTm1EngineFactAttribute.NoSourceMessage
+        ) + " Or set TM1_URL for a server that's already running.";
 
     /// <summary>The REST root and login of the TM1 to test against, starting the shared container the first time.</summary>
     public static (string Url, string User, string Password) Target()
@@ -84,6 +115,11 @@ public static class Live
         if (!string.IsNullOrWhiteSpace(Running))
         {
             return (Running, Environment.GetEnvironmentVariable("TM1_USER") ?? "admin", Environment.GetEnvironmentVariable("TM1_PASSWORD") ?? "apple");
+        }
+        if (IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            return (db.RestUrl, db.Login().User, "");
         }
         var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult();
         return (tm1.RestUrl, tm1.Username, tm1.Password);
@@ -96,12 +132,21 @@ public static class Live
     public static Tm1Client Client() => Builder().Build();
 
     /// <summary>Settings for a client of the TM1 to test against, logging in as <see cref="Target"/>
-    /// (or as <paramref name="user"/>, with TM1's own security), with the TM1_NAMESPACE and
-    /// TM1_VERIFY of a running server.</summary>
+    /// (or as <paramref name="user"/>), with the TM1_NAMESPACE and TM1_VERIFY of a running server.</summary>
     public static Tm1ClientBuilder Builder(string? user = null, string? password = null)
     {
         if (string.IsNullOrWhiteSpace(Running))
         {
+            if (IsEngine)
+            {
+                var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+                var login = user is null ? db.Login() : db.Login(user);
+                return Tm1Client
+                    .Builder()
+                    .BaseUrl(db.RestUrl)
+                    .Dialect(Tm1Dialect.V12(db.Instance, db.Name))
+                    .Authenticator(Tm1Authenticator.Application(login.ClientId, login.ClientSecret, login.User));
+            }
             var tm1 = Tm1ServerContainer.SharedAsync().GetAwaiter().GetResult();
             var own =
                 tm1.CamNamespace is { } cam && user is null
@@ -124,6 +169,19 @@ public static class Live
             builder.HttpHandler(new SocketsHttpHandler { UseCookies = false, SslOptions = { RemoteCertificateValidationCallback = (_, _, _, _) => true } });
         }
         return builder;
+    }
+
+    /// <summary>An authenticator for <paramref name="user"/> against the TM1 under test:
+    /// application credentials on a v12 engine, or Basic credentials on TM1 11.</summary>
+    public static Tm1Authenticator Authenticator(string user, string password)
+    {
+        if (IsEngine)
+        {
+            var db = Tm1EngineContainer.SharedAsync().GetAwaiter().GetResult().Database(Tm1EngineContainer.DefaultDatabase);
+            var login = db.Login(user);
+            return Tm1Authenticator.Application(login.ClientId, login.ClientSecret, login.User);
+        }
+        return Tm1Authenticator.Basic(user, password);
     }
 
     /// <summary>A name for a test's objects.</summary>

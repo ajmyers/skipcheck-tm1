@@ -23,7 +23,15 @@ public sealed class MdxAndModelLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task RunsAnMdxStatementButNotCreateSet()
     {
-        await _tm1.Cellsets.ExecuteStatementAsync("SELECT {} ON 0 FROM [}ClientGroups]");
+        if (await ServerAssumptions.IsV12Async(_tm1))
+        {
+            // TM1 v12 ExecuteMDXStatement supports CREATE/DROP only, not SELECT
+            await Assert.ThrowsAsync<Tm1BadRequestException>(() => _tm1.Cellsets.ExecuteStatementAsync("SELECT {} ON 0 FROM [}ClientGroups]"));
+        }
+        else
+        {
+            await _tm1.Cellsets.ExecuteStatementAsync("SELECT {} ON 0 FROM [}ClientGroups]");
+        }
         await Assert.ThrowsAsync<Tm1BadRequestException>(() =>
             _tm1.Cellsets.ExecuteStatementAsync("CREATE SET [}Clients].[Probe] AS {TM1SUBSETALL([}Clients].[}Clients])}")
         );

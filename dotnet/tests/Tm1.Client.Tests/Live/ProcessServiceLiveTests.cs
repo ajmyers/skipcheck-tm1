@@ -94,13 +94,22 @@ public sealed class ProcessServiceLiveTests : IAsyncLifetime
     [Tm1Fact]
     public async Task RunsAndSaysHowItEnded()
     {
+        var v12 = await ServerAssumptions.IsV12Async(_tm1);
         foreach (var count in new[] { 3, 4 })
         {
             // ProcessError, then a runtime error
             var result = await _tm1.Processes.ExecuteWithReturnAsync(_name, Parameters(count), ODataQuery.None().Expand("ErrorLogFile"));
             Assert.Equal(ProcessExecuteStatusCode.Aborted, result.ProcessExecuteStatusCode);
-            Assert.StartsWith("tm1processerror_", result.ErrorLogFile!.Filename);
-            Assert.EndsWith("_" + _name + ".log", result.ErrorLogFile.Filename);
+            if (v12)
+            {
+                Assert.StartsWith("ProcessLog_", result.ErrorLogFile!.Filename);
+                Assert.EndsWith("_" + _name + ".jsonl", result.ErrorLogFile.Filename);
+            }
+            else
+            {
+                Assert.StartsWith("tm1processerror_", result.ErrorLogFile!.Filename);
+                Assert.EndsWith("_" + _name + ".log", result.ErrorLogFile.Filename);
+            }
         }
         Assert.Equal(ProcessExecuteStatusCode.CompletedSuccessfully, await Status(1));
         Assert.Equal(ProcessExecuteStatusCode.QuitCalled, await Status(2));
@@ -118,8 +127,17 @@ public sealed class ProcessServiceLiveTests : IAsyncLifetime
         await _tm1.Processes.ExecuteWithReturnAsync(_name, Parameters(3));
         await _tm1.Processes.ExecuteAsync(_name, Parameters(1));
         await _tm1.Processes.ExecuteAsync(Definition("unsaved", Prolog), Parameters(1));
-        var log = Assert.Single(await _tm1.Processes.ErrorLogsAsync(_name).ToListAsync()); // the aborted run's
-        Assert.Contains("ProcessError", await _tm1.Processes.ErrorLogContentAsync(_name, log)); // keyed by its quoted timestamp
+        var logs = await _tm1.Processes.ErrorLogsAsync(_name).ToListAsync();
+        if (await ServerAssumptions.IsV12Async(_tm1))
+        {
+            // Deprecated Processes('...')/ErrorLogs is empty on TM1 v12
+            Assert.Empty(logs);
+        }
+        else
+        {
+            var log = Assert.Single(logs); // the aborted run's
+            Assert.Contains("ProcessError", await _tm1.Processes.ErrorLogContentAsync(_name, log)); // keyed by its quoted timestamp
+        }
     }
 
     private async Task<ProcessExecuteStatusCode?> Status(int count) =>

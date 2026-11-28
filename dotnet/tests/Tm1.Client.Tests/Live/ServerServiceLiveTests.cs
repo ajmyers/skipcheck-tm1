@@ -17,7 +17,14 @@ public class ServerServiceLiveTests
     {
         await using var tm1 = Live.Client();
         var read = await tm1.Server.ServerAsync();
-        Assert.False(string.IsNullOrEmpty(read.ProductVersion));
+        if (await ServerAssumptions.IsV12Async(tm1))
+        {
+            Assert.False(string.IsNullOrEmpty((await tm1.Server.ServerAsync(ODataQuery.None().Select(Server.Fields.ProductVersion))).ProductVersion));
+        }
+        else
+        {
+            Assert.False(string.IsNullOrEmpty(read.ProductVersion));
+        }
         Assert.Null(read.ETag); // none for the Server
         var fixedSettings = await tm1.Server.StaticConfigurationAsync();
         var active = await tm1.Server.ActiveConfigurationAsync();

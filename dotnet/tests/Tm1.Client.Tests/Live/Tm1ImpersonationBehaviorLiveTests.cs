@@ -45,7 +45,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
 
     /// <summary>Impersonation is decided at login, and the header on later requests is ignored. So
     /// it's a session setting, and one identity means one session.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void DecidesTheIdentityAtLoginAndIgnoresTheHeaderAfterwards()
     {
         var login = Tm1.Send(Tm1.Request("GET", "ActiveUser?$select=Name").WithBasic().WithHeader("TM1-Impersonate", Alice));
@@ -67,7 +67,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
     }
 
     /// <summary>It also works when logging in the session a 401 opened, as the client's re-login does.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void ImpersonatesOnALoginThatReusesThe401sSession()
     {
         var seed = RawTm1.CookieOf(Tm1.Send(Tm1.Request("GET", "ActiveUser?$select=Name")))!;
@@ -83,7 +83,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
 
     /// <summary>Impersonating a user that doesn't exist is a 400, and a non-administrator trying is a
     /// 403, both with plain-text bodies, which the client reads as the error message.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void RefusesUnknownUsersAndNonAdministratorsWithPlainTextErrors()
     {
         var unknown = Tm1.Send(Tm1.Request("GET", "ActiveUser?$select=Name").WithBasic().WithHeader("TM1-Impersonate", "zz_nobody"));
@@ -99,7 +99,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
     }
 
     /// <summary>Nobody can impersonate an administrator, not even another administrator.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void RefusesToImpersonateAnyAdministrator()
     {
         var otherAdmin = Alice + "_adm";
@@ -132,7 +132,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
 
     /// <summary>Data administrators can impersonate ordinary users; security and operations
     /// administrators can't, with a different 403 message.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void LetsDataAdministratorsImpersonateButNotOtherAdministratorRoles()
     {
         var dataAdmin = Alice + "_data";
@@ -166,7 +166,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
 
     /// <summary>Impersonating a disabled user is a 401 with an empty body: exactly what wrong
     /// credentials look like. The client can't tell the two apart, so it reports both.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void RefusesADisabledUserLikeWrongCredentials()
     {
         Tm1.Send(Tm1.Request("PATCH", $"Users('{Bob}')").WithCookie(Admin).WithBody("{\"Enabled\":false}"));
@@ -176,7 +176,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
     }
 
     /// <summary>An empty <c>TM1-Impersonate</c> means no impersonation. So the client must never send a blank name.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void TreatsAnEmptyHeaderAsNoImpersonation()
     {
         var login = Impersonate(Tm1.User, Tm1.Password, "");
@@ -195,7 +195,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
     }
 
     /// <summary>User names match ignoring case and spaces, so the pool compares identities the same way.</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void MatchesUserNamesIgnoringCaseAndSpaces()
     {
         foreach (var written in new[] { Alice.ToUpperInvariant(), Alice.Replace("_", "_ ", StringComparison.Ordinal) })
@@ -220,7 +220,7 @@ public sealed class Tm1ImpersonationBehaviorLiveTests : IDisposable
     /// the name as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user
     /// unknown. Sent over a bare socket, so the bytes are exactly these. The client sends UTF-8
     /// (<c>Tm1Session.Utf8Headers</c>).</summary>
-    [Tm1Fact]
+    [Tm1Fact(V11Only = true)]
     public void ImpersonatesUsersWithNonAsciiNamesOnlyAsUtf8()
     {
         var accented = Alice + "_ë";
