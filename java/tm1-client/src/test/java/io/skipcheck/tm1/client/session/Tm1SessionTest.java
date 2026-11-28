@@ -16,6 +16,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 
 import io.micrometer.observation.tck.TestObservationRegistry;
@@ -29,6 +30,7 @@ import io.skipcheck.tm1.client.error.Tm1NotFoundException;
 import io.skipcheck.tm1.client.error.Tm1TransportException;
 import io.skipcheck.tm1.client.odata.ODataPath;
 import io.skipcheck.tm1.client.odata.ODataQuery;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -323,6 +325,47 @@ class Tm1SessionTest {
 			.hasObservationWithNameEqualTo("tm1.session.close")
 			.that()
 			.hasBeenStopped();
+	}
+
+	@Test
+	void closesTm112SessionsAtTheInstanceLevel() {
+		String dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+		String instClose = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+		FakeTm1 v12 = new FakeTm1()
+			.on("GET " + dbRoot + "ActiveSession?$select=ID",
+					r -> Mono.just(FakeTm1.json(200, "{\"ID\":9}", "TM1SessionId=s9; Path=/; HttpOnly")))
+			.on("GET " + dbRoot + "Server?$select=Name", r -> Mono.just(FakeTm1.json(200, "{\"Name\":\"sales\"}")))
+			.on(instClose, r -> Mono.just(FakeTm1.status(204, "TM1SessionId=s9; Path=/; Max-Age=0")));
+
+		Tm1Session session = Tm1Session.builder()
+			.dialect(Tm1Dialect.v12("sales"))
+			.address("http://tm1.test")
+			.basicAuth("admin", "apple")
+			.webClient(WebClient.builder().exchangeFunction(v12))
+			.build();
+
+		StepVerifier.create(session.execute(SERVER)).expectNextCount(1).verifyComplete();
+		StepVerifier.create(session.close()).verifyComplete();
+
+		assertThat(v12.requests(instClose)).hasSize(1);
+		assertThat(FakeTm1.cookie(v12.requests(instClose).get(0))).isEqualTo("s9");
+		assertThat(v12.requests("POST " + dbRoot + "ActiveSession/tm1.Close")).isEmpty();
+	}
+
+	@Test
+	void readsTm112AuthErrorDetailsOnLogin401() {
+		tm1.on(FakeTm1.LOGIN, r -> Mono.just(FakeTm1.json(401,
+				"{\"error\":\"invalid_token\",\"error_details\":\"Unable to validate authorization header\"}")));
+		Tm1Session session = tm1.session();
+
+		StepVerifier.create(session.execute(SERVER))
+			.expectErrorSatisfies(e -> assertThat(e).isInstanceOfSatisfying(Tm1AuthenticationException.class, a -> {
+				assertThat(a.kind()).isEqualTo(Tm1ErrorKind.CREDENTIAL_REJECTED);
+				assertThat(a.error()).isNotNull();
+				assertThat(a.error().code()).isEqualTo("invalid_token");
+				assertThat(a.error().message()).isEqualTo("Unable to validate authorization header");
+			}))
+			.verify();
 	}
 
 	/** A body Jackson can't write: reading its property fails. */

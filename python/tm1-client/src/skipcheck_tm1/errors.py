@@ -86,11 +86,26 @@ class ODataError:
 
     @staticmethod
     def from_json(body: Any) -> ODataError | None:
-        """The error in a parsed JSON body (``{"error": {...}}`` or the object itself), or
-        None if it isn't one (Java's ``ODataError.from``)."""
+        """The error in a parsed JSON body (``{"error": {...}}``, the object itself, or a TM1 12
+        auth/gateway error ``{"error": "invalid_token", "error_details": "..."}``), or None if it
+        isn't one (Java's ``ODataError.from``)."""
         if not isinstance(body, dict):
             return None
         error = body.get("error", body) if "error" in body else body
+        if isinstance(error, str):
+            code = error
+            raw_msg = body.get("error_details")
+            if raw_msg is None or raw_msg == "":
+                raw_msg = body.get("error_description")
+            if raw_msg is None:
+                message = ""
+            elif isinstance(raw_msg, str):
+                message = raw_msg
+            else:
+                message = json.dumps(raw_msg, separators=(",", ":"))
+            if not code and not message:
+                return None
+            return ODataError(code, message)
         if not isinstance(error, dict) or not ("code" in error or "message" in error):
             return None
         details = []

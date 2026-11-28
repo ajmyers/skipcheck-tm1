@@ -16,6 +16,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from .errors import Tm1ProtocolError, Tm1UnsupportedOperationError
+from .odata import ODataPath
 
 __all__ = ["Tm1Capabilities", "Tm1Capability", "Tm1Departure", "Tm1Dialect", "Tm1Version"]
 
@@ -435,19 +436,74 @@ class Tm1Capabilities:
         return f"Tm1Capabilities[schema {self._schema_version or 'unknown'}, product {self._product_version or 'unknown'}]"
 
 
+_UNSET: Any = object()
+_INSTANCE_SEGMENT = re.compile(r"[A-Za-z0-9._~-]+\Z")
+_DATABASE_ROOT_SUFFIX = re.compile(r"/api/v1/Databases\([^/]+\)\Z")
+_PERCENT_HEX = re.compile(r"%[0-9a-fA-F]{2}")
+
+
 class Tm1Dialect:
-    """How a server's address becomes its REST API's service root: ``V11`` for TM1 11
-    (``http://tm1:8010`` → ``http://tm1:8010/api/v1/``)."""
+    """How a server's address becomes its REST API's service root and how a session is closed:
+    ``V11`` for TM1 11 (``http://tm1:8010`` → ``http://tm1:8010/api/v1/``), and :meth:`v12`
+    for TM1 12 (Planning Analytics Engine)."""
 
     V11: Tm1Dialect
 
-    def __init__(self, name: str, service_root: Any):
+    def __init__(
+        self,
+        name: str,
+        service_root: Any,
+        close_url: Any = None,
+        *,
+        _key: tuple[str, ...] | None = None,
+        _detail: str | None = None,
+    ):
         self._name = name
         self._service_root = service_root
+        self._close_url = close_url or _default_close_url
+        self._key = _key
+        self._detail = _detail
+
+    @classmethod
+    def v12(cls, instance_or_database: str, database: str = _UNSET) -> Tm1Dialect:
+        """TM1 12 (Planning Analytics Engine) for a database in the default ``tm1`` instance
+        (``Tm1Dialect.v12("sales")``) or a named instance (``Tm1Dialect.v12("prod", "sales")``)."""
+        if database is _UNSET:
+            instance, db = "tm1", instance_or_database
+        else:
+            instance, db = instance_or_database, database
+        if not isinstance(instance, str) or not instance.strip():
+            raise ValueError("instance must not be blank")
+        if instance in (".", "..") or not _INSTANCE_SEGMENT.match(instance):
+            raise ValueError(f"A TM1 12 instance name must be a single URL path segment: {instance}")
+        if not isinstance(db, str) or not db.strip():
+            raise ValueError("database must not be blank")
+        instance_path = f"/{instance}/api/v1"
+        database_segment = f"/{ODataPath.of('Databases').key(db)}"
+        full_suffix = instance_path + database_segment
+
+        def resolve_root(address: str) -> str:
+            parts = _parse_http_url(
+                address,
+                f"A TM1 12 address is the gateway's scheme, host and HTTP port, such as http://tm1:4444: {address}",
+            )
+            path = parts.path.rstrip("/")
+            normalized_path = _PERCENT_HEX.sub(lambda m: m.group(0).upper(), path)
+            if normalized_path.endswith(full_suffix):
+                path = path[: len(path) - len(full_suffix)] + full_suffix
+            elif _DATABASE_ROOT_SUFFIX.search(path):
+                raise ValueError(f"The address already names another TM1 12 database: {address}")
+            elif path.endswith(instance_path):
+                path += database_segment
+            else:
+                path += full_suffix
+            return f"{parts.scheme}://{parts.netloc}{path}/"
+
+        return cls("TM1 12", resolve_root, _v12_close_url, _key=("v12", instance, db), _detail=f"{instance}/{db}")
 
     @property
     def name(self) -> str:
-        """The deployment kind, for logs and messages, such as ``TM1 11``."""
+        """The deployment kind, for logs and messages, such as ``TM1 11`` or ``TM1 12``."""
         return self._name
 
     def service_root(self, address: str) -> str:
@@ -456,8 +512,66 @@ class Tm1Dialect:
         ValueError if it isn't an address."""
         return self._service_root(address)
 
+    def close_url(self, service_root: str) -> str:
+        """The full URL a session posts to in order to close itself on TM1. TM1 11 closes at
+        ``<service_root>ActiveSession/tm1.Close``; TM1 12 closes at the instance level
+        ``/<instance>/api/v1/ActiveSession/tm1s.Close``."""
+        return self._close_url(service_root)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Tm1Dialect):
+            return NotImplemented
+        if self._key is not None or other._key is not None:
+            return self._key == other._key
+        return self is other
+
+    def __hash__(self) -> int:
+        return hash(self._key) if self._key is not None else object.__hash__(self)
+
     def __repr__(self) -> str:
+        if self._detail is not None:
+            return f"Tm1Dialect[{self._name}, {self._detail}]"
         return f"Tm1Dialect[{self._name}]"
+
+
+def _parse_absolute_url(raw: str, message: str) -> Any:
+    trimmed = raw.strip()
+    if not trimmed or "?" in trimmed or "#" in trimmed or any(ord(c) <= 32 for c in trimmed):
+        raise ValueError(message)
+    parts = urlsplit(trimmed)
+    if not parts.scheme or not parts.hostname:
+        raise ValueError(message)
+    try:
+        _ = parts.port
+    except ValueError as e:
+        raise ValueError(message) from e
+    return parts
+
+
+def _parse_http_url(raw: str, message: str) -> Any:
+    parts = _parse_absolute_url(raw, message)
+    if parts.scheme.lower() not in ("http", "https"):
+        raise ValueError(message)
+    return parts
+
+
+def _default_close_url(service_root: str) -> str:
+    parts = _parse_absolute_url(service_root, f"Not a service root: {service_root}")
+    path = parts.path.rstrip("/")
+    return f"{parts.scheme}://{parts.netloc}{path}/ActiveSession/tm1.Close"
+
+
+def _v12_close_url(service_root: str) -> str:
+    parts = _parse_http_url(service_root, f"Not a TM1 12 service root: {service_root}")
+    path = parts.path.rstrip("/")
+    last_slash = path.rfind("/")
+    if last_slash <= 0:
+        raise ValueError(f"A TM1 12 database service root must include its instance API path: {service_root}")
+    instance_root = path[:last_slash]
+    last_segment = path[last_slash + 1 :]
+    if not instance_root.endswith("/api/v1") or not last_segment.startswith("Databases(") or not last_segment.endswith(")"):
+        raise ValueError(f"A TM1 12 database service root must end with /api/v1/Databases('<db>')/: {service_root}")
+    return f"{parts.scheme}://{parts.netloc}{instance_root}/ActiveSession/tm1s.Close"
 
 
 def _v11(address: str) -> str:

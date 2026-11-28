@@ -45,6 +45,7 @@ import io.skipcheck.tm1.client.odata.ODataQuery;
 import io.skipcheck.tm1.client.odata.Utf8Repair;
 import io.skipcheck.tm1.client.version.Tm1Capabilities;
 import io.skipcheck.tm1.client.version.Tm1Capability;
+import io.skipcheck.tm1.client.version.Tm1Dialect;
 import io.skipcheck.tm1.client.version.Tm1Version;
 import io.skipcheck.tm1.csdl.CsdlDocument;
 import io.skipcheck.tm1.csdl.CsdlParseException;
@@ -86,13 +87,13 @@ final class Connection {
 
 	private static final String LOGIN_PATH = "ActiveSession?$select=ID";
 
-	private static final String CLOSE_PATH = "ActiveSession/tm1.Close";
-
 	private static final byte[] EMPTY_OBJECT = { '{', '}' };
 
 	private final WebClient web;
 
 	private final String root;
+
+	private final URI closeUri;
 
 	private final Tm1Authenticator authenticator;
 
@@ -134,11 +135,13 @@ final class Connection {
 	/** What {@link #close()} returns, once called. Guarded by this. */
 	private @Nullable Mono<Void> closing;
 
-	Connection(WebClient web, String root, Tm1Authenticator authenticator, @Nullable String sessionContext,
-			@Nullable String impersonate, Tm1Timeouts timeouts, Tm1ErrorClassifier classifier, ObjectMapper mapper,
-			ObservationRegistry observations, LongSupplier nanoTime, CapabilitiesCache capabilitiesCache) {
+	Connection(WebClient web, String root, Tm1Dialect dialect, Tm1Authenticator authenticator,
+			@Nullable String sessionContext, @Nullable String impersonate, Tm1Timeouts timeouts,
+			Tm1ErrorClassifier classifier, ObjectMapper mapper, ObservationRegistry observations, LongSupplier nanoTime,
+			CapabilitiesCache capabilitiesCache) {
 		this.web = Objects.requireNonNull(web, "web");
 		this.root = Objects.requireNonNull(root, "root");
+		this.closeUri = URI.create(Objects.requireNonNull(dialect, "dialect").closeUrl(root));
 		this.authenticator = Objects.requireNonNull(authenticator, "authenticator");
 		this.sessionContext = sessionContext;
 		this.impersonate = impersonate;
@@ -551,19 +554,21 @@ final class Connection {
 
 	/** The exception for an error status and its body, wherever the body came from. */
 	Tm1ApiException errorFrom(int status, byte[] body, String method, URI uri) {
-		ODataError error = null;
-		if (body.length > 0) {
-			try {
-				error = ODataError.from(mapper.readTree(body));
-			}
-			catch (JacksonException e) {
-				// Not JSON: TM1 sends some errors as plain text, read below
-			}
-			if (error == null) {
-				error = ODataError.fromText(new String(body, StandardCharsets.UTF_8));
-			}
+		return Tm1ApiException.of(status, parseError(body), method, uri.toString(), classifier);
+	}
+
+	private @Nullable ODataError parseError(byte[] body) {
+		if (body.length == 0) {
+			return null;
 		}
-		return Tm1ApiException.of(status, error, method, uri.toString(), classifier);
+		ODataError error = null;
+		try {
+			error = ODataError.from(mapper.readTree(body));
+		}
+		catch (JacksonException e) {
+			// Not JSON: TM1 sends some errors as plain text, read below
+		}
+		return error != null ? error : ODataError.fromText(new String(body, StandardCharsets.UTF_8));
 	}
 
 	/**
@@ -707,12 +712,17 @@ final class Connection {
 				if (status == 401) {
 					// TM1 answers a disabled impersonated user exactly like wrong
 					// credentials
-					ODataError why = impersonate == null ? null
-							: new ODataError("", "The credentials were refused, or the user being impersonated ("
-									+ impersonate + ") is disabled", null, List.of(), null);
-					return response.releaseBody()
-						.then(Mono.error(
-								Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, why, "GET", uri.toString())));
+					if (impersonate != null) {
+						ODataError why = new ODataError("",
+								"The credentials were refused, or the user being impersonated (" + impersonate
+										+ ") is disabled",
+								null, List.of(), null);
+						return response.releaseBody()
+							.then(Mono.error(Tm1ApiException.of(401, Tm1ErrorKind.CREDENTIAL_REJECTED, why, "GET",
+									uri.toString())));
+					}
+					return bytes(response).flatMap(body -> Mono.error(Tm1ApiException.of(401,
+							Tm1ErrorKind.CREDENTIAL_REJECTED, parseError(body), "GET", uri.toString())));
 				}
 				if (status >= 400) {
 					return errorOf(response, "GET", uri).flatMap(e -> Mono.error(impersonationError(e, uri)));
@@ -763,7 +773,7 @@ final class Connection {
 	}
 
 	private Mono<Void> sendClose(LoggedIn session) {
-		URI uri = uri(CLOSE_PATH);
+		URI uri = closeUri;
 		Mono<Void> close = web.post().uri(uri).headers(h -> {
 			odataHeaders(h, Tm1Request.Response.SINGLE);
 			// TM1 sometimes drops the connection that carried a close, so the next

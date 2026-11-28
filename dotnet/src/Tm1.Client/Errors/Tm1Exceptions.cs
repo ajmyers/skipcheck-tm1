@@ -102,7 +102,8 @@ public sealed record ODataError
     /// <summary>The server's own extra information (<c>innererror</c>), or null.</summary>
     public JsonElement? InnerError { get; }
 
-    /// <summary>The error in a JSON body, wrapped in <c>error</c> or not; null if it isn't one.</summary>
+    /// <summary>The error in a JSON body, wrapped in <c>error</c> or not, or a TM1 12 auth/gateway
+    /// error (<c>{"error":"invalid_token","error_details":"..."}</c>); null if it isn't one.</summary>
     public static ODataError? From(JsonElement? body)
     {
         if (body is not { ValueKind: JsonValueKind.Object } b)
@@ -110,6 +111,17 @@ public sealed record ODataError
             return null;
         }
         var error = b.TryGetProperty("error", out var e) ? e : b;
+        if (error.ValueKind == JsonValueKind.String)
+        {
+            var code = error.GetString() ?? "";
+            var message = Text(b, "error_details");
+            if (string.IsNullOrEmpty(message))
+            {
+                message = Text(b, "error_description");
+            }
+            message ??= "";
+            return code.Length == 0 && message.Length == 0 ? null : new ODataError(code, message);
+        }
         if (error.ValueKind != JsonValueKind.Object || !(error.TryGetProperty("code", out _) || error.TryGetProperty("message", out _)))
         {
             return null;

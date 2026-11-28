@@ -384,6 +384,8 @@ public final class Tm1Session {
 
 		private @Nullable String baseUrl;
 
+		private @Nullable String address;
+
 		private Tm1Dialect dialect = Tm1Dialect.V11;
 
 		private @Nullable Tm1Authenticator authenticator;
@@ -416,6 +418,7 @@ public final class Tm1Session {
 		Builder copy() {
 			Builder copy = new Builder();
 			copy.baseUrl = baseUrl;
+			copy.address = address;
 			copy.dialect = dialect;
 			copy.authenticator = authenticator;
 			copy.sessionContext = sessionContext;
@@ -457,17 +460,23 @@ public final class Tm1Session {
 		 * @throws IllegalArgumentException if the address doesn't fit the dialect
 		 */
 		public Builder address(String address) {
-			return baseUrl(dialect.serviceRoot(address));
+			String resolved = dialect.serviceRoot(address);
+			this.address = address;
+			this.baseUrl = resolved;
+			return this;
 		}
 
 		/**
-		 * The kind of deployment, for {@link #address}. {@link Tm1Dialect#V11} unless
-		 * set.
+		 * The kind of deployment, for {@link #address} and for how the session is closed
+		 * (even when {@link #baseUrl} is given). {@link Tm1Dialect#V11} unless set.
 		 * @param dialect the dialect
 		 * @return this builder
 		 */
 		public Builder dialect(Tm1Dialect dialect) {
 			this.dialect = Objects.requireNonNull(dialect, "dialect");
+			if (this.address != null) {
+				this.baseUrl = dialect.serviceRoot(this.address);
+			}
 			return this;
 		}
 
@@ -485,6 +494,7 @@ public final class Tm1Session {
 			if (!uri.isAbsolute() || uri.getRawQuery() != null || uri.getRawFragment() != null) {
 				throw new IllegalArgumentException("baseUrl must be an absolute URL with no query or fragment: " + url);
 			}
+			this.address = null;
 			this.baseUrl = url.endsWith("/") ? url : url + "/";
 			return this;
 		}
@@ -655,8 +665,8 @@ public final class Tm1Session {
 				.observationRegistry(observations)
 				.build();
 			ObjectMapper json = mapper != null ? mapper : JsonMapper.builder().build();
-			return new Tm1Session(new Connection(web, baseUrl, authenticator, sessionContext, impersonate, timeouts,
-					classifier, json, observations, nanoTime, capabilitiesCache));
+			return new Tm1Session(new Connection(web, baseUrl, dialect, authenticator, sessionContext, impersonate,
+					timeouts, classifier, json, observations, nanoTime, capabilitiesCache));
 		}
 
 		private static ClientHttpConnector nettyConnector(Tm1Timeouts timeouts) {

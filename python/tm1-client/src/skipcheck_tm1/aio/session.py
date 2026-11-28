@@ -125,6 +125,7 @@ class _AsyncConnection:
     def __init__(
         self,
         base_url: str,
+        dialect: Tm1Dialect,
         authenticator: Authenticator,
         session_context: str | None,
         impersonate: str | None,
@@ -136,6 +137,7 @@ class _AsyncConnection:
         clock: Callable[[], float],
     ):
         self.base_url = base_url if base_url.endswith("/") else base_url + "/"
+        self.close_url = dialect.close_url(self.base_url)
         self.authenticator = authenticator
         self.session_context = session_context
         self.impersonate = impersonate
@@ -262,7 +264,7 @@ class _AsyncConnection:
         if status == 401:
             # TM1 answers a disabled impersonated user exactly like wrong credentials
             why = (
-                None
+                ODataError.parse(response.content)
                 if self.impersonate is None
                 else ODataError("", f"The credentials were refused, or the user being impersonated ({self.impersonate}) is disabled")
             )
@@ -382,7 +384,7 @@ class _AsyncConnection:
                 cookie, self.cookie = self.cookie, None
             if cookie is None:
                 return
-            url = self.base_url + p.CLOSE
+            url = self.close_url
             headers = p.headers(
                 None,
                 p.JSON,
@@ -450,6 +452,7 @@ class AsyncTm1Session:
         http = client or runtime.HttpClient(verify=_ssl_context(verify), timeout=httpx2.Timeout(timeouts.request, connect=timeouts.connect))
         self._connection = _AsyncConnection(
             base_url,
+            dialect,
             authenticator,
             session_context,
             None if impersonate is None else check_impersonated(impersonate),
@@ -914,7 +917,8 @@ class AsyncTm1SessionBuilder:
         return self._set(address=address)
 
     def dialect(self, dialect: Tm1Dialect) -> Self:
-        """The kind of deployment, for :meth:`address`. :attr:`Tm1Dialect.V11` unless set."""
+        """The kind of deployment, for :meth:`address` and for how the session is closed (even
+        when :meth:`base_url` is given). :attr:`Tm1Dialect.V11` unless set."""
         return self._set(dialect=dialect)
 
     def basic_auth(self, user: str, password: str | None) -> Self:

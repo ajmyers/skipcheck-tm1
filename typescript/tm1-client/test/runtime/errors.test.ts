@@ -35,6 +35,34 @@ describe("Tm1 errors", () => {
     expect(ODataError.from(JSON.parse("[]"))).toBeUndefined();
   });
 
+  it("reads TM1 12 auth error bodies", () => {
+    const v12 = error('{"error":"invalid_token","error_details":"Unable to validate authorization header"}')!;
+    expect(v12.code).toBe("invalid_token");
+    expect(v12.message).toBe("Unable to validate authorization header");
+
+    const oauth = error('{"error":"invalid_client","error_description":"Bad credentials"}')!;
+    expect(oauth.code).toBe("invalid_client");
+    expect(oauth.message).toBe("Bad credentials");
+
+    const emptyDetails = error('{"error":"invalid_token","error_details":"","error_description":"Token expired"}')!;
+    expect(emptyDetails.message).toBe("Token expired");
+
+    const objectDetails = error('{"error":"invalid_token","error_details":{"reason":"expired"}}')!;
+    expect(objectDetails.code).toBe("invalid_token");
+    expect(objectDetails.message).toBe('{"reason":"expired"}');
+
+    const codeOnly = error('{"error":"invalid_token"}')!;
+    expect(codeOnly.code).toBe("invalid_token");
+    expect(codeOnly.message).toBe("");
+
+    expect(ODataError.from(JSON.parse('{"error":""}'))).toBeUndefined();
+
+    const auth = api(401, '{"error":"invalid_token","error_details":"Bad token"}');
+    expect(auth).toBeInstanceOf(Tm1AuthenticationException);
+    expect(auth.message).toContain("Bad token");
+    expect(auth.message).toContain("[code invalid_token]");
+  });
+
   /** TM1 11.8 sends impersonation errors as plain text: a status line, then the message. */
   it("reads and classifies plain-text errors", () => {
     const unknown = ODataError.fromText("Error: Bad Request\r\nThe user specified in the impersonation request does not exist.\r\n")!;

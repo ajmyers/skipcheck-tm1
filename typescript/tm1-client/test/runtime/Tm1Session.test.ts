@@ -15,6 +15,7 @@ import {
   Tm1BadRequestException,
   Tm1Capabilities,
   Tm1Capability,
+  Tm1Dialect,
   Tm1ForbiddenException,
   Tm1NotFoundException,
   Tm1ProtocolException,
@@ -331,6 +332,35 @@ describe("Tm1Session", () => {
     const tm1 = scripted().on(CLOSE, () => ScriptedTm1.status(401));
     const session = await tm1.session().connect();
     await session.close();
+  });
+
+  it("closes TM1 12 sessions at the instance level", async () => {
+    const dbRoot = "http://tm1.test/tm1/api/v1/Databases('sales')/";
+    const instClose = "POST http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close";
+    const v12 = new ScriptedTm1()
+      .on("GET " + dbRoot + "ActiveSession?$select=ID", () => ScriptedTm1.json(200, '{"ID":9}', "TM1SessionId=s9; Path=/; HttpOnly"))
+      .on("GET " + dbRoot + "Server?$select=Name", () => ScriptedTm1.json(200, '{"Name":"sales"}'))
+      .on(instClose, () => ScriptedTm1.status(204, "TM1SessionId=s9; Path=/; Max-Age=0"));
+
+    const session = Tm1Session.builder().dialect(Tm1Dialect.v12("sales")).address("http://tm1.test").basicAuth("admin", "apple").transport(v12).build();
+    await session.execute(SERVER);
+    await session.close();
+
+    const closes = v12.requests(instClose);
+    expect(closes).toHaveLength(1);
+    expect(closes[0]!.cookie).toBe("s9");
+    expect(v12.requests("POST " + dbRoot + "ActiveSession/tm1.Close")).toHaveLength(0);
+  });
+
+  it("reads TM1 12 auth error details on login 401", async () => {
+    const tm1 = scripted().on(LOGIN, () => ScriptedTm1.json(401, '{"error":"invalid_token","error_details":"Unable to validate authorization header"}'));
+    const e = await failure(tm1.session().execute(SERVER));
+    expect(e).toBeInstanceOf(Tm1AuthenticationException);
+    const auth = e as Tm1AuthenticationException;
+    expect(auth.kind).toBe("CredentialRejected");
+    expect(auth.error).toBeDefined();
+    expect(auth.error!.code).toBe("invalid_token");
+    expect(auth.error!.message).toBe("Unable to validate authorization header");
   });
 
   it("refuses a base URL that isn't an absolute URL, and settings without a server or credentials", () => {
