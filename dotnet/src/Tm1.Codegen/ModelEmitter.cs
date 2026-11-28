@@ -36,6 +36,7 @@ public sealed class ModelEmitter
         ["Edm.Duration"] = ("TimeSpan", true),
         ["Edm.Guid"] = ("Guid", true),
         ["Edm.PrimitiveType"] = ("JsonElement", true),
+        ["Edm.Untyped"] = ("JsonElement", true),
     };
 
     private readonly Spec _spec;

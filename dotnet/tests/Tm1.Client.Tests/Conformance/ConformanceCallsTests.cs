@@ -71,7 +71,12 @@ public class ConformanceCallsTests
             return;
         }
         var (session, c) = All.Value[id];
-        var fake = new FakeTm1 { ProductVersion = session["productVersion"]!.GetValue<string>() };
+        var schema = c["schema"]?.GetValue<string>() ?? session["schema"]?.GetValue<string>();
+        var fake = new FakeTm1 { ProductVersion = (c["productVersion"] ?? session["productVersion"])!.GetValue<string>() };
+        if (schema is not null)
+        {
+            fake.Metadata = File.ReadAllBytes(Repo.SnapshotFor(schema));
+        }
         // Each entry a list of exchanges: one, or an unordered group's, answered by the equal request
         var entries = new Queue<List<JsonNode>>(
             c["exchanges"]!.AsArray().Select(x => x!["unordered"] is JsonArray group ? group.Select(g => g!).ToList() : [x!])

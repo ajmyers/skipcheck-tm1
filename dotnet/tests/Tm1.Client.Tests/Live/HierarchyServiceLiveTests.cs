@@ -80,7 +80,7 @@ public class HierarchyServiceLiveTests
         await using var made = await Region();
         var (tm1, d) = (made.Tm1, made.Name);
         var etag = (await tm1.Hierarchies.GetAsync(d, d)).ETag!;
-        await tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().ElementsSortType("ByInput").Build(), etag);
+        await tm1.Hierarchies.UpdateAsync(d, d, HierarchyPatch.Builder().ElementsSortType(SortType.ByInput).Build(), etag);
         // HierarchyPatch doesn't offer Visible, as TM1 ignores it: sent as it is, to pin it
         await tm1.Session.ExecuteAsync(
             Tm1Request.Patch(ODataPath.Of("Dimensions").Key(d).Nav("Hierarchies").Key(d), new Dictionary<string, object?> { ["Visible"] = false })

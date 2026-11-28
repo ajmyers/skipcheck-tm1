@@ -19,14 +19,14 @@ public class OperationCatalogTests
         var catalog = Tm1Operations.All.Select(op => op.Endpoint()).ToList();
         Assert.Equal(catalog.Count, catalog.Distinct().Count());
         Assert.Equal(operations, catalog.Order());
-        Assert.Equal(105, catalog.Count);
+        Assert.Equal(112, catalog.Count);
     }
 
     [Fact]
     public void EveryCapabilityIsOneTheSnapshotHas()
     {
-        var snapshot = Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot));
-        Assert.All(Tm1Operations.All, op => Assert.True(snapshot.Supports(op.Capability()), op.Endpoint()));
+        var snapshots = Repo.Snapshots.Select(path => Tm1Capabilities.Parse(File.ReadAllText(path))).ToList();
+        Assert.All(Tm1Operations.All, op => Assert.True(snapshots.Any(s => s.Supports(op.Capability())), op.Endpoint()));
     }
 
     [Fact]
@@ -36,7 +36,7 @@ public class OperationCatalogTests
         var mdx = Tm1Operations.ExecuteMdx;
         Assert.Equal(Tm1Operation.OperationKind.Action, mdx.Kind);
         Assert.Equal("ExecuteMDX", mdx.ImportName);
-        Assert.Equal([new Tm1Operation.Parameter("MDX", "Edm.String", false)], mdx.Parameters);
+        Assert.Equal([new Tm1Operation.Parameter("MDX", "Edm.String", false), new Tm1Operation.Parameter("Context", "Edm.Untyped", true)], mdx.Parameters);
         Assert.Equal("tm1.Cellset", mdx.ReturnType);
         Assert.Equal("10.2.2.1", mdx.AddedIn);
         Assert.Contains(Tm1Operations.All, op => op.Deprecated());

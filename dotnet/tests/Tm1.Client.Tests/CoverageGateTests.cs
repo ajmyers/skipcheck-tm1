@@ -65,6 +65,6 @@ public class CoverageGateTests
         Assert.Contains("EntitySet Cubes", endpoints);
         Assert.Contains("Navigation ViewTitle/Subset", endpoints);
         // The same count as the Java client's CoverageGateTest
-        Assert.Equal(242, endpoints.Count);
+        Assert.Equal(256, endpoints.Count);
     }
 }

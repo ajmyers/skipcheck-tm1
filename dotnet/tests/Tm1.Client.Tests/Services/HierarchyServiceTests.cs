@@ -29,13 +29,13 @@ public class HierarchyServiceTests
         Assert.Equal(("POST", "Dimensions('Region')/Hierarchies", """{"Name":"Leaves"}"""), (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text));
 
         _tm1.Respond = _ => null;
-        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortType("ByName").Build());
+        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortType(SortType.ByName).Build());
         Assert.Equal(
             ("PATCH", "Dimensions('Region')/Hierarchies('Leaves')", """{"ElementsSortType":"ByName"}"""),
             (_tm1.Last.Method, _tm1.Last.Target, _tm1.Last.Text)
         );
         Assert.False(_tm1.Last.Headers.ContainsKey("if-match"));
-        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortSense("Descending").Build(), "W/\"2\"");
+        await tm1.Hierarchies.UpdateAsync("Region", "Leaves", HierarchyPatch.Builder().ElementsSortSense(SortSense.Descending).Build(), "W/\"2\"");
         Assert.Equal("W/\"2\"", _tm1.Last.Headers["if-match"]);
         await tm1.Hierarchies.DeleteAsync("Region", "Leaves");
         Assert.Equal(("DELETE", "Dimensions('Region')/Hierarchies('Leaves')"), (_tm1.Last.Method, _tm1.Last.Target));

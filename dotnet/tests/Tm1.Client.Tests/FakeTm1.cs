@@ -25,7 +25,11 @@ public static class Repo
 
     public static string Payloads => Path.Combine(Root, "java", "tm1-client", "src", "test", "resources", "payloads", "11.8.35");
 
-    public static string Snapshot => Path.Combine(Root, "java", "tm1-client", "src", "model", "metadata", "tm1-schema-11.8.35.xml");
+    public static string Snapshot => SnapshotFor("11.8.35");
+
+    public static IReadOnlyList<string> Snapshots => [SnapshotFor("11.8.35"), SnapshotFor("12.6.0")];
+
+    public static string SnapshotFor(string schema) => Path.Combine(Root, "java", "tm1-client", "src", "model", "metadata", $"tm1-schema-{schema}.xml");
 
     public static string JavaServices => Path.Combine(Root, "java", "tm1-client", "src", "main", "java", "io", "skipcheck", "tm1", "client", "service");
 

@@ -248,11 +248,12 @@ public class SessionTests
     [Fact]
     public void SpecListsTheEndpointsTheCoverageGateCounts()
     {
-        var caps = Version.Tm1Capabilities.Parse(File.ReadAllText(Repo.Snapshot));
-        Assert.Equal("11.8.35", caps.SchemaVersion);
-        Assert.True(caps.Endpoints.SetEquals(CoverageGateTests.Endpoints()));
+        var parsed = Repo.Snapshots.Select(path => Version.Tm1Capabilities.Parse(File.ReadAllText(path))).ToList();
+        var mergedEndpoints = parsed.SelectMany(c => c.Endpoints).ToHashSet();
+        Assert.Equal("12.6.0", parsed[^1].SchemaVersion);
+        Assert.True(mergedEndpoints.SetEquals(CoverageGateTests.Endpoints()));
         using var spec = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Repo.Spec));
-        Assert.Equal(caps.SchemaVersion, spec.RootElement.GetProperty("source").GetProperty("schemaVersion").GetString());
+        Assert.Equal(parsed[^1].SchemaVersion, spec.RootElement.GetProperty("source").GetProperty("schemaVersion").GetString());
     }
 
     [Fact]
