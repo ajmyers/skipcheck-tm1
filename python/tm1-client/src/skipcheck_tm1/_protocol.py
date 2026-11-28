@@ -21,7 +21,6 @@ from .odata import ODataQuery, query_value
 
 COOKIE = "TM1SessionId"
 LOGIN = "ActiveSession?$select=ID"
-CLOSE = "ActiveSession/tm1.Close"
 METADATA = "$metadata"
 JSON = "application/json"
 TEXT = "text/plain, application/json"

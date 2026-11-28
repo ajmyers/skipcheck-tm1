@@ -75,6 +75,34 @@ def test_reads_the_odata_error_body() -> None:
     assert error([]) is None
 
 
+def test_reads_tm112_auth_error_bodies() -> None:
+    v12 = error({"error": "invalid_token", "error_details": "Unable to validate authorization header"})
+    assert v12 is not None
+    assert (v12.code, v12.message) == ("invalid_token", "Unable to validate authorization header")
+
+    oauth = error({"error": "invalid_client", "error_description": "Bad credentials"})
+    assert oauth is not None
+    assert (oauth.code, oauth.message) == ("invalid_client", "Bad credentials")
+
+    empty_details = error({"error": "invalid_token", "error_details": "", "error_description": "Token expired"})
+    assert empty_details is not None
+    assert empty_details.message == "Token expired"
+
+    object_details = error({"error": "invalid_token", "error_details": {"reason": "expired"}})
+    assert object_details is not None
+    assert (object_details.code, object_details.message) == ("invalid_token", '{"reason":"expired"}')
+
+    code_only = error({"error": "invalid_token"})
+    assert code_only is not None
+    assert (code_only.code, code_only.message) == ("invalid_token", "")
+
+    assert error({"error": ""}) is None
+
+    auth_err = api(401, {"error": "invalid_token", "error_details": "Bad token"})
+    assert isinstance(auth_err, Tm1AuthenticationError)
+    assert "Bad token" in str(auth_err) and "[code invalid_token]" in str(auth_err)
+
+
 def test_reads_and_classifies_plain_text_errors() -> None:
     unknown = ODataError.from_text("Error: Bad Request\r\nThe user specified in the impersonation request does not exist.\r\n")
     assert unknown is not None
@@ -486,6 +514,50 @@ def test_finds_the_tm111_service_root_from_an_address() -> None:
 def test_refuses_what_isnt_an_address(address: str) -> None:
     with pytest.raises(ValueError):
         Tm1Dialect.V11.service_root(address)
+
+
+def test_finds_the_tm112_service_root_and_close_url() -> None:
+    sales = Tm1Dialect.v12("sales")
+    assert sales.name == "TM1 12"
+    assert sales == Tm1Dialect.v12("tm1", "sales")
+    assert hash(sales) == hash(Tm1Dialect.v12("tm1", "sales"))
+    assert repr(sales) == "Tm1Dialect[TM1 12, tm1/sales]"
+    assert sales.service_root("http://engine:4444") == "http://engine:4444/tm1/api/v1/Databases('sales')/"
+    assert sales.service_root("https://engine.example.com:4444/") == "https://engine.example.com:4444/tm1/api/v1/Databases('sales')/"
+    assert sales.service_root("http://engine:4444/tm1/api/v1") == "http://engine:4444/tm1/api/v1/Databases('sales')/", "already an instance root"
+    assert sales.service_root("http://engine:4444/tm1/api/v1/Databases('sales')/") == "http://engine:4444/tm1/api/v1/Databases('sales')/", "already a db root"
+    assert Tm1Dialect.v12("prod", "O'Neil Sales").service_root("https://proxy/pa/") == "https://proxy/pa/prod/api/v1/Databases('O''Neil%20Sales')/"
+    assert (
+        Tm1Dialect.v12("café").service_root("http://engine:4444/tm1/api/v1/Databases('caf%c3%a9')/") == "http://engine:4444/tm1/api/v1/Databases('caf%C3%A9')/"
+    )
+
+    assert Tm1Dialect.V11.close_url("http://tm1:8010/api/v1/") == "http://tm1:8010/api/v1/ActiveSession/tm1.Close"
+    assert sales.close_url("http://engine:4444/tm1/api/v1/Databases('sales')/") == "http://engine:4444/tm1/api/v1/ActiveSession/tm1s.Close"
+    assert sales.close_url("https://proxy/pa/tm1/api/v1/Databases('O''Neil%20Sales')") == "https://proxy/pa/tm1/api/v1/ActiveSession/tm1s.Close"
+
+
+def test_refuses_invalid_tm112_dialect_inputs() -> None:
+    for bad in (
+        lambda: Tm1Dialect.v12("  "),
+        lambda: Tm1Dialect.v12("", "sales"),
+        lambda: Tm1Dialect.v12("prod", None),  # type: ignore[arg-type]
+        lambda: Tm1Dialect.v12("a/b", "sales"),
+        lambda: Tm1Dialect.v12("..", "sales"),
+        lambda: Tm1Dialect.v12("a[b", "sales"),
+        lambda: Tm1Dialect.v12("tm1", " "),
+        lambda: Tm1Dialect.v12("sales").service_root("engine:4444"),
+        lambda: Tm1Dialect.v12("sales").service_root("ftp://engine:4444"),
+        lambda: Tm1Dialect.v12("sales").service_root("http://engine:4444?"),
+        lambda: Tm1Dialect.v12("sales").service_root("http://engine:4444#"),
+        lambda: Tm1Dialect.v12("sales").service_root("http:///tm1/api/v1"),
+        lambda: Tm1Dialect.v12("sales").service_root("http://engine:4444/tm1/api/v1/Databases('other')/"),
+        lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/"),
+        lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/tm1/api/v1/"),
+        lambda: Tm1Dialect.v12("sales").close_url("http://engine:4444/api/v1/"),
+        lambda: Tm1Dialect.V11.close_url("not a url"),
+    ):
+        with pytest.raises(ValueError):
+            bad()
 
 
 # Tm1TimeoutsTest

@@ -32,6 +32,7 @@ from skipcheck_tm1 import (
     Tm1BadRequestError,
     Tm1Capabilities,
     Tm1Capability,
+    Tm1Dialect,
     Tm1ErrorKind,
     Tm1ForbiddenError,
     Tm1NotFoundError,
@@ -1582,6 +1583,42 @@ def test_fails_a_body_that_stalls_for_longer_than_the_request_timeout(rt: Runtim
 def test_lets_a_session_be_built_from_an_address(rt: Runtime) -> None:
     session = rt.Session.builder().address("http://tm1:8010").basic_auth("admin", "").build()
     assert session.service_root == "http://tm1:8010/api/v1/"
+
+
+def test_closes_tm112_sessions_at_the_instance_level(rt: Runtime) -> None:
+    seen: list[httpx2.Request] = []
+    db_root = "http://tm1.test/tm1/api/v1/Databases('sales')/"
+    inst_close = "http://tm1.test/tm1/api/v1/ActiveSession/tm1s.Close"
+
+    def handle(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        url = str(request.url)
+        if request.method == "GET" and url == db_root + "ActiveSession?$select=ID":
+            return json_response(200, {"ID": 9}, "TM1SessionId=s9; Path=/; HttpOnly")
+        if request.method == "GET" and url == db_root + "Server?$select=Name":
+            return json_response(200, {"Name": "sales"})
+        if request.method == "POST" and url == inst_close:
+            return httpx2.Response(204, headers={"Set-Cookie": "TM1SessionId=s9; Path=/; Max-Age=0"})
+        return httpx2.Response(404)
+
+    http = httpx2.Client(transport=httpx2.MockTransport(handle)) if rt.flavor == "sync" else httpx2.AsyncClient(transport=httpx2.MockTransport(handle))
+    session = rt.Session.builder().dialect(Tm1Dialect.v12("sales")).address("http://tm1.test").basic_auth("admin", "apple").http_client(http).build()
+    assert session.service_root == db_root
+    rt.run(session.execute(SERVER))
+    rt.run(session.close())
+
+    closes = [r for r in seen if r.method == "POST" and str(r.url) == inst_close]
+    assert len(closes) == 1
+    assert cookie(closes[0]) == "s9"
+    assert not any(str(r.url) == db_root + "ActiveSession/tm1.Close" for r in seen)
+
+
+def test_reads_tm112_auth_error_details_on_login401(rt: Runtime) -> None:
+    rt.fake.on_login = lambda r: json_response(401, {"error": "invalid_token", "error_details": "Unable to validate authorization header"})
+    error = rt.raises(Tm1AuthenticationError, lambda: rt.session().execute(SERVER))
+    assert error.kind is Tm1ErrorKind.CREDENTIAL_REJECTED
+    assert error.error is not None
+    assert (error.error.code, error.error.message) == ("invalid_token", "Unable to validate authorization header")
 
 
 def test_basic_credentials_on_the_wire(rt: Runtime) -> None:
