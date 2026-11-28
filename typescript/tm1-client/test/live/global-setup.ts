@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { DockerHost, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
+import { DockerHost, Tm1EngineContainer, Tm1EngineSource, Tm1ServerContainer, Tm1Source } from "@skipcheck/tm1-testcontainers";
 import type { TestProject } from "vitest/node";
 
 /** Where the TM1 under test is, and how to log in to it. */
@@ -14,6 +14,14 @@ export interface Target {
   containerId: string | undefined;
   /** The version the shared container read as it started, or undefined for a server at `TM1_URL`. */
   version: string | undefined;
+  /** Set when running against a TM1 v12 engine container. */
+  engine?: {
+    url: string;
+    instance: string;
+    database: string;
+    clientId: string;
+    clientSecret: string;
+  };
 }
 
 /** What the live test files are given: the TM1 to test against, or why there isn't one. */
@@ -47,8 +55,35 @@ export default async function setup(project: TestProject): Promise<(() => Promis
     return;
   }
   // Docker is only asked when a source is set
-  if (!Tm1Source.discover()) return project.provide("liveTm1", { skip: "no-source" });
+  const serverSource = Tm1Source.discover();
+  const engineSource = serverSource ? undefined : Tm1EngineSource.discover();
+  if (!serverSource && !engineSource) return project.provide("liveTm1", { skip: "no-source" });
   if (!(await DockerHost.available())) return project.provide("liveTm1", { skip: "no-docker" });
+  if (engineSource) {
+    const engine = await Tm1EngineContainer.shared();
+    const db = engine.database(Tm1EngineContainer.DEFAULT_DATABASE);
+    const login = db.login();
+    project.provide("liveTm1", {
+      target: {
+        url: db.getRestUrl(),
+        user: login.getUser(),
+        password: "",
+        namespace: undefined,
+        containerId: engine.getContainerId(),
+        version: engine.getTm1Version().toString(),
+        engine: {
+          url: engine.getUrl(),
+          instance: db.getInstance(),
+          database: db.getName(),
+          clientId: login.getClientId(),
+          clientSecret: login.getClientSecret(),
+        },
+      },
+    });
+    return async () => {
+      await engine.stop();
+    };
+  }
   const tm1 = await Tm1ServerContainer.shared();
   project.provide("liveTm1", {
     target: {

@@ -18,6 +18,7 @@ export function trafficTo(dir: string): void {
 
 /** The session's own requests, which differ by when each client logs in and caches capabilities. */
 const SESSION = ["ActiveSession", "$metadata", "Server?$select=ProductVersion"];
+const V12_SESSION_SUFFIXES = ["/auth/v1/session", "/auth/v1/token", "/ActiveSession/tm1s.Close"];
 
 export interface Step {
   service: string;
@@ -76,7 +77,8 @@ export class Traffic implements Tm1Transport {
     const response = await this.inner.send(request);
     const root = this.root.endsWith("/") ? this.root : this.root + "/";
     const target = request.url.startsWith(root) ? request.url.slice(root.length) : request.url;
-    if (!SESSION.some((s) => target.startsWith(s))) {
+    const pathname = new URL(request.url).pathname;
+    if (!SESSION.some((s) => target.startsWith(s)) && !V12_SESSION_SUFFIXES.some((s) => pathname.endsWith(s))) {
       const headers: Record<string, string> = {};
       for (const [k, v] of Object.entries(request.headers)) headers[k.toLowerCase()] = v;
       this.exchanges.push({
@@ -217,6 +219,7 @@ export async function run(
 ): Promise<string[]> {
   const failures: string[] = [];
   const kept = new Map<string, unknown>();
+  let cleanupError: unknown = undefined;
   try {
     for (const [i, step] of scenario.steps.entries()) {
       if (!applies(step)) continue;
@@ -234,8 +237,13 @@ export async function run(
       if (!applies(step)) continue;
       // A step setting back what a step that didn't run would have read has nothing to send
       if (step.args.some((a) => a !== null && typeof a === "object" && !Array.isArray(a) && "$fromRead" in a && !kept.has(a.read))) continue;
-      await outcome(client, step, names, kept).catch(() => undefined);
+      try {
+        await outcome(client, step, names, kept);
+      } catch (e) {
+        cleanupError ??= e;
+      }
     }
   }
+  if (cleanupError !== undefined && failures.length === 0) throw cleanupError;
   return failures;
 }

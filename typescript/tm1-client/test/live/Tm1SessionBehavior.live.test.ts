@@ -15,12 +15,13 @@ describe("TM1's session behaviour" + liveReason, () => {
   let tm1: RawTm1;
 
   beforeAll(async () => {
-    if (Live.configured) tm1 = await RawTm1.connect();
+    if (Live.configured && !Live.isEngine) tm1 = await RawTm1.connect();
   });
 
   /** The client replays a request once after a 401 on an established session, POSTs included.
    * That's only safe if TM1 refuses the request before running it. */
-  tm1Test("refuses a request on a killed session without running it", async () => {
+  tm1Test("refuses a request on a killed session without running it", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const admin = await tm1.login();
     const victim = await tm1.login();
     const dimension = scratch();
@@ -42,7 +43,8 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** Every 401 opens a TM1 session with no user, and sets its cookie. Sending that cookie with the
    * credentials logs that same session in, instead of opening another. */
-  tm1Test("opens a session on every 401, and logs that session in when its cookie is sent with credentials", async () => {
+  tm1Test("opens a session on every 401, and logs that session in when its cookie is sent with credentials", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const admin = await tm1.login();
     try {
       const before = await tm1.allSessionCount(admin);
@@ -64,7 +66,8 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** `Server` can be read with no credentials, but even that opens a session. So the client never
    * reads anything, the version included, outside its own session. */
-  tm1Test("opens a session for an anonymous read of Server", async () => {
+  tm1Test("opens a session for an anonymous read of Server", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const admin = await tm1.login();
     try {
       const before = await tm1.allSessionCount(admin);
@@ -83,7 +86,8 @@ describe("TM1's session behaviour" + liveReason, () => {
    * a check that no session is left behind has to wait for the count to settle. */
   tm1Test(
     "refuses a closed session at once but lists it for seconds more",
-    async () => {
+    async (context) => {
+      if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
       const admin = await tm1.login();
       const cookie = await tm1.login();
       const id = await tm1.sessionId(cookie);
@@ -101,7 +105,8 @@ describe("TM1's session behaviour" + liveReason, () => {
   );
 
   /** Closing a session expires its cookie, and later requests with that cookie get a 401. */
-  tm1Test("expires the cookie on close and refuses it afterwards", async () => {
+  tm1Test("expires the cookie on close and refuses it afterwards", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const cookie = await tm1.login();
     const close = await tm1.request("POST", "ActiveSession/tm1.Close").withCookie(cookie).withBody("{}").send();
     expect(close.status).toBe(204);
@@ -115,7 +120,8 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** Requests on one session run in parallel: three one-second process runs finish in about one
    * second. So one shared session doesn't serialize the client's traffic. */
-  tm1Test("runs concurrent requests on one session in parallel", async () => {
+  tm1Test("runs concurrent requests on one session in parallel", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const cookie = await tm1.login();
     const process = scratch();
     try {
@@ -142,7 +148,8 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** `TM1-SessionContext` labels the whole session, and the last request to send it wins. So it can't
    * be a per-request setting on views that share one session. */
-  tm1Test("labels the session with the last session context sent", async () => {
+  tm1Test("labels the session with the last session context sent", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const login = await tm1.request("GET", "ActiveSession?$select=Context").withBasic().withHeader("TM1-SessionContext", "first").send();
     const cookie = RawTm1.cookieOf(login)!;
     try {
@@ -156,7 +163,8 @@ describe("TM1's session behaviour" + liveReason, () => {
 
   /** A create answers 201 with a relative `Location` and an `ETag`; with `Prefer: return=minimal`,
    * 204 with `Location` and `OData-EntityId`. */
-  tm1Test("answers a create with its location", async () => {
+  tm1Test("answers a create with its location", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const cookie = await tm1.login();
     const full = scratch();
     const minimal = scratch();
@@ -177,7 +185,8 @@ describe("TM1's session behaviour" + liveReason, () => {
   });
 
   /** `odata.metadata=none` drops `@odata.etag` but still sends `@odata.context`. */
-  tm1Test("drops the ETag but not the context with metadata none", async () => {
+  tm1Test("drops the ETag but not the context with metadata none", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
     const cookie = await tm1.login();
     const name = scratch();
     try {
@@ -201,7 +210,8 @@ describe("TM1's session behaviour" + liveReason, () => {
    * closing. Takes up to 150 s. */
   tm1Test(
     "closes a connection idle for ninety seconds",
-    async () => {
+    async (context) => {
+      if (Live.isEngine) return context.skip("TM1 11 raw protocol behaviour");
       const t = await Live.target();
       const url = new URL(t.url + "Server?$select=Name");
       const secure = url.protocol === "https:";

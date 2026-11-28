@@ -19,7 +19,7 @@ import {
 } from "../../src/index.js";
 import { Tm1Operations } from "../../src/generated/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { lacks } from "./server-assumptions.js";
+import { isV12, lacks } from "./server-assumptions.js";
 
 const element = (name: string): ElementCreate => ElementCreate.builder().name(name).type(ElementType.Numeric).build();
 
@@ -99,8 +99,12 @@ describe("DimensionService on TM1" + liveReason, () => {
         .build();
       await tm1.session.execute(Tm1Request.patch(ODataPath.of("Dimensions").key(name), { AllLeavesHierarchyName: "AllLeaves", Hierarchies: [hierarchy] }));
       const read = await tm1.dimensions.get(name, withElements);
-      // TM1 accepts the PATCH and ignores it
-      expect(read.AllLeavesHierarchyName ?? "").toBe("");
+      if (await isV12(tm1)) {
+        expect(read.AllLeavesHierarchyName).toBe("AllLeaves");
+      } else {
+        // TM1 11 accepts the PATCH and ignores it
+        expect(read.AllLeavesHierarchyName ?? "").toBe("");
+      }
       expect(read.Hierarchies).toHaveLength(1);
       expect(read.Hierarchies![0]!.Elements).toHaveLength(2);
     }),

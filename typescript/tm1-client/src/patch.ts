@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ODataPath } from "./odata/index.js";
+import { writeJson } from "./json.js";
 
 /** A write, as the Java model's patches (`CubePatch`): the properties set, explicit nulls included,
  * and `@odata.bind` references, in the order they were set. A subtype's patch sends its
@@ -27,12 +28,12 @@ export abstract class Tm1Patch {
 
   /** Whether `other` is a patch of the same type that sets the same properties to the same values. */
   equals(other: unknown): boolean {
-    return other instanceof Tm1Patch && other.constructor === this.constructor && JSON.stringify(other) === JSON.stringify(this);
+    return other instanceof Tm1Patch && other.constructor === this.constructor && writeJson(other) === writeJson(this);
   }
 
   /** The patch's type and the JSON it sends, for logs. */
   toString(): string {
-    return `${this.constructor.name}${JSON.stringify(this)}`;
+    return `${this.constructor.name}${writeJson(this)}`;
   }
 }
 

@@ -8,6 +8,9 @@ const source = (path: string): string => fileURLToPath(new URL(path, import.meta
 /** The live tests that start their own Cognos. */
 const CAM = "test/live/Cam*.live.test.ts";
 
+/** The live tests that start their own TM1 v12 engine with OAuth 2.0. */
+const ENGINE_AUTH = "test/live/Tm1EngineAuth.live.test.ts";
+
 export default defineConfig({
   resolve: {
     // The workspace's packages from their sources, as tsconfig.json's paths: test/live starts TM1
@@ -46,7 +49,7 @@ export default defineConfig({
         test: {
           name: "live",
           include: ["test/live/*.live.test.ts"],
-          exclude: [CAM],
+          exclude: [CAM, ENGINE_AUTH],
           globalSetup: ["test/live/global-setup.ts"],
           fileParallelism: false,
         },
@@ -56,6 +59,11 @@ export default defineConfig({
         // heavy to run two at once: these files run one after the other too
         extends: true,
         test: { name: "cam", include: [CAM], fileParallelism: false },
+      },
+      {
+        // Starts a Keycloak and TM1 v12 engine of its own for application and OAuth 2.0 bearer auth
+        extends: true,
+        test: { name: "engine", include: [ENGINE_AUTH], fileParallelism: false },
       },
     ],
   },

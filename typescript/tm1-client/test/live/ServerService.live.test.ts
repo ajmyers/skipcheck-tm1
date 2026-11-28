@@ -12,6 +12,7 @@ import {
   type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 /** ServerService against a real TM1: the server, its configurations and loggers. The Java client's
  * `ServerServiceTm1Test`. */
@@ -28,9 +29,15 @@ describe("ServerService on TM1" + liveReason, () => {
   });
 
   tm1Test("reads the server and its configurations", async () => {
+    const v12 = await isV12(tm1);
     const read = await tm1.server.server(ODataQuery.none());
     // The Java test compares with the container's version; here, with the version the session read
-    expect(read.ProductVersion).toBe((await tm1.session.version()).toString());
+    const version = (await tm1.session.version()).toString();
+    if (v12) {
+      expect((await tm1.server.server(ODataQuery.none().select("ProductVersion"))).ProductVersion).toBe(version);
+    } else {
+      expect(read.ProductVersion).toBe(version);
+    }
     expect(read["@odata.etag"], "none for the Server").toBeUndefined();
     const fixed = await tm1.server.staticConfiguration(ODataQuery.none());
     const active = await tm1.server.activeConfiguration(ODataQuery.none());
@@ -62,7 +69,11 @@ describe("ServerService on TM1" + liveReason, () => {
       ),
       "the active configuration is read only",
     ).rejects.toBeInstanceOf(Tm1BadRequestException);
-    expect(typeof active.Access?.CAM?.ClientPingCAMPassport, "a duration here, though declared Int32").toBe("string");
+    if (v12) {
+      expect(active.Access, "TM1 v12 omits Access from ActiveConfiguration").toBeUndefined();
+    } else {
+      expect(typeof active.Access?.CAM?.ClientPingCAMPassport, "a duration here, though declared Int32").toBe("string");
+    }
   });
 
   tm1Test("reads and sets logger levels", async () => {

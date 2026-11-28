@@ -3,6 +3,7 @@
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { ODataQuery, Tm1NotFoundException, type Tm1Client } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
+import { isV12 } from "./server-assumptions.js";
 
 /** OidcKeyService and SqlDataSourceService against a real TM1: the Java client's
  * `OidcKeyAndSqlDataSourceTm1Test`. The test server checks no OIDC tokens, so the cache is empty, and
@@ -22,10 +23,15 @@ describe("OidcKeyService and SqlDataSourceService on TM1" + liveReason, () => {
   tm1Test("reads and clears the OIDC key cache", async () => {
     expect(await tm1.oidcKeys.keys().toArray()).toEqual([]);
     await tm1.oidcKeys.remove([]);
-    // TM1 answers 400 ObjectNotFound, read as not found
-    const e = await tm1.oidcKeys.remove(["not-cached"]).catch((x: unknown) => x);
-    expect(e).toBeInstanceOf(Tm1NotFoundException);
-    expect((e as Error).message).toContain("ObjectNotFound");
+    if (await isV12(tm1)) {
+      // TM1 v12 answers 204 for an unknown key
+      await tm1.oidcKeys.remove(["not-cached"]);
+    } else {
+      // TM1 11 answers 400 ObjectNotFound, read as not found
+      const e = await tm1.oidcKeys.remove(["not-cached"]).catch((x: unknown) => x);
+      expect(e).toBeInstanceOf(Tm1NotFoundException);
+      expect((e as Error).message).toContain("ObjectNotFound");
+    }
   });
 
   tm1Test("lists the host's ODBC sources", async () => {

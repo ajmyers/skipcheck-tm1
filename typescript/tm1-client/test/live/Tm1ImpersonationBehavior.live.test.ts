@@ -28,7 +28,7 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   };
 
   beforeAll(async () => {
-    if (!Live.configured) return;
+    if (!Live.configured || Live.isEngine) return;
     tm1 = await RawTm1.connect();
     admin = await tm1.login();
     const run = randomUUID().replace(/-/g, "").slice(0, 6);
@@ -47,7 +47,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
 
   /** Impersonation is decided at login, and the header on later requests is ignored. So it's a
    * session setting, and one identity means one session. */
-  tm1Test("decides the identity at login and ignores the header afterwards", async () => {
+  tm1Test("decides the identity at login and ignores the header afterwards", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const login = await tm1.request("GET", "ActiveUser?$select=Name").withBasic().withHeader("TM1-Impersonate", alice).send();
     expect(login.status).toBe(200);
     expect(RawTm1.json(login)["Name"]).toBe(alice);
@@ -65,7 +66,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   });
 
   /** It also works when logging in the session a 401 opened, as the client's re-login does. */
-  tm1Test("impersonates on a login that reuses the 401's session", async () => {
+  tm1Test("impersonates on a login that reuses the 401's session", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const seed = RawTm1.cookieOf(await tm1.request("GET", "ActiveUser?$select=Name").send())!;
     try {
       expect(await nameOf(tm1.request("GET", "ActiveUser?$select=Name").withCookie(seed).withBasic().withHeader("TM1-Impersonate", alice))).toBe(alice);
@@ -76,7 +78,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
 
   /** Impersonating a user that doesn't exist is a 400, and a non-administrator trying is a 403, both
    * with plain-text bodies, which the client reads as the error message. */
-  tm1Test("refuses unknown users and non-administrators with plain-text errors", async () => {
+  tm1Test("refuses unknown users and non-administrators with plain-text errors", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const unknown = await tm1.request("GET", "ActiveUser?$select=Name").withBasic().withHeader("TM1-Impersonate", "zz_nobody").send();
     expect(unknown.status).toBe(400);
     expect(unknown.body.startsWith("Error: Bad Request")).toBe(true);
@@ -90,7 +93,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   });
 
   /** Nobody can impersonate an administrator, not even another administrator. */
-  tm1Test("refuses to impersonate any administrator", async () => {
+  tm1Test("refuses to impersonate any administrator", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const otherAdmin = alice + "_adm";
     const dataAdmin = alice + "_data";
     await createUser(otherAdmin, "ADMIN");
@@ -114,7 +118,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
 
   /** Data administrators can impersonate ordinary users; security and operations administrators
    * can't, with a different 403 message. */
-  tm1Test("lets data administrators impersonate, but not other administrator roles", async () => {
+  tm1Test("lets data administrators impersonate, but not other administrator roles", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const dataAdmin = alice + "_data";
     const securityAdmin = alice + "_sec";
     const operationsAdmin = alice + "_ops";
@@ -139,7 +144,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
 
   /** Impersonating a disabled user is a 401 with an empty body: exactly what wrong credentials look
    * like. The client can't tell the two apart, so it reports both. */
-  tm1Test("refuses a disabled user like wrong credentials", async () => {
+  tm1Test("refuses a disabled user like wrong credentials", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     await tm1.request("PATCH", `Users('${bob}')`).withCookie(admin).withBody('{"Enabled":false}').send();
     try {
       const refused = await impersonate(tm1.user, tm1.password, bob);
@@ -151,7 +157,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   });
 
   /** An empty `TM1-Impersonate` means no impersonation. So the client must never send a blank name. */
-  tm1Test("treats an empty header as no impersonation", async () => {
+  tm1Test("treats an empty header as no impersonation", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const login = await impersonate(tm1.user, tm1.password, "");
     try {
       expect(login.status).toBe(200);
@@ -162,7 +169,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   });
 
   /** User names match ignoring case and spaces, so the pool compares identities the same way. */
-  tm1Test("matches user names ignoring case and spaces", async () => {
+  tm1Test("matches user names ignoring case and spaces", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     for (const written of [alice.toUpperCase(), alice.replace(/_/g, "_ ")]) {
       const login = await impersonate(tm1.user, tm1.password, written);
       try {
@@ -177,7 +185,8 @@ describe("TM1's impersonation behaviour" + liveReason, () => {
   /** A user whose name has characters outside ASCII is impersonated when the header carries the name
    * as UTF-8, and only then: as ISO 8859-1 bytes or percent-encoded, TM1 reports the user unknown.
    * Sent over a bare socket, so the bytes are exactly these. The client sends UTF-8 (`headerText`). */
-  tm1Test("impersonates users with non-ASCII names only as UTF-8", async () => {
+  tm1Test("impersonates users with non-ASCII names only as UTF-8", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     const accented = alice + "_ë";
     const impersonateBytes = (target: Uint8Array): Promise<RawBytes> =>
       tm1.getWithHeaderBytes("ActiveUser?$select=Name", basic(tm1.user, tm1.password), "TM1-Impersonate", target);

@@ -280,9 +280,10 @@ function durationMillis(iso: string): number {
 export function result(value: unknown): Json {
   if (value === undefined || value === null) return null;
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (typeof value === "bigint") return value.toString();
   if (Array.isArray(value)) return value.map(result);
   if (value instanceof Uint8Array) return { $bytes: Buffer.from(value).toString("base64") };
-  if (typeof value === "object") return JSON.parse(JSON.stringify(value)) as Json;
+  if (typeof value === "object") return JSON.parse(JSON.stringify(value, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v))) as Json;
   throw new Unknown("can't encode a result of type " + typeof value);
 }
 

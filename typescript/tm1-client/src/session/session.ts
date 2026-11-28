@@ -2,7 +2,7 @@
 
 import { Tm1Authenticator } from "../auth/index.js";
 import { ODataError, Tm1ErrorClassifier, Tm1ProtocolException } from "../errors/index.js";
-import { readAs, writeJson } from "../json.js";
+import { parseJson, readAs, writeJson } from "../json.js";
 import { Json } from "../model.js";
 import { ODataEncoding, ODataPath, ODataQuery } from "../odata/index.js";
 import type { Tm1Operation } from "../operation.js";
@@ -159,8 +159,9 @@ export class Tm1Session implements AsyncDisposable {
     return this;
   }
 
-  /** The session's ID on TM1 (`ActiveSession`), logging in if needed. */
-  sessionId(options?: Tm1CallOptions): Promise<number> {
+  /** The session's ID on TM1 (`ActiveSession`), logging in if needed. Returns a `bigint` when the
+   * server assigns a 64-bit ID outside `Number.MAX_SAFE_INTEGER` (TM1 v12). */
+  sessionId(options?: Tm1CallOptions): Promise<number | bigint> {
     return this.connection.loginId(options?.signal);
   }
 
@@ -269,7 +270,7 @@ export class Tm1Session implements AsyncDisposable {
     // The body as it's written, whatever it was built as: a plain object, a model, a class instance
     const text = writeJson(request.body) as string | undefined;
     if (text === undefined) return request;
-    const written: unknown = JSON.parse(text);
+    const written: unknown = parseJson(text);
     if (!isPlainObject(written)) return request;
     const sent = checkParameters(capabilities, request.requirement()!, operation, request.parameterDefaults(), written, this.connection.root);
     return sent === written ? request : request.withBody(sent);
@@ -381,7 +382,7 @@ export class Tm1Session implements AsyncDisposable {
 
 function parse(request: Tm1Request<unknown>, reply: Reply): unknown {
   try {
-    return JSON.parse(textOf(reply.body));
+    return parseJson(textOf(reply.body));
   } catch (e) {
     throw new Tm1ProtocolException(
       `TM1 answered ${reply.status} to ${request.toString()} with something this client can't read: ${(e as Error).message}`,
@@ -504,7 +505,7 @@ export class BatchQueue {
     // Written now, so a body that can't be written fails its own call, where it was made, rather
     // than the run and every other call with it. The body is what it was when the call was queued.
     const written = request.body === undefined ? undefined : writeJson(request.body);
-    const body: unknown = written === undefined ? undefined : JSON.parse(written);
+    const body: unknown = written === undefined ? undefined : parseJson(written);
     let resolve!: (v: unknown) => void;
     let reject!: (e: unknown) => void;
     const result = new Promise<unknown>((res, rej) => {
@@ -580,7 +581,7 @@ export class BatchQueue {
           }
           const status = typeof item["status"] === "number" ? item["status"] : 0;
           const b = item["body"];
-          const body = b === undefined || b === null ? new Uint8Array() : utf8.encode(typeof b === "string" ? b : JSON.stringify(b));
+          const body = b === undefined || b === null ? new Uint8Array() : utf8.encode(typeof b === "string" ? b : writeJson(b));
           try {
             e.resolve(e.read(connection.check(e.method, url, { status, headers: {}, body })));
           } catch (error) {
@@ -801,7 +802,7 @@ function canonicalJson(value: unknown): string {
               .map(([k, x]) => [k, sorted(x)]),
           )
         : v;
-  return JSON.stringify(sorted(JSON.parse(writeJson(value)) as unknown));
+  return writeJson(sorted(parseJson(writeJson(value))));
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

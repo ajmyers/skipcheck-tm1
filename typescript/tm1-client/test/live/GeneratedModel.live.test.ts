@@ -25,7 +25,7 @@ import {
   View,
 } from "../../src/index.js";
 import { Live, liveReason, tm1Test } from "./live.js";
-import { ownSnapshot } from "./server-assumptions.js";
+import { ownSnapshot, TM1_12 } from "./server-assumptions.js";
 import { sessions } from "./raw-tm1.js";
 
 const rules = async (session: Tm1Session, cube: ODataPath): Promise<string | null | undefined> =>
@@ -42,7 +42,13 @@ describe("The generated model on TM1" + liveReason, () => {
       const server = await session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none(), Server));
       // What the container read as it started; a server at TM1_URL has only the session's reading
       const version = (await Live.target()).version ?? (await session.version());
-      expect(server.ProductVersion).toBe(version.toString());
+      if ((await session.version()).isAtLeast(TM1_12)) {
+        // TM1 v12 omits ProductVersion from bare GET Server unless selected
+        const selected = await session.execute(Tm1Request.get(ODataPath.of("Server"), ODataQuery.none().select(Server.Fields.ProductVersion), Server));
+        expect(selected.ProductVersion).toBe(version.toString());
+      } else {
+        expect(server.ProductVersion).toBe(version.toString());
+      }
       expect(server["@odata.etag"], "TM1 sends no ETag for the Server singleton").toBeUndefined();
 
       const dimensions = await session.stream(Tm1Request.list(ODataPath.of("Dimensions"), ODataQuery.none().expand("Hierarchies"), Dimension)).toArray();
@@ -143,10 +149,11 @@ describe("The generated model on TM1" + liveReason, () => {
           Cube,
         ),
       );
+      const v12 = (await session.version()).isAtLeast(TM1_12);
       expect(
         (created.Dimensions ?? []).map((d) => d.Name),
-        "TM1 lists its virtual Sandboxes dimension first",
-      ).toEqual(["Sandboxes", n, "}Groups"]);
+        "TM1 11 lists its virtual Sandboxes dimension first; v12 omits it when EnableSandboxDimension is off",
+      ).toEqual(v12 ? [n, "}Groups"] : ["Sandboxes", n, "}Groups"]);
       const elements = await session.stream(Tm1Request.list(dimension.nav("Hierarchies").key(n).nav("Elements"), ODataQuery.none(), Element)).toArray();
       expect(elements.map((e) => [e.Name, e.Type]).sort()).toEqual([
         ["North", ElementType.Numeric],

@@ -2,15 +2,15 @@
 
 import { randomUUID } from "node:crypto";
 import { inject, it } from "vitest";
-import { CognosSource } from "@skipcheck/tm1-testcontainers";
-import { RequiresCognos, RequiresTm1 } from "@skipcheck/tm1-testcontainers/vitest";
-import { Tm1Authenticator, Tm1Client, Tm1ClientBuilder } from "../../src/index.js";
+import { CognosSource, Tm1EngineSource } from "@skipcheck/tm1-testcontainers";
+import { RequiresCognos, RequiresTm1, RequiresTm1Engine } from "@skipcheck/tm1-testcontainers/vitest";
+import { Tm1Authenticator, Tm1Client, Tm1ClientBuilder, Tm1Dialect } from "../../src/index.js";
 import type { LiveTm1, Target } from "./global-setup.js";
 
 export type { Target };
 
 const NOT_CONFIGURED =
-  "No TM1 configured: set TM1_URL (with TM1_USER, TM1_PASSWORD) for a server that's already running, or one of TM1_PRIVATE_IMAGE, TM1_HOME_DIR, TM1_INSTALL_VOLUME, TM1_BUNDLE_DIR or TM1_BUNDLE_URL to start one in Docker";
+  "No TM1 configured: set TM1_URL (with TM1_USER, TM1_PASSWORD) for a server that's already running, or one of TM1_PRIVATE_IMAGE, TM1_HOME_DIR, TM1_INSTALL_VOLUME, TM1_BUNDLE_DIR or TM1_BUNDLE_URL (or TM1_ENGINE_* for a TM1 v12 engine) to start one in Docker";
 
 // What global-setup.ts found for the run. Nothing is provided to a file outside the "live" project
 // (the CAM files, which start their own servers).
@@ -35,6 +35,11 @@ export const Live = {
     return provided.target !== undefined;
   },
 
+  /** Whether the live tests are running against a TM1 v12 engine container. */
+  get isEngine(): boolean {
+    return provided.target?.engine !== undefined;
+  },
+
   /** Why the tests are skipped. */
   get reason(): string {
     return provided.skip === "no-docker" ? RequiresTm1.NO_DOCKER_MESSAGE : NOT_CONFIGURED;
@@ -51,6 +56,12 @@ export const Live = {
    * or `TM1_NAMESPACE`) if it has one, with TM1's own security otherwise. */
   async builder(user?: string, password?: string): Promise<Tm1ClientBuilder> {
     const t = await Live.target();
+    if (t.engine) {
+      return Tm1Client.builder()
+        .baseUrl(t.url)
+        .dialect(Tm1Dialect.v12(t.engine.instance, t.engine.database))
+        .authenticator(Tm1Authenticator.application(t.engine.clientId, t.engine.clientSecret, user ?? t.user));
+    }
     // Node's fetch takes no per-request certificate options: TM1_VERIFY=false turns checking off for the run
     if (process.env["TM1_VERIFY"]?.trim() === "false") process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = "0";
     const [u, p] = user !== undefined ? [user, password ?? ""] : [t.user, t.password];
@@ -61,6 +72,16 @@ export const Live = {
   /** A new client of the TM1 under test. */
   async client(): Promise<Tm1Client> {
     return (await Live.builder()).build();
+  },
+
+  /** An authenticator for `user` against the TM1 under test: application credentials on a v12
+   * engine, or Basic credentials on TM1 11. */
+  async authenticator(user: string, password: string): Promise<Tm1Authenticator> {
+    const t = await Live.target();
+    if (t.engine) {
+      return Tm1Authenticator.application(t.engine.clientId, t.engine.clientSecret, user);
+    }
+    return Tm1Authenticator.basic(user, password);
   },
 
   /** A name for a test's objects. */
@@ -99,3 +120,25 @@ export const cognosConfigured = cognosSkip === undefined;
 
 /** The reason the Cognos tests are skipped, for a describe's title. */
 export const cognosReason = cognosSkip === undefined ? "" : ` (skipped: ${cognosSkip})`;
+
+/** Why the tests that start their own TM1 v12 engine can't run, or undefined if they can, as Java's
+ * `@RequiresTm1Engine`. */
+async function engineSkipReason(): Promise<string | undefined> {
+  try {
+    if (!Tm1EngineSource.discover()) return RequiresTm1Engine.NO_SOURCE_MESSAGE;
+  } catch {
+    // Set but wrong
+  }
+  return RequiresTm1Engine.skipReason();
+}
+
+const engineSkip = await engineSkipReason();
+
+/** `it`, skipped without a TM1 v12 engine source and Docker. */
+export const engineTest: typeof it = (engineSkip === undefined ? it : it.skip) as typeof it;
+
+/** Whether the TM1 v12 engine auth tests run. */
+export const engineConfigured = engineSkip === undefined;
+
+/** The reason the TM1 v12 engine auth tests are skipped, for a describe's title. */
+export const engineReason = engineSkip === undefined ? "" : ` (skipped: ${engineSkip})`;

@@ -10,6 +10,7 @@ import {
   Tm1TransportException,
   type Tm1ErrorClassifier,
 } from "../errors/index.js";
+import { parseJson } from "../json.js";
 import { Tm1Request } from "../request.js";
 import { Tm1Capabilities, type Tm1Dialect, Tm1Version } from "../version/index.js";
 import type { Tm1Timeouts } from "./timeouts.js";
@@ -39,7 +40,7 @@ export function textOf(body: Uint8Array): string {
 
 interface Login {
   cookie: string | undefined;
-  id: number;
+  id: number | bigint;
 }
 
 /** One login, shared by every request that needs it while it runs. */
@@ -194,7 +195,7 @@ export class Connection {
   }
 
   /** The ID of the session on TM1, logging in first if needed. */
-  async loginId(signal?: AbortSignal): Promise<number> {
+  async loginId(signal?: AbortSignal): Promise<number | bigint> {
     return (await this.wait(this.current().login, signal)).id;
   }
 
@@ -308,17 +309,21 @@ export class Connection {
     return { cookie: effective, id: this.parseSessionId(activeReply.body, activeUrl) };
   }
 
-  private parseSessionId(body: Uint8Array, url: string): number {
+  private parseSessionId(body: Uint8Array, url: string): number | bigint {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(textOf(body));
+      parsed = parseJson(textOf(body));
     } catch (e) {
       throw new Tm1ProtocolException("TM1 accepted the login but its response isn't JSON", undefined, "GET", url, e);
     }
     const id = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>)["ID"] : undefined;
-    const n = typeof id === "number" ? id : typeof id === "string" && /^-?\d+$/.test(id) ? Number(id) : NaN;
-    if (!Number.isFinite(n)) throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", undefined, "GET", url);
-    return n;
+    if (typeof id === "bigint") return id;
+    if (typeof id === "number" && Number.isFinite(id)) return id;
+    if (typeof id === "string" && /^-?\d+$/.test(id)) {
+      const n = Number(id);
+      return Number.isSafeInteger(n) ? n : BigInt(id);
+    }
+    throw new Tm1ProtocolException("TM1 accepted the login but didn't return the session ID", undefined, "GET", url);
   }
 
   /** The authenticator's credentials, given up on after the login timeout. The authenticator may ask

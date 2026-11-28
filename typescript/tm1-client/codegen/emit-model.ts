@@ -106,6 +106,8 @@ function emitDepartures(spec: Spec): string {
   return out + "];\n";
 }
 
+const BIGINT_IDS = new Set(["Session.ID", "Thread.ID", "Thread.SessionID"]);
+
 function emitType(spec: Spec, t: SpecType): string {
   const base = spec.base(t);
   const root = spec.root(t);
@@ -124,8 +126,9 @@ function emitType(spec: Spec, t: SpecType): string {
   if (!base && spec.derived(t).length)
     out += `  /** The type TM1 says this is, such as \`#${spec.derived(t)[0]!.qualifiedName}\`. */\n  "@odata.type"?: string;\n`;
   for (const p of t.properties ?? []) {
-    const type = propertyType(spec, p);
+    let type = propertyType(spec, p);
     if (type === undefined) continue;
+    if (BIGINT_IDS.has(`${t.name}.${p.name}`)) type = "number | bigint";
     const doc = [p.description, p.departure?.note, p.lenientDate?.note].filter(Boolean).join(" ");
     out += jsdoc("  ", doc, p);
     out += `  ${Names.key(p.name)}?: ${type}${p.nullable === false ? "" : " | null"};\n`;

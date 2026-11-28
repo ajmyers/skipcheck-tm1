@@ -17,7 +17,7 @@ import {
   type Tm1Client,
 } from "../../src/index.js";
 import { Live, liveReason } from "./live.js";
-import { isAtLeast, STALE_FIRST_PULL_FROM } from "./server-assumptions.js";
+import { isAtLeast, isV12, STALE_FIRST_PULL_FROM } from "./server-assumptions.js";
 
 const COMMIT = new GitCommitDetails("Add a dimension", "tm1-client", "tm1-client@example.com");
 
@@ -174,10 +174,10 @@ describe("GitService on TM1" + gitReason, () => {
 
         if (remote.local) {
           await remote.commitCopyOf(dimension, copy);
-          // The first pull after the remote moves: from 11.8.034 the commit TM1 had, then the new one;
-          // before, the new one at once
+          // The first pull after the remote moves: on TM1 11.8.034+ the commit TM1 had, then the
+          // new one; before 11.8.034 and on TM1 v12, the new one at once
           let pull = await tm1.git.pull("main", none, null, true);
-          if (await isAtLeast(tm1, STALE_FIRST_PULL_FROM)) {
+          if ((await isAtLeast(tm1, STALE_FIRST_PULL_FROM)) && !(await isV12(tm1))) {
             expect(pull.Commit?.Summary, "the commit TM1 had").toBe("Add a dimension");
             pull = await tm1.git.pull("main", none, null, true);
           }

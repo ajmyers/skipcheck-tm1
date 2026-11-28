@@ -38,7 +38,13 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     await tm1.close();
   });
 
-  tm1Test("stops at a breakpoint, reads the state and runs to the end", async () => {
+  async function debuggingEnabled(): Promise<boolean> {
+    const config = await tm1.session.execute(Tm1Request.get<{ EnableTIDebugging?: boolean }>(ODataPath.of("ActiveConfiguration").nav("Modelling").nav("TI")));
+    return config.EnableTIDebugging === true;
+  }
+
+  tm1Test("stops at a breakpoint, reads the state and runs to the end", async (context) => {
+    if (!(await debuggingEnabled())) return context.skip("EnableTIDebugging is off on this server");
     const debug = tm1.processDebugging;
     const id = (await debug.debug(process, {}, ODataQuery.none())).ID!;
     try {
@@ -99,7 +105,8 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
     );
   }
 
-  tm1Test("needs a chosen breakpoint ID, and updates and removes by it", async () => {
+  tm1Test("needs a chosen breakpoint ID, and updates and removes by it", async (context) => {
+    if (!(await debuggingEnabled())) return context.skip("EnableTIDebugging is off on this server");
     const debug = tm1.processDebugging;
     await debug
       .debugging(process, {}, async (context) => {
@@ -117,7 +124,8 @@ describe("ProcessDebugService on TM1" + liveReason, () => {
       .toArray();
   });
 
-  tm1Test("finishes the run after debugging, even with breakpoints left", async () => {
+  tm1Test("finishes the run after debugging, even with breakpoints left", async (context) => {
+    if (!(await debuggingEnabled())) return context.skip("EnableTIDebugging is off on this server");
     const debug = tm1.processDebugging;
     let id: string | undefined;
     await debug

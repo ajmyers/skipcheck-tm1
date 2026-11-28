@@ -47,18 +47,29 @@ describe("Tm1SessionPool on TM1" + liveReason, () => {
     await pool?.close();
   });
 
+  const identity = async (user: string, password: string): Promise<Tm1Identity> =>
+    Live.isEngine ? Tm1Identity.withCredentials(user, await Live.authenticator(user, password)) : Tm1Identity.impersonating(user);
+
   tm1Test("runs each identity as itself", async () => {
     await start();
+    const targetUser = (await Live.target()).user.toLowerCase();
+    if (Live.isEngine) {
+      expect(await name(pool.session(await identity(alice, "a")))).toBe(alice);
+      expect(await name(pool.session(await identity(bob, "b")))).toBe(bob);
+      expect((await name(pool.session())).toLowerCase()).toBe(targetUser);
+      expect(pool.stats().held).toBe(3);
+      return;
+    }
     expect(await name(pool.session(Tm1Identity.impersonating(alice)))).toBe(alice);
     expect(await name(pool.session(Tm1Identity.impersonating(bob)))).toBe(bob);
     expect(await name(pool.session(Tm1Identity.withCredentials(bob, Tm1Authenticator.basic(bob, "b"))))).toBe(bob);
-    expect((await name(pool.session())).toLowerCase()).toBe("admin");
+    expect((await name(pool.session())).toLowerCase()).toBe(targetUser);
     expect(pool.stats().held).toBe(4);
   });
 
   tm1Test("closes evicted sessions on TM1", async () => {
     await start();
-    const s = pool.session(Tm1Identity.impersonating(alice));
+    const s = pool.session(await identity(alice, "a"));
     expect(await name(s)).toBe(alice);
     const id = await s.sessionId();
     await sleep(1_100);
@@ -70,14 +81,15 @@ describe("Tm1SessionPool on TM1" + liveReason, () => {
 
   tm1Test("leaves no session behind when closed", async () => {
     await start();
-    await name(pool.session(Tm1Identity.impersonating(alice)));
-    await name(pool.session(Tm1Identity.impersonating(bob)));
+    await name(pool.session(await identity(alice, "a")));
+    await name(pool.session(await identity(bob, "b")));
     await pool.close();
     expect(await raw.awaitSessionCount(admin, context, 0)).toBe(0);
   });
 
   /** Asking for an administrator fails; nothing runs as the pool's own user instead. */
-  tm1Test("never falls back to another identity", async () => {
+  tm1Test("never falls back to another identity", async (context) => {
+    if (Live.isEngine) return context.skip("TM1 v12 does not support TM1-Impersonate");
     await start();
     const e = await failure(pool.session(Tm1Identity.impersonating("Admin")).execute(ACTIVE_USER));
     expect(e).toBeInstanceOf(Tm1ApiException);
